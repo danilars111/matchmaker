@@ -12,112 +12,110 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class Matchmaker {
     private List<Group> groups;
     private Map<UUID, Player> attendingPlayers;
+
+
+    private static final double MAX_SCORE = 10.0;
+    private static final double DEFAULT_SCORE = 1.0;
 
     public Matchmaker(List<Group> groups, Map<UUID, Player> attendingPlayers) {
         this.groups = new ArrayList<>(groups);
         this.attendingPlayers = new HashMap<>(attendingPlayers);
     }
 
-    public List<Group> Match() {
-        // 1. Prepare your data
-        List<Player> playerList = new ArrayList<>(this.attendingPlayers.values());
-        List<Object> slotList = new ArrayList<>(); // A simple list of all available group slots
-        for (Group group : this.groups) {
-            for (int i = 0; i < 4; i++) { // Assuming party size of 4
-                slotList.add(new Object()); // You could create a proper Slot class later
-            }
+    public List<Group> match() {
+        // First, filter out the DMs so we are only trying to match actual players
+        List<Player> playersToMatch = this.attendingPlayers.values().stream()
+                .filter(player -> !player.isDungeonMaster())
+                .collect(Collectors.toList());
+
+        if (playersToMatch.isEmpty() || groups.isEmpty()) {
+            return this.groups;
         }
 
-        int numPlayers = playerList.size();
-        int numSlots = slotList.size();
+        // --- Step 1: Calculate Dynamic Group Sizes ---
+        int numPlayers = playersToMatch.size();
+        int numGroups = this.groups.size();
+        int baseSize = numPlayers / numGroups;
+        int remainder = numPlayers % numGroups;
 
-        // The solver requires numPlayers <= numSlots. We can add dummy slots if needed.
+        List<Integer> groupSizes = new ArrayList<>();
+        for (int i = 0; i < numGroups; i++) {
+            groupSizes.add(baseSize + (i < remainder ? 1 : 0));
+        }
+        System.out.println("Calculated group sizes: " + groupSizes);
+        int totalSlots = groupSizes.stream().mapToInt(Integer::intValue).sum();
+        // ---------------------------------------------
 
-        // 2. Create the solver instance
+
+        // --- The Anti-Crash Safety Check ---
+        if (numPlayers > totalSlots) {
+            System.err.println("Error: More players than available slots. This should not happen with dynamic sizing.");
+            return this.groups;
+        }
+        // ------------------------------------
+
+
+        // --- Step 2: Build the Slot-to-Group Map ---
+        List<Integer> slotToGroupMap = new ArrayList<>();
+        for (int i = 0; i < numGroups; i++) {
+            for (int j = 0; j < groupSizes.get(i); j++) {
+                slotToGroupMap.add(i);
+            }
+        }
+        // ------------------------------------------
+
         LinearSumAssignment assignment = new LinearSumAssignment();
-
-        double maxScore = 10.0; // Your highest possible score (e.g., houseBonus)
-
-        // 3. Build the cost matrix
-        for (int i = 0; i < numPlayers; i++) {
-            for (int j = 0; j < numSlots; j++) {
-                Player player = playerList.get(i);
-                int groupIndex = j / 4; // Figure out which group this slot belongs to
-                Group group = this.groups.get(groupIndex);
-
-                // Calculate the score, then invert it to a cost
-                double score = this.calculateScore(player, group, true); // Use your existing score logic!
-                double cost = maxScore - score;
-                assignment.addArcWithCost(i, j, (long) cost);
-            }
-        }
-
-        // 4. Solve the assignment problem
-        if (assignment.solve() == LinearSumAssignment.Status.OPTIMAL) {
-            System.out.println("Total cost = " + assignment.getOptimalCost());
-
-            // 5. Build the final groups from the results
+        try {
+            // Build the cost matrix using the total number of slots
             for (int i = 0; i < numPlayers; i++) {
-                int slotIndex = assignment.getRightMate(i);
-                if (slotIndex != -1) { // -1 means the player was unassigned
-                    Player player = playerList.get(i);
-                    int groupIndex = slotIndex / 4;
-                    this.groups.get(groupIndex).addPartyMember(player);
+                for (int j = 0; j < totalSlots; j++) {
+                    Player player = playersToMatch.get(i);
+                    // Use our new map to find the correct group for this slot
+                    int groupIndex = slotToGroupMap.get(j);
+                    Group group = this.groups.get(groupIndex);
+                    double score = calculateScore(player, group);
+                    double cost = MAX_SCORE - score;
+                    assignment.addArcWithCost(i, j, (long) cost);
                 }
             }
-        } else {
-            System.out.println("No solution found.");
+
+            // Solve and assign players
+            if (assignment.solve() == LinearSumAssignment.Status.OPTIMAL) {
+                System.out.println("Total cost = " + assignment.getOptimalCost());
+                for (int i = 0; i < numPlayers; i++) {
+                    int slotIndex = assignment.getRightMate(i);
+                    if (slotIndex != -1) {
+                        Player player = playersToMatch.get(i);
+                        // Use the map again to place the player in the correct group
+                        int groupIndex = slotToGroupMap.get(slotIndex);
+                        this.groups.get(groupIndex).addPartyMember(player);
+                    }
+                }
+            } else {
+                System.out.println("No optimal solution found.");
+            }
+        } finally {
+            assignment.delete();
         }
 
         return this.groups;
     }
 
-    private Player getBestMatch(Group group, Map<UUID, Player> availablePlayers, boolean strictMatching) {
-        Player bestMatch = null;
-        double highestScore = Double.MIN_VALUE;
-        List<Player> tiedPlayers = new ArrayList<>();
 
-        for (Player player : availablePlayers.values()) {
-            double currentScore = this.calculateScore(player, group, strictMatching);
-
-            if (currentScore > highestScore) {
-                highestScore = currentScore;
-                tiedPlayers.clear();
-                tiedPlayers.add(player);
-            } else if (currentScore == highestScore) {
-                tiedPlayers.add(player);
+    private double calculateScore(Player player, Group group) {
+        for (Character character : player.getCharacters()) {
+            if (character != null && character.getHouse().equals(group.getHouse())) {
+                return MAX_SCORE;
             }
         }
-
-        if (!tiedPlayers.isEmpty()) {
-            int randomIndex = new Random().nextInt(tiedPlayers.size());
-            bestMatch = tiedPlayers.get(randomIndex);
-        }
-
-        return bestMatch;
+        return DEFAULT_SCORE;
     }
 
-    private double calculateScore(Player player, Group group, boolean strictMatching) {
-        double houseBonus = 10.0;
-        double defaultScore = 1.0;
-
-        if (strictMatching) {
-            for (Character character : player.getCharacters()) {
-                if (character != null && character.getHouse().equals(group.getHouse())) {
-                    return houseBonus;
-                }
-            }
-            return defaultScore;
-        } else {
-            // In a more complex system, this pass would have its own weights.
-            // For now, let's just make sure anyone can get a spot.
-            return defaultScore;
-        }
-    }
     public List<Group> getGroups() {
         return groups;
     }

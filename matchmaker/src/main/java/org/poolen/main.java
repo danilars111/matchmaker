@@ -1,7 +1,6 @@
 package org.poolen;
 
 import com.google.ortools.Loader;
-import com.google.ortools.graph.LinearSumAssignment;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
@@ -25,22 +24,6 @@ public class main {
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
 
-        // ---- The Priming Pump ----
-        // We're going to create and destroy a dummy solver right away.
-        // This forces the native library to initialize itself fully in a clean state.
-        try {
-            System.out.println("Priming OR-Tools native library...");
-            LinearSumAssignment dummySolver = new LinearSumAssignment();
-            dummySolver.delete();
-            System.out.println("Library primed successfully.");
-        } catch (Exception e) {
-            System.err.println("Failed to prime the OR-Tools library. Aborting.");
-            e.printStackTrace();
-            return; // Exit if priming fails
-        }
-        // -------------------------
-
-
         addPlayers();
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();
@@ -52,11 +35,23 @@ public class main {
         Player DM_2 = new Player("DM_2", true);
         Player DM_3 = new Player("DM_3", true);
         Player DM_4 = new Player("DM_4", true);
+        Player DM_5 = new Player("DM_5", true);
+        Player DM_6 = new Player("DM_6", true);
+        Player DM_7 = new Player("DM_7", true);
+        Player DM_8 = new Player("DM_8", true); /*
+        Player DM_9 = new Player("DM_9", true);
+        Player DM_10 = new Player("DM_10", true);*/
 
         playerStore.addPlayer(DM_1);
         playerStore.addPlayer(DM_2);
         playerStore.addPlayer(DM_3);
         playerStore.addPlayer(DM_4);
+        playerStore.addPlayer(DM_5);/*
+        playerStore.addPlayer(DM_6);
+        playerStore.addPlayer(DM_7);
+        playerStore.addPlayer(DM_8);
+        playerStore.addPlayer(DM_9);
+        playerStore.addPlayer(DM_10);*/
 
         GroupSuggester groupSuggester = new GroupSuggester(playerStore.getAllPlayers());
 
@@ -68,7 +63,7 @@ public class main {
 
         Matchmaker matchmaker = new Matchmaker(createGroups(groups), attendingPlayers);
 
-        List<Group> completedGroups = matchmaker.Match();
+        List<Group> completedGroups = matchmaker.match();
 
         for(Group group : completedGroups) {
             System.out.println(group.toString() + "\n");
@@ -94,11 +89,11 @@ public class main {
 
         House[] houses = House.values();
 
-        for(int i = 0; i < 16; i++) {
+        for(int i = 0; i < 50; i++) {
             Random random = new Random();
             Character character1 = new Character("1", houses[random.nextInt(houses.length)]);
             Character character2 = new Character("2", houses[random.nextInt(houses.length)]);
-            Player player = new Player(character1.getHouse() +"/" + character2.getHouse(), false);
+            Player player = new Player(character1.getHouse().toString() +"/" + character2.getHouse(), false);
             player.addCharacter(character1);
             player.addCharacter(character2);
             playerStore.addPlayer(player);

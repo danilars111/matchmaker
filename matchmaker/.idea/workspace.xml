@@ -5,30 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.idea/encodings.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.idea/vcs.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.mvn/wrapper/maven-wrapper.jar" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../.mvn/wrapper/maven-wrapper.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/GroupSuggester.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/GroupSuggester.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/Matchmaker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/Matchmaker.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../mvnw" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../mvnw.cmd" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../pom.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/com/example/matchmaker/HelloApplication.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/com/example/matchmaker/HelloController.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/constants/House.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/entities/Character.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/entities/Group.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/entities/Player.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/store/CharacterStore.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/store/PlayerStore.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/engine/Matchmaker.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/main.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/resources/com/example/matchmaker/hello-view.fxml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -80,6 +61,15 @@
   }
 }]]></component>
   <component name="RunManager">
+    <configuration name="main" type="Application" factoryName="Application">
+      <option name="ALTERNATIVE_JRE_PATH" value="17" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <option name="MAIN_CLASS_NAME" value="org.poolen.main" />
+      <module name="matchmaker" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration default="true" type="JetRunConfigurationType">
       <method v="2">
         <option name="Make" enabled="true" />
@@ -101,7 +91,7 @@
       <option name="presentableId" value="Default" />
       <updated>1756968768178</updated>
       <workItem from="1756968769250" duration="694000" />
-      <workItem from="1756984740230" duration="6669000" />
+      <workItem from="1756984740230" duration="9559000" />
     </task>
     <servers />
   </component>

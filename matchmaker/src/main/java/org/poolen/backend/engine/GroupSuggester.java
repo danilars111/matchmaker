@@ -4,88 +4,114 @@ import com.google.ortools.graph.LinearSumAssignment;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class GroupSuggester {
-    private final List<Player> attendingPlayers;
-    private final List<Player> availableDMs;
-    private final List<House> allPossibleHouses;
-    private static final double MAX_SCORE = 10.0; // The highest score a player can get.
-    private static final double DEFAULT_SCORE = 1.0; // The score for a non-matching player.
 
-    public GroupSuggester(List<Player> allAttendees) {
-        Map<Boolean, List<Player>> partitionedAttendees = allAttendees.stream()
-                .collect(Collectors.partitioningBy(Player::isDungeonMaster));
+    private final List<Player> dungeonMasters;
+    private final List<Player> playersToMatch;
+    private static final double MAX_SCORE = 10.0;
+    private static final double DEFAULT_SCORE = 1.0;
 
-        this.availableDMs = partitionedAttendees.getOrDefault(true, List.of());
-        this.attendingPlayers = partitionedAttendees.getOrDefault(false, List.of());
-        this.allPossibleHouses = Arrays.stream(House.values()).toList();
+    public GroupSuggester(Collection<Player> attendees) {
+        this.dungeonMasters = attendees.stream()
+                .filter(Player::isDungeonMaster)
+                .collect(Collectors.toList());
+        this.playersToMatch = attendees.stream()
+                .filter(p -> !p.isDungeonMaster())
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Suggests the optimal set of house themes by simulating the matchmaker for all
-     * possible theme combinations and finding the one with the lowest potential cost.
-     * @return A list of House themes that will result in the best possible player assignments.
-     */
     public List<House> suggestGroupThemes() {
-        int numberOfGroupsToForm = availableDMs.size();
-        if (numberOfGroupsToForm == 0 || attendingPlayers.isEmpty()) {
-            return List.of();
+        if (dungeonMasters.isEmpty() || playersToMatch.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        List<List<House>> allCombinations = generateCombinations(allPossibleHouses, numberOfGroupsToForm);
+        List<House> allPossibleHouses = Stream.of(House.values()).collect(Collectors.toList());
+        int numGroupsToSuggest = dungeonMasters.size();
 
-        long lowestCost = Long.MAX_VALUE;
+        // Generate all possible combinations of house themes for the given number of groups
+        List<List<House>> themeCombinations = getCombinations(allPossibleHouses, numGroupsToSuggest);
+
         List<House> bestCombination = new ArrayList<>();
+        long minCost = Long.MAX_VALUE;
 
-        // Iterate through every possible combination of group themes
-        for (List<House> combination : allCombinations) {
-            // Calculate the potential optimal cost for this combination
-            long currentCost = calculatePotentialCost(combination);
-
-            if (currentCost < lowestCost) {
-                lowestCost = currentCost;
+        // Simulate matchmaking for each combination to find the one with the lowest potential cost
+        for (List<House> combination : themeCombinations) {
+            long currentCost = calculateTotalCost(this.playersToMatch, combination);
+            if (currentCost < minCost) {
+                minCost = currentCost;
                 bestCombination = combination;
             }
         }
 
+        System.out.println("Suggestion found with a minimum potential cost of: " + minCost);
         return bestCombination;
     }
 
-    /**
-     * Simulates a player assignment for a given combination of group themes and returns the optimal cost.
-     * This uses the same logic as your Matchmaker class.
-     * @param themeCombination A potential list of group themes, e.g., [AMBER, OPAL, OPAL].
-     * @return The lowest possible assignment cost for this theme setup.
-     */
-    private long calculatePotentialCost(List<House> themeCombination) {
-        int numPlayers = attendingPlayers.size();
-        int numSlots = themeCombination.size() * 4; // Assuming 4 players per group
+    private long calculateTotalCost(List<Player> players, List<House> themeCombination) {
+        if (players.isEmpty() || themeCombination.isEmpty()) {
+            return Long.MAX_VALUE;
+        }
 
-        LinearSumAssignment assignment = new LinearSumAssignment();
+        // --- Step 1: Calculate Dynamic Group Sizes (Mirrors Matchmaker logic) ---
+        int numPlayers = players.size();
+        int numGroups = themeCombination.size();
+        int baseSize = numPlayers / numGroups;
+        int remainder = numPlayers % numGroups;
 
-        for (int i = 0; i < numPlayers; i++) {
-            Player player = attendingPlayers.get(i);
-            for (int j = 0; j < numSlots; j++) {
-                House groupHouse = themeCombination.get(j / 4);
-                double score = calculateScoreForPlayer(player, groupHouse);
-                double cost = MAX_SCORE - score;
-                assignment.addArcWithCost(i, j, (long) cost);
+        List<Integer> groupSizes = new ArrayList<>();
+        for (int i = 0; i < numGroups; i++) {
+            groupSizes.add(baseSize + (i < remainder ? 1 : 0));
+        }
+        int totalSlots = groupSizes.stream().mapToInt(Integer::intValue).sum();
+        // --------------------------------------------------------------------
+
+        if (numPlayers > totalSlots) {
+            return Long.MAX_VALUE; // Safeguard
+        }
+
+        // --- Step 2: Build the Slot-to-Group Map (Mirrors Matchmaker logic) ---
+        List<Integer> slotToGroupMap = new ArrayList<>();
+        for (int i = 0; i < numGroups; i++) {
+            for (int j = 0; j < groupSizes.get(i); j++) {
+                slotToGroupMap.add(i);
             }
         }
+        // -------------------------------------------------------------------
 
-        if (assignment.solve() == LinearSumAssignment.Status.OPTIMAL) {
-            return assignment.getOptimalCost();
+        LinearSumAssignment assignment = new LinearSumAssignment();
+        long totalCost = Long.MAX_VALUE;
+        try {
+            for (int i = 0; i < numPlayers; i++) {
+                for (int j = 0; j < totalSlots; j++) {
+                    Player player = players.get(i);
+                    int groupIndex = slotToGroupMap.get(j);
+                    House house = themeCombination.get(groupIndex);
+                    double score = calculateScoreForHouse(player, house);
+                    double cost = MAX_SCORE - score;
+                    assignment.addArcWithCost(i, j, (long) cost);
+                }
+            }
+
+            if (assignment.solve() == LinearSumAssignment.Status.OPTIMAL) {
+                totalCost = assignment.getOptimalCost();
+            }
+        } finally {
+            assignment.delete();
         }
-
-        return Long.MAX_VALUE; // Return a high cost if no solution is found
+        return totalCost;
     }
 
-    private double calculateScoreForPlayer(Player player, House house) {
+    private double calculateScoreForHouse(Player player, House house) {
         for (Character character : player.getCharacters()) {
             if (character != null && character.getHouse().equals(house)) {
                 return MAX_SCORE;
@@ -94,27 +120,21 @@ public class GroupSuggester {
         return DEFAULT_SCORE;
     }
 
-    /**
-     * Helper method to generate all possible combinations (with repetition) of group themes.
-     * @param houses The list of available house themes.
-     * @param count The number of groups to form.
-     * @return A list of all possible theme combinations.
-     */
-    private List<List<House>> generateCombinations(List<House> houses, int count) {
-        List<List<House>> result = new ArrayList<>();
-        generateCombinationsRecursive(houses, count, new ArrayList<>(), result);
-        return result;
+    // Helper method to generate combinations with repetitions
+    private List<List<House>> getCombinations(List<House> elements, int k) {
+        List<List<House>> combinations = new ArrayList<>();
+        generateCombinationsRecursive(elements, k, new ArrayList<>(), combinations);
+        return combinations;
     }
 
-    private void generateCombinationsRecursive(List<House> houses, int count, List<House> current, List<List<House>> result) {
-        if (current.size() == count) {
-            result.add(new ArrayList<>(current));
+    private void generateCombinationsRecursive(List<House> elements, int k, List<House> current, List<List<House>> combinations) {
+        if (current.size() == k) {
+            combinations.add(new ArrayList<>(current));
             return;
         }
-
-        for (House house : houses) {
-            current.add(house);
-            generateCombinationsRecursive(houses, count, current, result);
+        for (House element : elements) {
+            current.add(element);
+            generateCombinationsRecursive(elements, k, current, combinations);
             current.remove(current.size() - 1);
         }
     }
