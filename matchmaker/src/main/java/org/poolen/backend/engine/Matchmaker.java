@@ -1,6 +1,6 @@
 package org.poolen.backend.engine;
 
-import com.google.ortools.Loader;
+
 import com.google.ortools.graph.LinearSumAssignment;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
@@ -14,9 +14,6 @@ import java.util.Random;
 import java.util.UUID;
 
 public class Matchmaker {
-    static {
-        Loader.loadNativeLibraries();
-    }
     private List<Group> groups;
     private Map<UUID, Player> attendingPlayers;
 

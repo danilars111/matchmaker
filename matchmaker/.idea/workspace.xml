@@ -13,12 +13,13 @@
       <change beforePath="$PROJECT_DIR$/../.mvn/wrapper/maven-wrapper.jar" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../.mvn/wrapper/maven-wrapper.properties" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/Matchmaker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/Matchmaker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../mvnw" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../mvnw.cmd" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../pom.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../src/main/java/com/example/matchmaker/HelloApplication.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../src/main/java/com/example/matchmaker/HelloController.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../src/main/java/module-info.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/constants/House.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/entities/Character.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../src/main/java/org/poolen/backend/db/entities/Group.java" beforeDir="false" />
@@ -34,6 +35,13 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
@@ -46,6 +54,9 @@
     </option>
   </component>
   <component name="ProjectId" id="32Dx6LDUmSTaJHF4Yw8wX2zBkLR" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -90,7 +101,7 @@
       <option name="presentableId" value="Default" />
       <updated>1756968768178</updated>
       <workItem from="1756968769250" duration="694000" />
-      <workItem from="1756984740230" duration="3326000" />
+      <workItem from="1756984740230" duration="6669000" />
     </task>
     <servers />
   </component>
@@ -98,20 +109,6 @@
     <option name="version" value="3" />
   </component>
   <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/org/poolen/main.java</url>
-          <line>70</line>
-          <option name="timeStamp" value="1" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/org/poolen/main.java</url>
-          <line>60</line>
-          <option name="timeStamp" value="2" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
     <watches-manager>
       <configuration name="Application">
         <watch expression="((HashMap)playerStore.playerMap).entrySet().toArray()[1]" custom="java.util.HashMap" />
