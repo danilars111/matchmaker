@@ -1,4 +1,4 @@
-package org.poolen.backend.db.maps;
+package org.poolen.backend.db.store;
 
 import org.poolen.backend.db.entities.Player;
 
