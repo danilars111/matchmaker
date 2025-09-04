@@ -1,14 +1,16 @@
 package org.poolen.backend.db.entities;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.UUID;
 
 public class Player {
     private UUID uuid;
     private String name;
-    private ArrayList<Character> characters;
+    private ArrayList<Character> characters = new ArrayList<>();
     private boolean isDungeonMaster;
+    private Date lastSeen;
 
     public Player(String name, boolean isDungeonMaster) {
         this.uuid = UUID.randomUUID();

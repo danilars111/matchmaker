@@ -8,6 +8,7 @@ public class Character {
     private UUID uuid;
     private String name;
     private House house;
+    private boolean isMain;
 
     public Character(String name, House house) {
         this.uuid = UUID.randomUUID();
@@ -37,5 +38,13 @@ public class Character {
 
     public void setHouse(House house) {
         this.house = house;
+    }
+
+    public boolean isMain() {
+        return isMain;
+    }
+
+    public void setMain(boolean main) {
+        isMain = main;
     }
 }
