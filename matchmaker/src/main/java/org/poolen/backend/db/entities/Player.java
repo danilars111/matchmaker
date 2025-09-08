@@ -2,13 +2,21 @@ package org.poolen.backend.db.entities;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.UUID;
 
 public class Player {
     private UUID uuid;
     private String name;
     private ArrayList<Character> characters = new ArrayList<>();
+
+    private Map<UUID, Player> buddylist = new HashMap<>();
+    private Map<UUID, Player> blacklist = new HashMap<>();
+    private Map<UUID, Player> DmBlacklist = new HashMap<>();
+    private Map<UUID, Integer> recencyLog = new HashMap<>();
+
     private boolean isDungeonMaster;
     private Date lastSeen;
 
@@ -64,5 +72,46 @@ public class Player {
 
     public void setDungeonMaster(boolean dungeonMaster) {
         isDungeonMaster = dungeonMaster;
+    }
+
+    public Map<UUID, Player> getBuddylist() {
+        return buddylist;
+    }
+
+    public void setBuddylist(Map<UUID, Player> buddylist) {
+        this.buddylist = buddylist;
+    }
+
+    public Map<UUID, Player> getBlacklist() {
+        return blacklist;
+    }
+
+    public void setBlacklist(Map<UUID, Player> blacklist) {
+        this.blacklist = blacklist;
+    }
+
+    public Date getLastSeen() {
+        return lastSeen;
+    }
+
+    public Map<UUID, Player> getDmBlacklist() {
+        return DmBlacklist;
+    }
+
+    public void setDmBlacklist(Map<UUID, Player> dmBlacklist) {
+        DmBlacklist = dmBlacklist;
+    }
+
+    public Map<UUID, Integer> getRecencyLog() {
+        return recencyLog;
+    }
+
+    public void setRecencyLog(Map<UUID, Integer> recencyLog) {
+        this.recencyLog = recencyLog;
+    }
+
+    public void setLastSeen(Date lastSeen) {
+        this.lastSeen = lastSeen;
+
     }
 }

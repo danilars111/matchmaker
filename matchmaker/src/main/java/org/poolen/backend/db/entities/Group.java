@@ -5,12 +5,15 @@ import org.poolen.backend.db.constants.House;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class Group {
     private Player dungeonMaster;
-    private List<Player> party;
+    private Map<UUID, Player> party;
     private House house;
     private Date date;
 
@@ -18,13 +21,13 @@ public class Group {
         this.dungeonMaster = dungeonMaster;
         this.house = house;
         this.date = date;
-        this.party = new ArrayList<>();
+        this.party = new HashMap<>();
     }
 
     @Override
     public String toString() {
         // Build a string with all the lovely details!
-        String partyMembers = party.stream()
+        String partyMembers = party.values().stream()
                 .map(Player::getName)
                 .collect(Collectors.joining(", "));
 
@@ -45,16 +48,16 @@ public class Group {
         this.dungeonMaster = dungeonMaster;
     }
 
-    public List<Player> getParty() {
-        return Collections.unmodifiableList(party);
+    public Map<UUID, Player> getParty() {
+        return Collections.unmodifiableMap(party);
     }
 
     public void addPartyMember(Player player) {
-        this.party.add(player);
+        this.party.put(player.getUuid(), player);
     }
 
     public void removePartyMember(Player player) {
-        this.party.remove(player);
+        this.party.remove(player.getUuid());
     }
 
     public House getHouse() {

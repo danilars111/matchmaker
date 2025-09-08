@@ -2,17 +2,22 @@ package org.poolen;
 
 import com.google.ortools.Loader;
 import org.poolen.backend.db.constants.House;
+import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.backend.db.store.SettingsStore;
+import org.poolen.backend.engine.ConstraintMatchmaker;
 import org.poolen.backend.engine.GroupSuggester;
+import org.poolen.backend.engine.HybridMatchmaker;
 import org.poolen.backend.engine.Matchmaker;
 
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -20,11 +25,13 @@ import java.util.UUID;
 
 public class main {
     static PlayerStore playerStore = PlayerStore.getInstance();
+    static SettingsStore settingsStore = SettingsStore.getInstance();
 
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
 
         addPlayers();
+        initSettings();
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();
 
@@ -36,9 +43,9 @@ public class main {
         Player DM_3 = new Player("DM_3", true);
         Player DM_4 = new Player("DM_4", true);
         Player DM_5 = new Player("DM_5", true);
-        Player DM_6 = new Player("DM_6", true);
+        Player DM_6 = new Player("DM_6", true);/*
         Player DM_7 = new Player("DM_7", true);
-        Player DM_8 = new Player("DM_8", true); /*
+        Player DM_8 = new Player("DM_8", true);
         Player DM_9 = new Player("DM_9", true);
         Player DM_10 = new Player("DM_10", true);*/
 
@@ -61,7 +68,11 @@ public class main {
         System.out.println(groups);
 
 
-        Matchmaker matchmaker = new Matchmaker(createGroups(groups), attendingPlayers);
+       // Matchmaker matchmaker = new Matchmaker(createGroups(groups), attendingPlayers);
+
+        //ConstraintMatchmaker matchmaker = new ConstraintMatchmaker(createGroups(groups), attendingPlayers);
+
+        HybridMatchmaker matchmaker = new HybridMatchmaker(createGroups(groups), attendingPlayers);
 
         List<Group> completedGroups = matchmaker.match();
 
@@ -89,7 +100,7 @@ public class main {
 
         House[] houses = House.values();
 
-        for(int i = 0; i < 50; i++) {
+        for(int i = 0; i < 20; i++) {
             Random random = new Random();
             Character character1 = new Character("1", houses[random.nextInt(houses.length)]);
             Character character2 = new Character("2", houses[random.nextInt(houses.length)]);
@@ -97,7 +108,48 @@ public class main {
             player.addCharacter(character1);
             player.addCharacter(character2);
             playerStore.addPlayer(player);
-
         }
+
+        Character character1 = new Character("1", House.AVENTURINE);
+        Character character2 = new Character("2", House.AMBER);
+        Player player = new Player("BLACKLISTER", false);
+        player.addCharacter(character1);
+        player.addCharacter(character2);
+        playerStore.addPlayer(player);
+
+        Character character3 = new Character("1", House.AVENTURINE);
+        Character character4 = new Character("2", House.AMBER);
+        Player player2 = new Player("BLACKLISTEE", false);
+        player2.addCharacter(character3);
+        player2.addCharacter(character4);
+        playerStore.addPlayer(player2);
+
+        player.getBlacklist().put(player2.getUuid(), player2);
+
+        Character character5 = new Character("1", House.AVENTURINE);
+        Character character6 = new Character("2", House.AMBER);
+        Player player3 = new Player("BUDDY", false);
+        player2.addCharacter(character5);
+        player2.addCharacter(character6);
+        playerStore.addPlayer(player3);
+
+        player.getBuddylist().put(player3.getUuid(), player3);
+    }
+
+    private static void initSettings() {
+        // MATCHMAKING
+        settingsStore.getSettingsMap().put(Settings.HOUSE_BONUS, 50.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_SECOND_CHOICE_BONUS, 25.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_THIRD_CHOICE_BONUS, 10.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
+
+        settingsStore.getSettingsMap().put(Settings.BLACKLIST_BONUS, -5.0);
+        settingsStore.getSettingsMap().put(Settings.BUDDY_BONUS, 2.0);
+
+  /*      List<House> amberPriorities;
+        settingsStore.getSettingsMap().put(Settings.AMBER_PRIORITIES, );
+        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);*/
     }
 }
