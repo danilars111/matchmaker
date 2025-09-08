@@ -1,3 +1,4 @@
+/*
 package org.poolen.backend.engine;
 
 import org.poolen.backend.db.constants.House;
@@ -49,8 +50,8 @@ public class GroupSwapper {
             if(player.getBuddylist().containsKey(otherPlayer.getUuid())) {
                 score += BUDDY_BONUS;
             }
-            if(player.getRecencyLog().containsKey(otherPlayer)) {
-                score -= player.getRecencyLog().get(otherPlayer.getUuid());
+            if(player.getPlayerLog().containsKey(otherPlayer)) {
+                score -= player.getPlayerLog().get(otherPlayer.getUuid());
             }
             return score;
 
@@ -60,3 +61,4 @@ public class GroupSwapper {
 
 
 }
+*/

@@ -14,6 +14,9 @@ import org.poolen.backend.engine.HybridMatchmaker;
 import org.poolen.backend.engine.Matchmaker;
 
 
+import java.time.LocalDate;
+import java.time.Month;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -134,12 +137,16 @@ public class main {
         playerStore.addPlayer(player3);
 
         player.getBuddylist().put(player3.getUuid(), player3);
+        player3.getBuddylist().put(player2.getUuid(), player2);
+
+        player.getPlayerLog().put(player3.getUuid(), Date.from(LocalDate.of(2025, Month.SEPTEMBER, 5).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        player3.getPlayerLog().put(player.getUuid(), Date.from(LocalDate.of(2025, Month.SEPTEMBER, 5).atStartOfDay(ZoneId.systemDefault()).toInstant()));
     }
 
     private static void initSettings() {
         // MATCHMAKING
-        settingsStore.getSettingsMap().put(Settings.HOUSE_BONUS, 50.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_SECOND_CHOICE_BONUS, 25.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_BONUS, 1000.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_SECOND_CHOICE_BONUS, 250.0);
         settingsStore.getSettingsMap().put(Settings.HOUSE_THIRD_CHOICE_BONUS, 10.0);
         settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
 

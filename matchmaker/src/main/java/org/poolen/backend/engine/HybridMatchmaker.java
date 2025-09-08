@@ -7,6 +7,9 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -151,7 +154,7 @@ public class HybridMatchmaker {
         double totalScore = 0;
         List<Player> party = new ArrayList<>(group.getParty().values());
 
-        // Part 1: Calculate Social Score
+        // Part 1: Calculate Social Score between players
         for (int i = 0; i < party.size(); i++) {
             for (int j = i + 1; j < party.size(); j++) {
                 Player p1 = party.get(i);
@@ -163,21 +166,29 @@ public class HybridMatchmaker {
                 if (p1.getBuddylist().containsKey(p2.getUuid()) || p2.getBuddylist().containsKey(p1.getUuid())) {
                     totalScore += BUDDY_BONUS;
                 }
-                if (p1.getRecencyLog().containsKey(p2.getUuid())) {
-                    totalScore -= p1.getRecencyLog().get(p2.getUuid());
+
+                Date lastPlayed = p1.getPlayerLog().get(p2.getUuid());
+                if (lastPlayed != null) {
+                    long daysAgo = ChronoUnit.DAYS.between(
+                            lastPlayed.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+                            LocalDate.now()
+                    );
+                    if (daysAgo < 14) {
+                        double recencyPenalty = 10.0 * (1.0 - (daysAgo / 14.0));
+                        totalScore -= recencyPenalty;
+                    }
                 }
-                if (p2.getRecencyLog().containsKey(p1.getUuid())) {
-                    totalScore -= p2.getRecencyLog().get(p1.getUuid());
-                }
-            }
-        }
+            } // <-- End of the player-pair loop
+        } // <-- End of the outer player loop
+
+        // Part 2: Calculate DM Blacklist score (now runs just once per group!)
         for (Player player : party) {
             if (player.getDmBlacklist().containsKey(group.getDungeonMaster().getUuid())) {
                 totalScore += BLACKLIST_PENALTY;
             }
         }
 
-        // Part 2: Add House Preference Score
+        // Part 3: Add House Preference Score
         for (Player player : party) {
             totalScore += houseScore(player, group);
         }

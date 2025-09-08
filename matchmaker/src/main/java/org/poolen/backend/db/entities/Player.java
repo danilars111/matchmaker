@@ -15,7 +15,7 @@ public class Player {
     private Map<UUID, Player> buddylist = new HashMap<>();
     private Map<UUID, Player> blacklist = new HashMap<>();
     private Map<UUID, Player> DmBlacklist = new HashMap<>();
-    private Map<UUID, Integer> recencyLog = new HashMap<>();
+    private Map<UUID, Date> playerLog = new HashMap<>();
 
     private boolean isDungeonMaster;
     private Date lastSeen;
@@ -102,12 +102,12 @@ public class Player {
         DmBlacklist = dmBlacklist;
     }
 
-    public Map<UUID, Integer> getRecencyLog() {
-        return recencyLog;
+    public Map<UUID, Date> getPlayerLog() {
+        return playerLog;
     }
 
-    public void setRecencyLog(Map<UUID, Integer> recencyLog) {
-        this.recencyLog = recencyLog;
+    public void setPlayerLog(Map<UUID, Date> playerLog) {
+        this.playerLog = playerLog;
     }
 
     public void setLastSeen(Date lastSeen) {
