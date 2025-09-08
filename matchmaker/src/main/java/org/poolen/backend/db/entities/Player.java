@@ -89,6 +89,34 @@ public class Player {
     public void setBlacklist(Map<UUID, Player> blacklist) {
         this.blacklist = blacklist;
     }
+    public void blacklist(Player player) {
+        // First, check if we've already blacklisted this player.
+        // If we have, our work is done and we can stop!
+        if (this.blacklist.containsKey(player.getUuid())) {
+            return;
+        }
+
+        // If not, add them to our list and the log...
+        this.blacklist.put(player.getUuid(), player);
+        this.playerLog.put(player.getUuid(), new Date());
+
+        // ...and now we can safely tell them to blacklist us back!
+        player.blacklist(this);
+    }
+
+    public void unblacklist(Player player) {
+        // First, check if we've actually blacklisted this player.
+        // If we have, our work is done and we can stop!
+        if (!this.blacklist.containsKey(player.getUuid())) {
+            return;
+        }
+
+        // If not, remove them to our list...
+        this.blacklist.remove(player.getUuid());
+
+        // ...and now we can safely tell them to unblacklist us back!
+        player.unblacklist(this);
+    }
 
     public Date getLastSeen() {
         return lastSeen;
@@ -100,6 +128,9 @@ public class Player {
 
     public void setDmBlacklist(Map<UUID, Player> dmBlacklist) {
         DmBlacklist = dmBlacklist;
+    }
+    public void blacklistDm(Player player) {
+        this.DmBlacklist.put(player.getUuid(), player);
     }
 
     public Map<UUID, Date> getPlayerLog() {

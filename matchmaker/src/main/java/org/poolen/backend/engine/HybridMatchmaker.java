@@ -1,6 +1,7 @@
 package org.poolen.backend.engine;
 
 import com.google.ortools.graph.LinearSumAssignment;
+import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
@@ -12,6 +13,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,8 +32,18 @@ public class HybridMatchmaker {
     private static final double BLACKLIST_PENALTY = settingsStore.getSetting(Settings.BLACKLIST_BONUS);
 
     // Constants for the initial assignment pass
-    private static final double MAX_INITIAL_SCORE = 100.0;
+    private static final double MAX_INITIAL_SCORE = 1000.0;
     private static final double DEFAULT_INITIAL_SCORE = 10.0;
+
+    // --- House Priority Map ---
+    // This defines the "second best" choices for autofilling.
+    private static final Map<House, List<House>> housePriorityMap = new EnumMap<>(House.class);
+    static {
+        housePriorityMap.put(House.GARNET, List.of(House.AMBER, House.OPAL, House.AVENTURINE));
+        housePriorityMap.put(House.AMBER, List.of(House.GARNET, House.OPAL, House.AVENTURINE));
+        housePriorityMap.put(House.OPAL, List.of(House.AMBER, House.AVENTURINE, House.GARNET));
+        housePriorityMap.put(House.AVENTURINE, List.of(House.OPAL, House.AMBER,  House.GARNET));
+    }
 
 
     public HybridMatchmaker(List<Group> groups, Map<UUID, Player> attendingPlayers) {
@@ -168,15 +180,22 @@ public class HybridMatchmaker {
                 }
 
                 Date lastPlayed = p1.getPlayerLog().get(p2.getUuid());
+                final double RECENCY_GRUDGE = settingsStore.getSettingsMap().get(Settings.RECENCY_GRUDGE);
+                final double MAX_REUNION_BONUS = settingsStore.getSetting(Settings.MAX_REUNION_BONUS);
                 if (lastPlayed != null) {
-                    long daysAgo = ChronoUnit.DAYS.between(
+                    long weeksAgo = ChronoUnit.WEEKS.between(
                             lastPlayed.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
                             LocalDate.now()
                     );
-                    if (daysAgo < 14) {
-                        double recencyPenalty = 10.0 * (1.0 - (daysAgo / 14.0));
-                        totalScore -= recencyPenalty;
+                    if (weeksAgo < RECENCY_GRUDGE) {
+                        // Apply a sliding scale penalty. Max penalty for playing this week.
+                        double reunionPenalty = MAX_REUNION_BONUS * (1.0 - ((double) weeksAgo / RECENCY_GRUDGE));
+                        totalScore += MAX_REUNION_BONUS - reunionPenalty;
+                    } else {
+                        totalScore += MAX_REUNION_BONUS;
                     }
+                } else {
+                    totalScore += MAX_REUNION_BONUS;
                 }
             } // <-- End of the player-pair loop
         } // <-- End of the outer player loop
@@ -190,29 +209,77 @@ public class HybridMatchmaker {
 
         // Part 3: Add House Preference Score
         for (Player player : party) {
-            totalScore += houseScore(player, group);
+            totalScore += getTieredHouseScore(player, group);
         }
 
         return totalScore;
     }
 
-    // This is for the swapping logic, using the balanced weights
-    private double houseScore(Player player, Group group) {
-        for (Character character : player.getCharacters()) {
-            if (character != null && character.getHouse().equals(group.getHouse())) {
-                return HOUSE_MATCH_BONUS;
+    private double getTieredHouseScore(Player player, Group group) {
+        if (player.getCharacters().isEmpty()) {
+            throw new RuntimeException("Player's need to have a character");
+        }
+
+        double bestScore = HOUSE_DEFAULT_SCORE;
+        double houseBonus = settingsStore.getSetting(Settings.HOUSE_BONUS);
+
+        // Iterate through all characters to find the best possible score for this player in this group
+        for (int i = 0; i < player.getCharacters().size(); i++) {
+            Character character = player.getCharacters().get(i);
+            House playerHouse = character.getHouse();
+            House groupHouse = group.getHouse();
+
+            double currentCharacterScore = 0;
+
+            // Perfect match
+            if (playerHouse.equals(groupHouse)) {
+                currentCharacterScore = houseBonus;
+            } else {
+                // Tiered match for autofilling
+                List<House> preferences = housePriorityMap.get(playerHouse);
+                if (preferences != null) {
+                    int priorityIndex = preferences.indexOf(groupHouse);
+                    switch (priorityIndex) {
+                        case 0:
+                            currentCharacterScore
+                                    = houseBonus * settingsStore.getSetting(Settings.HOUSE_SECOND_CHOICE_MULTIPLIER);
+                            break;
+                        case 1:
+                            currentCharacterScore
+                                    = houseBonus * settingsStore.getSetting(Settings.HOUSE_THIRD_CHOICE_MULTIPLIER);
+                            break;
+                        case 2:
+                            currentCharacterScore
+                                    = houseBonus * settingsStore.getSetting(Settings.HOUSE_FOURTH_CHOICE_MULTIPLIER);
+                            break;
+                        default:
+                            currentCharacterScore
+                                    = HOUSE_DEFAULT_SCORE;
+                            break;
+                    }
+                } else {
+                    currentCharacterScore = HOUSE_DEFAULT_SCORE;
+                }
+            }
+
+            // Add the main character bonus if this is their first character
+            if (i == 0) {
+                currentCharacterScore += settingsStore.getSetting(Settings.MAIN_CHARACTER_MULTIPLIER);
+            }
+
+            // Keep track of the highest score found so far
+            if (currentCharacterScore > bestScore) {
+                bestScore = currentCharacterScore;
             }
         }
-        return HOUSE_DEFAULT_SCORE;
+
+        return bestScore;
     }
 
-    // This is for the initial, house-focused assignment only
+    // This is now redundant, but kept for clarity on the initial pass logic.
+    // The actual logic is now in getTieredHouseScore.
     private double initialHouseScore(Player player, Group group) {
-        for (Character character : player.getCharacters()) {
-            if (character != null && character.getHouse().equals(group.getHouse())) {
-                return MAX_INITIAL_SCORE;
-            }
-        }
-        return DEFAULT_INITIAL_SCORE;
+        // We'll use a different scale for the initial pass to make the priorities clearer to the solver.
+        return getTieredHouseScore(player, group);
     }
 }

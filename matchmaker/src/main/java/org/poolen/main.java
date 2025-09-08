@@ -127,36 +127,40 @@ public class main {
         player2.addCharacter(character4);
         playerStore.addPlayer(player2);
 
-        player.getBlacklist().put(player2.getUuid(), player2);
+        player.blacklist(player2);
 
         Character character5 = new Character("1", House.AVENTURINE);
         Character character6 = new Character("2", House.AMBER);
         Player player3 = new Player("BUDDY", false);
-        player2.addCharacter(character5);
-        player2.addCharacter(character6);
+        player3.addCharacter(character5);
+        player3.addCharacter(character6);
         playerStore.addPlayer(player3);
 
         player.getBuddylist().put(player3.getUuid(), player3);
-        player3.getBuddylist().put(player2.getUuid(), player2);
+        //player3.getBuddylist().put(player2.getUuid(), player2);
 
-        player.getPlayerLog().put(player3.getUuid(), Date.from(LocalDate.of(2025, Month.SEPTEMBER, 5).atStartOfDay(ZoneId.systemDefault()).toInstant()));
-        player3.getPlayerLog().put(player.getUuid(), Date.from(LocalDate.of(2025, Month.SEPTEMBER, 5).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        player.getPlayerLog().put(player3.getUuid(), Date.from(LocalDate.of(2025, Month.AUGUST, 25).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        player3.getPlayerLog().put(player.getUuid(), Date.from(LocalDate.of(2025, Month.AUGUST, 25).atStartOfDay(ZoneId.systemDefault()).toInstant()));
     }
 
     private static void initSettings() {
         // MATCHMAKING
-        settingsStore.getSettingsMap().put(Settings.HOUSE_BONUS, 1000.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_SECOND_CHOICE_BONUS, 250.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_THIRD_CHOICE_BONUS, 10.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_BONUS, 500.0);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_SECOND_CHOICE_MULTIPLIER, 0.5);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_THIRD_CHOICE_MULTIPLIER, 0.25);
+        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_MULTIPLIER, 0.1);
+
+
+        settingsStore.getSettingsMap().put(Settings.MAIN_CHARACTER_MULTIPLIER, 2.0);
 
         settingsStore.getSettingsMap().put(Settings.BLACKLIST_BONUS, -5.0);
-        settingsStore.getSettingsMap().put(Settings.BUDDY_BONUS, 2.0);
+        settingsStore.getSettingsMap().put(Settings.BUDDY_BONUS, 3.0);
+
+
+        settingsStore.getSettingsMap().put(Settings.RECENCY_GRUDGE, 4.0);
+        settingsStore.getSettingsMap().put(Settings.MAX_REUNION_BONUS, 10.0);
 
   /*      List<House> amberPriorities;
-        settingsStore.getSettingsMap().put(Settings.AMBER_PRIORITIES, );
-        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_BONUS, 5.0);*/
+        settingsStore.getSettingsMap().put(Settings.AMBER_PRIORITIES, ); */
     }
 }
