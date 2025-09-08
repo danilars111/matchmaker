@@ -1,6 +1,7 @@
 package org.poolen;
 
 import com.google.ortools.Loader;
+import javafx.application.Application;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Character;
@@ -12,6 +13,7 @@ import org.poolen.backend.engine.ConstraintMatchmaker;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.HybridMatchmaker;
 import org.poolen.backend.engine.Matchmaker;
+import org.poolen.frontend.gui.MainFrame;
 
 
 import java.time.LocalDate;
@@ -38,9 +40,7 @@ public class main {
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();
 
-        for(Player player : playerStore.getAllPlayers()) {
-            attendingPlayers.put(player.getUuid(), player);
-        }
+
         Player DM_1 = new Player("DM_1", true);
         Player DM_2 = new Player("DM_2", true);
         Player DM_3 = new Player("DM_3", true);
@@ -63,6 +63,10 @@ public class main {
         playerStore.addPlayer(DM_9);
         playerStore.addPlayer(DM_10);*/
 
+        for(Player player : playerStore.getAllPlayers()) {
+            attendingPlayers.put(player.getUuid(), player);
+        }
+
         GroupSuggester groupSuggester = new GroupSuggester(playerStore.getAllPlayers());
 
         List<House> groups = groupSuggester.suggestGroupThemes();
@@ -75,15 +79,15 @@ public class main {
 
         //ConstraintMatchmaker matchmaker = new ConstraintMatchmaker(createGroups(groups), attendingPlayers);
 
-        HybridMatchmaker matchmaker = new HybridMatchmaker(createGroups(groups), attendingPlayers);
+/*        HybridMatchmaker matchmaker = new HybridMatchmaker(createGroups(groups), attendingPlayers);
 
         List<Group> completedGroups = matchmaker.match();
 
         for(Group group : completedGroups) {
             System.out.println(group.toString() + "\n");
-        }
+        }*/
 
-
+        Application.launch(MainFrame.class, args);
     }
 
     private static List<Group> createGroups(List<House> suggestedGroups) {
