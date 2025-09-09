@@ -14,10 +14,11 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
-import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.entities.Group;
+import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.HybridMatchmaker;
+import org.poolen.frontend.gui.forms.PlayerForm;
 
 import java.time.LocalDate;
 import java.time.Month;
@@ -29,32 +30,35 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class MainFrame extends Application {
-    private static Map<UUID, Player> attendingPlayers = new HashMap<>();
 
+    private Map<UUID, Player> attendingPlayers = new HashMap<>();
     private List<House> houseThemes;
+    private ListView<String> playerListView;
+    private VBox groupsDisplay;
+    private Label playerLabel;
+    private Label groupLabel;
 
     public MainFrame() {}
 
-    public void run(String[] args) {
-        launch(args);
-    }
-
     @Override
     public void start(Stage primaryStage) {
-
-
         primaryStage.setTitle("D&D Matchmaker Deluxe");
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));
 
+        // Initialize the member variables
+        playerListView = new ListView<>();
+        groupsDisplay = new VBox(10);
+        playerLabel = new Label("Attending Adventurers");
+        groupLabel = new Label();
+
         // --- Left Side: Player List ---
         VBox leftPanel = new VBox(10);
         leftPanel.setPadding(new Insets(10));
-        Label playerLabel = new Label("Attending Adventurers");
-        ListView<String> playerListView = new ListView<>();
         leftPanel.getChildren().addAll(playerLabel, playerListView);
         root.setLeft(leftPanel);
 
@@ -62,85 +66,39 @@ public class MainFrame extends Application {
         VBox centerPanel = new VBox(20);
         centerPanel.setAlignment(Pos.CENTER);
         centerPanel.setPadding(new Insets(10, 50, 10, 50));
-        Label groupLabel = new Label("Suggested Groups: \n");
 
-        Button generateButton = new Button("✨ Generate ✨");
-        generateButton.setStyle("-fx-font-size: 16px; -fx-background-color: #4682B4; -fx-text-fill: white;");
-        Button generateGroupsButton = new Button("✨ Generate Groups ✨");
-        generateGroupsButton.setStyle("-fx-font-size: 16px; -fx-background-color: #9370DB; -fx-text-fill: white;");
+        Button rematchButton = new Button("✨ Rematch Groups ✨");
+        rematchButton.setStyle("-fx-font-size: 16px; -fx-background-color: #9370DB; -fx-text-fill: white; -fx-font-weight: bold;");
+
         Button generatePlayersButton = new Button("🎲 Generate New Players 🎲");
         generatePlayersButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4682B4; -fx-text-fill: white;");
-        centerPanel.getChildren().addAll(groupLabel, generateButton, generateGroupsButton, generatePlayersButton);
+
+        Button addPlayerButton = new Button("👤 Add New Player 👤");
+        addPlayerButton.setStyle("-fx-font-size: 14px; -fx-background-color: #3CB371; -fx-text-fill: white;");
+
+        centerPanel.getChildren().addAll(groupLabel, rematchButton, generatePlayersButton, addPlayerButton);
         root.setCenter(centerPanel);
 
         // --- Right Side: Group Display ---
         HBox rightPanel = new HBox(10);
         rightPanel.setPadding(new Insets(10));
-        VBox groupsDisplay = new VBox(10);
         rightPanel.getChildren().addAll(groupsDisplay);
 
         TitledPane groupsPane = new TitledPane("Generated Groups", rightPanel);
         groupsPane.setCollapsible(false);
         root.setRight(groupsPane);
 
-        // --- Event Handler ---
-        generateButton.setOnAction(event -> {
-            generatePlayersButton.fire();
-            generateGroupsButton.fire();
-        });
-
-
-        generateGroupsButton.setOnAction(event -> {
-            // 3. Run the matchmaking logic
-            List<Player> dms = attendingPlayers.values().stream().filter(Player::isDungeonMaster).toList();
-            List<Group> initialGroups = new ArrayList<>();
-            for(int i = 0; i < dms.size(); i++) {
-                initialGroups.add(new Group(dms.get(i), houseThemes.get(i), new Date()));
-            }
-
-            HybridMatchmaker matchmaker = new HybridMatchmaker(initialGroups, attendingPlayers);
-            List<Group> finalGroups = matchmaker.match();
-
-            // 4. Display the results
-            groupsDisplay.getChildren().clear();
-            for (Group group : finalGroups) {
-                VBox groupBox = new VBox(5);
-                Label dmLabel = new Label("DM: " + group.getDungeonMaster().getName());
-                ListView<String> groupMembers = new ListView<>();
-                group.getParty().values().forEach(p -> groupMembers.getItems().add(p.getName()));
-
-                TitledPane groupPane = new TitledPane("House " + group.getHouse(), groupBox);
-                groupPane.setCollapsible(false);
-                groupBox.getChildren().addAll(dmLabel, groupMembers);
-                groupsDisplay.getChildren().add(groupPane);
-            }
-        });
+        // --- Event Handlers (now much simpler!) ---
+        rematchButton.setOnAction(event -> updateUI());
 
         generatePlayersButton.setOnAction(event -> {
-            attendingPlayers = createMockData();
-            // 2. Populate the initial player list
-            playerListView.getItems().clear();
+            this.attendingPlayers = createMockData();
+            updateUI();
+        });
 
-            attendingPlayers.values().stream()
-                    .sorted((p1, p2) -> {
-                        // This is our new, smarter sorting logic!
-                        // If one is a DM and the other isn't, the DM always comes first.
-                        if (p1.isDungeonMaster() && !p2.isDungeonMaster()) {
-                            return -1;
-                        } else if (!p1.isDungeonMaster() && p2.isDungeonMaster()) {
-                            return 1;
-                        } else {
-                            // If both are DMs or both are players, sort them alphabetically.
-                            return p1.getName().compareTo(p2.getName());
-                        }
-                    })
-                    .forEach(p -> playerListView.getItems().add(p.getName() + (p.isDungeonMaster() ? " (DM)" : "")));
-
-            GroupSuggester groupSuggester = new GroupSuggester(attendingPlayers.values());
-            List<House> houseThemes = groupSuggester.suggestGroupThemes();
-            setHouseThemes(houseThemes);
-
-            groupLabel.setText("Suggested groups: \n" + houseThemes);
+        addPlayerButton.setOnAction(event -> {
+            PlayerForm form = new PlayerForm(this.attendingPlayers, this::updateUI);
+            form.show();
         });
 
         Scene scene = new Scene(root, 1000, 600);
@@ -148,15 +106,72 @@ public class MainFrame extends Application {
         primaryStage.show();
     }
 
+    /**
+     * This is now the one true method for updating the entire user interface.
+     * It handles everything from player lists to suggestions and final group generation.
+     */
+    public void updateUI() {
+        // Update the player count label
+        long dmCount = attendingPlayers.values().stream().filter(Player::isDungeonMaster).count();
+        long playerCount = attendingPlayers.size() - dmCount;
+        playerLabel.setText("Attending Adventurers (" + playerCount + " Players, " + dmCount + " DMs)");
 
-    public Map<UUID, Player> getAttendingPlayers() {
-        return attendingPlayers;
+        GroupSuggester groupSuggester = new GroupSuggester(attendingPlayers.values());
+        List<House> houseThemes = groupSuggester.suggestGroupThemes();
+        setHouseThemes(houseThemes);
+
+        groupLabel.setText("Suggested groups: \n" + houseThemes);
+
+        // Update the player list view
+        playerListView.getItems().clear();
+        attendingPlayers.values().stream()
+                .sorted((p1, p2) -> {
+                    if (p1.isDungeonMaster() && !p2.isDungeonMaster()) return -1;
+                    if (!p1.isDungeonMaster() && p2.isDungeonMaster()) return 1;
+                    return p1.getName().compareTo(p2.getName());
+                })
+                .forEach(p -> playerListView.getItems().add(p.getName() + (p.isDungeonMaster() ? " (DM)" : "")));
+
+        // Run the matchmaking logic
+        List<Player> dms = attendingPlayers.values().stream().filter(Player::isDungeonMaster).toList();
+        if(dms.isEmpty()){
+            groupsDisplay.getChildren().clear();
+            groupsDisplay.getChildren().add(new Label("No DMs available to form groups!"));
+            return;
+        }
+
+        // In a real app you might use your GroupSuggester here.
+        // For now, we'll assign houses cyclically for simplicity.
+        List<Group> initialGroups = new ArrayList<>();
+        for(int i = 0; i < dms.size(); i++) {
+            initialGroups.add(new Group(dms.get(i), houseThemes.get(i), new Date()));
+        }
+
+        HybridMatchmaker matchmaker = new HybridMatchmaker(initialGroups, attendingPlayers);
+        List<Group> finalGroups = matchmaker.match();
+
+        // Display the final results
+        groupsDisplay.getChildren().clear();
+        for (Group group : finalGroups) {
+            VBox groupBox = new VBox(5);
+            Label dmLabel = new Label("DM: " + group.getDungeonMaster().getName());
+            dmLabel.setStyle("-fx-font-weight: bold;");
+
+            ListView<String> groupMembers = new ListView<>();
+            group.getParty().values().stream()
+                    .map(Player::getName)
+                    .sorted()
+                    .forEach(name -> groupMembers.getItems().add(name));
+            groupMembers.setPrefHeight(120);
+
+            TitledPane groupPane = new TitledPane("House " + group.getHouse(), groupBox);
+            groupPane.setCollapsible(false);
+            groupBox.getChildren().addAll(dmLabel, groupMembers);
+            groupsDisplay.getChildren().add(groupPane);
+        }
     }
 
-    public static void setAttendingPlayers(Map<UUID, Player> attendingPlayers) {
-        MainFrame.attendingPlayers = attendingPlayers;
-    }
-
+    // Mock data for demonstration
     private Map<UUID, Player> createMockData() {
         House[] houses = House.values();
         attendingPlayers.clear();
@@ -205,6 +220,14 @@ public class MainFrame extends Application {
             attendingPlayers.put(dm.getUuid(), dm);
         }
         return attendingPlayers;
+    }
+
+    public Map<UUID, Player> getAttendingPlayers() {
+        return attendingPlayers;
+    }
+
+    public void setAttendingPlayers(Map<UUID, Player> attendingPlayers) {
+        this.attendingPlayers = attendingPlayers;
     }
 
     public List<House> getHouseThemes() {
