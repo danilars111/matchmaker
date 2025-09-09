@@ -69,6 +69,7 @@ public class PlayerFormView extends GridPane {
 
         blacklistButton = new Button("Blacklist");
         blacklistButton.setStyle("-fx-background-color: #2F4F4F; -fx-text-fill: white;");
+        blacklistButton.setVisible(false);
 
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
 
@@ -139,6 +140,7 @@ public class PlayerFormView extends GridPane {
         dmCheckBox.setSelected(player.isDungeonMaster());
         actionButton.setText("Update");
         actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
+        blacklistButton.setVisible(true);
         deleteButton.setVisible(true);
         Platform.runLater(nameField::requestFocus);
     }
@@ -153,6 +155,7 @@ public class PlayerFormView extends GridPane {
         dmCheckBox.setSelected(false);
         actionButton.setText("Create");
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
+        blacklistButton.setVisible(false);
         deleteButton.setVisible(false);
         Platform.runLater(nameField::requestFocus);
     }

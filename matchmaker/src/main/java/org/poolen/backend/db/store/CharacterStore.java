@@ -47,4 +47,6 @@ public class CharacterStore {
     public void addCharacter(List<Character> characters) {
         characters.forEach(this::addCharacter);
     }
+
+    public void removeCharacter(Character character) { this.characterMap.remove(character.getUuid()); }
 }

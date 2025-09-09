@@ -73,6 +73,14 @@ public class PlayerRosterTableView extends VBox {
         });
     }
 
+    /**
+     * A handy little getter to find out who is currently selected in the table.
+     * @return The currently selected Player, or null if no one is selected.
+     */
+    public Player getSelectedPlayer() {
+        return playerTable.getSelectionModel().getSelectedItem();
+    }
+
     public void updateRoster() {
         playerTable.getItems().clear();
         playerTable.getItems().addAll(playerStore.getAllPlayers());

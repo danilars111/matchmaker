@@ -46,4 +46,8 @@ public class PlayerStore {
     public void addPlayer(List<Player> players) {
         players.forEach(this::addPlayer);
     }
+
+    public void removePlayer(Player player) {
+        this.playerMap.remove(player.getUuid());
+    }
 }
