@@ -6,9 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/forms/PlayerForm.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/forms/PlayerFormView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/forms/PlayerFormView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/forms/PlayerFormView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/PlayerManagementStage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/PlayerManagementStage.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tables/PlayerRosterTableView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tables/PlayerRosterTableView.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -91,7 +91,7 @@
       <option name="presentableId" value="Default" />
       <updated>1756968768178</updated>
       <workItem from="1756968769250" duration="694000" />
-      <workItem from="1756984740230" duration="51611000" />
+      <workItem from="1756984740230" duration="54990000" />
     </task>
     <servers />
   </component>

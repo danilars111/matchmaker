@@ -3,6 +3,7 @@ package org.poolen.frontend.gui.components.stages;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.SplitPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.stage.Modality;
@@ -20,28 +21,32 @@ import java.util.UUID;
  */
 public class PlayerManagementStage extends Stage {
 
-    static PlayerStore playerStore = PlayerStore.getInstance();
+    private static final PlayerStore playerStore = PlayerStore.getInstance();
 
     public PlayerManagementStage(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Player Management");
 
-        // --- Main Layout ---
-        HBox root = new HBox(20);
-        root.setPadding(new Insets(20));
+        SplitPane root = new SplitPane();
 
-        // --- Create instances of our reusable components ---
         PlayerFormView formView = new PlayerFormView();
         PlayerRosterTableView rosterView = new PlayerRosterTableView();
-        HBox.setHgrow(rosterView, Priority.ALWAYS);
 
-        // --- Add them to the window ---
-        root.getChildren().addAll(formView, rosterView);
+        root.getItems().addAll(formView, rosterView);
+        // We can even set the initial position of the draggable "seam"!
+        root.setDividerPositions(0.35);
 
         // --- Event Handlers ---
-        formView.getCancelButton().setOnAction(e -> this.close());
 
-        formView.getCreateButton().setOnAction(e -> {
+        // Listen for double-clicks from our beautiful roster view
+        rosterView.setOnPlayerDoubleClick(player -> {
+            formView.populateForm(player);
+        });
+
+        formView.getCancelButton().setOnAction(e -> formView.clearForm());
+
+        // The action button is now super-powered!
+        formView.getActionButton().setOnAction(e -> {
             String playerName = formView.getPlayerName();
             if (playerName.isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.ERROR, "Player must have a name.");
@@ -49,20 +54,26 @@ public class PlayerManagementStage extends Stage {
                 return;
             }
 
-            Player newPlayer = new Player(playerName, formView.isDungeonMaster());
+            Player playerToProcess = formView.getPlayerBeingEdited();
 
-            playerStore.addPlayer(newPlayer);
+            if (playerToProcess == null) {
+                // --- CREATE MODE ---
+                Player newPlayer = new Player(playerName, formView.isDungeonMaster());
+                playerStore.addPlayer(newPlayer);
 
-            // This updates the main window's UI
+            } else {
+                // --- UPDATE MODE ---
+                playerToProcess.setName(playerName);
+                playerToProcess.setDungeonMaster(formView.isDungeonMaster());
+            }
+
             onUpdate.run();
-            // This updates the table inside this pop-up window
             rosterView.updateRoster();
-
-            // For now, we'll close the window after a player is created.
-            this.close();
+            formView.clearForm();
         });
 
-        Scene scene = new Scene(root);
+        Scene scene = new Scene(root, 800, 500);
         setScene(scene);
     }
 }
+

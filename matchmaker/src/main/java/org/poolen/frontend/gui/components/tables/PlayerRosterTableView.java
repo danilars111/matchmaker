@@ -11,7 +11,7 @@ import javafx.scene.layout.VBox;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 
-import java.util.Collection;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +32,9 @@ public class PlayerRosterTableView extends VBox {
 
         VBox.setVgrow(this.playerTable, Priority.ALWAYS);
         this.playerTable.setMaxWidth(Double.MAX_VALUE);
+        this.setMinWidth(420);
+
+        playerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
 
         TableColumn<Player, String> nameCol = new TableColumn<>("Name");
@@ -44,31 +47,35 @@ public class PlayerRosterTableView extends VBox {
         charCol.setCellValueFactory(cellData -> {
             Player player = cellData.getValue();
             String characters = player.getCharacters().stream()
-                    .map(c -> c.getHouse().toString().substring(0, 1)) // Abbreviate for space
+                    .map(c -> c.getHouse().toString().substring(0, 1))
                     .collect(Collectors.joining(", "));
             return new SimpleStringProperty(characters);
         });
 
-        // --- The Proportional Stretching Magic! ---
-        // Instead of a fixed width, we bind each column's width to a percentage of the table's total width.
-        // This ensures they all resize beautifully together.
-        nameCol.prefWidthProperty().bind(playerTable.widthProperty().multiply(0.375));
-        dmCol.prefWidthProperty().bind(playerTable.widthProperty().multiply(0.125));
-        charCol.prefWidthProperty().bind(playerTable.widthProperty().multiply(0.50));
-        // ------------------------------------------
-
-
         playerTable.getColumns().addAll(nameCol, dmCol, charCol);
-        updateRoster(); // Populate the table on creation
+        updateRoster();
 
         this.getChildren().addAll(new Label("Current Roster"), playerTable);
     }
 
     /**
-     * Clears and repopulates the table with the latest data from the PlayerStore.
+     * Sets up a listener for double-clicks on rows in the table.
+     * @param onPlayerDoubleClick The action to perform when a player is double-clicked.
      */
+    public void setOnPlayerDoubleClick(Consumer<Player> onPlayerDoubleClick) {
+        playerTable.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                Player selectedPlayer = playerTable.getSelectionModel().getSelectedItem();
+                if (selectedPlayer != null) {
+                    onPlayerDoubleClick.accept(selectedPlayer);
+                }
+            }
+        });
+    }
+
     public void updateRoster() {
         playerTable.getItems().clear();
         playerTable.getItems().addAll(playerStore.getAllPlayers());
     }
 }
+
