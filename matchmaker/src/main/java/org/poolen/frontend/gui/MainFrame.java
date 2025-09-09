@@ -18,7 +18,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.HybridMatchmaker;
-import org.poolen.frontend.gui.forms.PlayerForm;
+import org.poolen.frontend.gui.components.stages.PlayerManagementStage;
 
 import java.time.LocalDate;
 import java.time.Month;
@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public class MainFrame extends Application {
 
@@ -97,8 +96,8 @@ public class MainFrame extends Application {
         });
 
         addPlayerButton.setOnAction(event -> {
-            PlayerForm form = new PlayerForm(this.attendingPlayers, this::updateUI);
-            form.show();
+            PlayerManagementStage playerManagementStage = new PlayerManagementStage(this.attendingPlayers, this::updateUI);
+            playerManagementStage.show();
         });
 
         Scene scene = new Scene(root, 1000, 600);

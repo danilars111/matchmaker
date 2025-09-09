@@ -9,10 +9,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
-import org.poolen.backend.engine.ConstraintMatchmaker;
 import org.poolen.backend.engine.GroupSuggester;
-import org.poolen.backend.engine.HybridMatchmaker;
-import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.MainFrame;
 
 
