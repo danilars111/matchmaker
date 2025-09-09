@@ -2,6 +2,7 @@ package org.poolen.frontend.gui.components.forms;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.CheckBox;
@@ -13,6 +14,7 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import org.poolen.backend.db.entities.Player;
 
 /**
@@ -26,6 +28,8 @@ public class PlayerFormView extends GridPane {
 
     private final Button actionButton;
     private final Button cancelButton;
+    private final Button deleteButton;
+    private final Button blacklistButton;
     private Player playerBeingEdited;
 
     public PlayerFormView() {
@@ -40,12 +44,9 @@ public class PlayerFormView extends GridPane {
 
         uuidField = new TextField();
         uuidField.setEditable(false);
-        // --- The new styling magic! ---
-        // A lovely grey to show it's read-only.
         uuidField.setStyle("-fx-control-inner-background: #f0f0f0; -fx-text-fill: #555;");
 
-        // --- The new copy button! ---
-        Button copyButton = new Button("📋"); // A cute clipboard icon!
+        Button copyButton = new Button("📋");
         copyButton.setOnAction(e -> {
             Clipboard clipboard = Clipboard.getSystemClipboard();
             ClipboardContent content = new ClipboardContent();
@@ -53,28 +54,48 @@ public class PlayerFormView extends GridPane {
             clipboard.setContent(content);
         });
 
-        // We'll put the field and button together in a little box.
         HBox uuidBox = new HBox(5, uuidField, copyButton);
-        HBox.setHgrow(uuidField, Priority.ALWAYS); // Let the text field stretch
+        HBox.setHgrow(uuidField, Priority.ALWAYS);
 
         nameField = new TextField();
         dmCheckBox = new CheckBox("Dungeon Master");
         actionButton = new Button("Create");
         cancelButton = new Button("Cancel");
 
+        // --- Buttons and Styling ---
+        deleteButton = new Button("Delete");
+        deleteButton.setStyle("-fx-background-color: #DC143C; -fx-text-fill: white;");
+        deleteButton.setVisible(false);
+
+        blacklistButton = new Button("Blacklist");
+        blacklistButton.setStyle("-fx-background-color: #2F4F4F; -fx-text-fill: white;");
+
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
 
+        // --- New Layout Logic ---
+        // Make the special buttons span the full width
+        deleteButton.setMaxWidth(Double.MAX_VALUE);
+        blacklistButton.setMaxWidth(Double.MAX_VALUE);
+
+        // A special box to push our main action buttons to the right
+        HBox mainActionsBox = new HBox(10, cancelButton, actionButton);
+        mainActionsBox.setAlignment(Pos.CENTER_RIGHT);
+
+        // A simple VBox will act as our spacer to push the final buttons down.
+        VBox spacer = new VBox();
+        GridPane.setVgrow(spacer, Priority.ALWAYS); // This is the magic!
+        // ------------------------
+
         add(new Label("UUID"), 0, 0);
-        add(uuidBox, 0, 1); // Add our new box to the layout
+        add(uuidBox, 0, 1);
         add(new Label("Name:"), 0, 2);
         add(nameField, 0, 3);
         add(dmCheckBox, 0, 4);
+        add(blacklistButton, 0, 5); // Blacklist button on its own row
+        add(deleteButton, 0, 6);    // Delete button on its own row
+        add(spacer, 0, 7);          // The spacer pushes everything below it down
+        add(mainActionsBox, 0, 8);  // Add the final row for the main buttons
 
-        HBox buttonBox = new HBox(10, cancelButton, actionButton);
-        add(buttonBox, 0, 5);
-
-        // --- The new focus magic! ---
-        // This politely asks the name field to take focus after the window has appeared.
         Platform.runLater(nameField::requestFocus);
     }
 
@@ -95,6 +116,14 @@ public class PlayerFormView extends GridPane {
         return cancelButton;
     }
 
+    public Button getDeleteButton() {
+        return deleteButton;
+    }
+
+    public Button getBlacklistButton() {
+        return blacklistButton;
+    }
+
     public Player getPlayerBeingEdited() {
         return playerBeingEdited;
     }
@@ -110,7 +139,8 @@ public class PlayerFormView extends GridPane {
         dmCheckBox.setSelected(player.isDungeonMaster());
         actionButton.setText("Update");
         actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
-        Platform.runLater(nameField::requestFocus); // Also set focus when updating
+        deleteButton.setVisible(true);
+        Platform.runLater(nameField::requestFocus);
     }
 
     /**
@@ -123,6 +153,7 @@ public class PlayerFormView extends GridPane {
         dmCheckBox.setSelected(false);
         actionButton.setText("Create");
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
-        Platform.runLater(nameField::requestFocus); // And set focus when clearing
+        deleteButton.setVisible(false);
+        Platform.runLater(nameField::requestFocus);
     }
 }
