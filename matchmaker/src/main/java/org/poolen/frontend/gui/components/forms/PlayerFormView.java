@@ -59,7 +59,7 @@ public class PlayerFormView extends GridPane {
 
         nameField = new TextField();
         dmCheckBox = new CheckBox("Dungeon Master");
-        actionButton = new Button("Player");
+        actionButton = new Button("Create");
         cancelButton = new Button("Cancel");
 
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
