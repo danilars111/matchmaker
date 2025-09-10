@@ -30,6 +30,7 @@ public class PlayerFormView extends GridPane {
     private final Button cancelButton;
     private final Button deleteButton;
     private final Button blacklistButton;
+    private final Button showBlacklistButton; // The new button!
     private Player playerBeingEdited;
 
     public PlayerFormView() {
@@ -71,20 +72,23 @@ public class PlayerFormView extends GridPane {
         blacklistButton.setStyle("-fx-background-color: #2F4F4F; -fx-text-fill: white;");
         blacklistButton.setVisible(false);
 
+        showBlacklistButton = new Button("Show Blacklist");
+        showBlacklistButton.setStyle("-fx-background-color: #6A5ACD; -fx-text-fill: white;"); // A lovely slate blue
+        showBlacklistButton.setVisible(false);
+
+
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
 
         // --- New Layout Logic ---
-        // Make the special buttons span the full width
         deleteButton.setMaxWidth(Double.MAX_VALUE);
         blacklistButton.setMaxWidth(Double.MAX_VALUE);
+        showBlacklistButton.setMaxWidth(Double.MAX_VALUE);
 
-        // A special box to push our main action buttons to the right
         HBox mainActionsBox = new HBox(10, cancelButton, actionButton);
         mainActionsBox.setAlignment(Pos.CENTER_RIGHT);
 
-        // A simple VBox will act as our spacer to push the final buttons down.
         VBox spacer = new VBox();
-        GridPane.setVgrow(spacer, Priority.ALWAYS); // This is the magic!
+        GridPane.setVgrow(spacer, Priority.ALWAYS);
         // ------------------------
 
         add(new Label("UUID"), 0, 0);
@@ -92,10 +96,11 @@ public class PlayerFormView extends GridPane {
         add(new Label("Name:"), 0, 2);
         add(nameField, 0, 3);
         add(dmCheckBox, 0, 4);
-        add(blacklistButton, 0, 5); // Blacklist button on its own row
-        add(deleteButton, 0, 6);    // Delete button on its own row
-        add(spacer, 0, 7);          // The spacer pushes everything below it down
-        add(mainActionsBox, 0, 8);  // Add the final row for the main buttons
+        add(showBlacklistButton, 0, 5); // New button gets its own row
+        add(blacklistButton, 0, 6);
+        add(deleteButton, 0, 7);
+        add(spacer, 0, 8);
+        add(mainActionsBox, 0, 9);
 
         Platform.runLater(nameField::requestFocus);
     }
@@ -125,9 +130,30 @@ public class PlayerFormView extends GridPane {
         return blacklistButton;
     }
 
+    public Button getShowBlacklistButton() {
+        return showBlacklistButton;
+    }
+
     public Player getPlayerBeingEdited() {
         return playerBeingEdited;
     }
+
+    /**
+     * Toggles the text and style of the blacklist buttons.
+     * @param isShowingBlacklist True if the view is in "show blacklist" mode.
+     */
+    public void setBlacklistMode(boolean isShowingBlacklist) {
+        if (isShowingBlacklist) {
+            showBlacklistButton.setText("Hide Blacklist");
+            blacklistButton.setText("Remove from Blacklist");
+            blacklistButton.setStyle("-fx-background-color: #B22222; -fx-text-fill: white;"); // Firebrick red for removal
+        } else {
+            showBlacklistButton.setText("Show Blacklist");
+            blacklistButton.setText("Blacklist");
+            blacklistButton.setStyle("-fx-background-color: #2F4F4F; -fx-text-fill: white;"); // Back to slate grey
+        }
+    }
+
 
     /**
      * Populates the form with an existing player's data and switches to "Update" mode.
@@ -140,8 +166,9 @@ public class PlayerFormView extends GridPane {
         dmCheckBox.setSelected(player.isDungeonMaster());
         actionButton.setText("Update");
         actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
-        blacklistButton.setVisible(true);
         deleteButton.setVisible(true);
+        showBlacklistButton.setVisible(true);
+        blacklistButton.setVisible(true);
         Platform.runLater(nameField::requestFocus);
     }
 
@@ -155,8 +182,11 @@ public class PlayerFormView extends GridPane {
         dmCheckBox.setSelected(false);
         actionButton.setText("Create");
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
-        blacklistButton.setVisible(false);
         deleteButton.setVisible(false);
+        showBlacklistButton.setVisible(false);
+        blacklistButton.setVisible(false);
+        setBlacklistMode(false); // Make sure to reset the button text!
         Platform.runLater(nameField::requestFocus);
     }
 }
+

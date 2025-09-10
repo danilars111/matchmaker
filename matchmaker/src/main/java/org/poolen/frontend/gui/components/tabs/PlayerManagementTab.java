@@ -1,11 +1,9 @@
-package org.poolen.frontend.gui.components.stages;
+package org.poolen.frontend.gui.components.tabs;
 
-import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
+import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.components.forms.PlayerFormView;
@@ -16,16 +14,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * A dedicated pop-up window for creating and updating players.
+ * A dedicated tab for creating and updating players.
  */
-public class PlayerManagementStage extends Stage {
+public class PlayerManagementTab extends Tab {
 
     private boolean isShowingBlacklist = false;
     private static final PlayerStore playerStore = PlayerStore.getInstance();
 
-    public PlayerManagementStage(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
-        initModality(Modality.APPLICATION_MODAL);
-        setTitle("Player Management");
+    public PlayerManagementTab(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
+        super("Player Management"); // Set the tab's title
 
         SplitPane root = new SplitPane();
 
@@ -35,16 +32,11 @@ public class PlayerManagementStage extends Stage {
         root.getItems().addAll(formView, rosterView);
         root.setDividerPositions(0.35);
 
-
         // --- Event Handlers ---
-
         rosterView.setOnPlayerDoubleClick(player -> {
-            // --- The New, Smarter Logic! ---
             if (isShowingBlacklist) {
-                // If we're in blacklist mode, a double-click is a shortcut for "remove".
                 formView.getBlacklistButton().fire();
             } else {
-                // Otherwise, it's the normal "edit" action.
                 formView.populateForm(player);
                 formView.setBlacklistMode(false);
             }
@@ -63,7 +55,7 @@ public class PlayerManagementStage extends Stage {
 
             if (playerToProcess == null) {
                 Player newPlayer = new Player(playerName, formView.isDungeonMaster());
-                playerStore.addPlayer(newPlayer); // Add to the central store
+                playerStore.addPlayer(newPlayer);
             } else {
                 playerToProcess.setName(playerName);
                 playerToProcess.setDungeonMaster(formView.isDungeonMaster());
@@ -128,7 +120,6 @@ public class PlayerManagementStage extends Stage {
             }
 
             if (isShowingBlacklist) {
-                // --- REMOVE BLACKLIST MODE ---
                 Optional<ButtonType> response = new Alert(Alert.AlertType.CONFIRMATION,
                         "Remove " + selected.getName() + " from " + editor.getName() + "'s blacklist?",
                         ButtonType.YES, ButtonType.NO).showAndWait();
@@ -136,10 +127,9 @@ public class PlayerManagementStage extends Stage {
                 if (response.isPresent() && response.get() == ButtonType.YES) {
                     editor.unblacklist(selected);
                     onUpdate.run();
-                    rosterView.showBlacklistedPlayers(editor); // Refresh the view
+                    rosterView.showBlacklistedPlayers(editor);
                 }
             } else {
-                // --- ADD BLACKLIST MODE ---
                 Optional<ButtonType> response = new Alert(Alert.AlertType.CONFIRMATION,
                         "Are you sure you want " + editor.getName() + " to blacklist " + selected.getName() + "?",
                         ButtonType.YES, ButtonType.NO).showAndWait();
@@ -151,8 +141,7 @@ public class PlayerManagementStage extends Stage {
             }
         });
 
-        Scene scene = new Scene(root, 800, 500);
-        setScene(scene);
+        // The SplitPane is the content of our beautiful new tab!
+        this.setContent(root);
     }
 }
-

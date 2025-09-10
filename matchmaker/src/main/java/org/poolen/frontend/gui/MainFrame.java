@@ -18,6 +18,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.HybridMatchmaker;
+import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.PlayerManagementStage;
 
 import java.time.LocalDate;
@@ -96,8 +97,8 @@ public class MainFrame extends Application {
         });
 
         addPlayerButton.setOnAction(event -> {
-            PlayerManagementStage playerManagementStage = new PlayerManagementStage(this.attendingPlayers, this::updateUI);
-            playerManagementStage.show();
+            ManagementStage managementStage = new ManagementStage(this.attendingPlayers, this::updateUI);
+            managementStage.show();
         });
 
         Scene scene = new Scene(root, 1000, 600);

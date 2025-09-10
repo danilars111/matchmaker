@@ -42,6 +42,7 @@ public class PlayerRosterTableView extends VBox {
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
     private final CheckBox attendingFilterCheckbox;
+    private final TableColumn<Player, Boolean> attendingCol; // Now a member variable!
 
 
     public PlayerRosterTableView(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
@@ -66,7 +67,7 @@ public class PlayerRosterTableView extends VBox {
 
 
         // --- The "Attending" Checkbox Column! ---
-        TableColumn<Player, Boolean> attendingCol = new TableColumn<>("Attending");
+        this.attendingCol = new TableColumn<>("Attending");
 
         attendingCol.setCellValueFactory(cellData -> {
             Player player = cellData.getValue();
@@ -77,7 +78,7 @@ public class PlayerRosterTableView extends VBox {
                 } else {
                     attendingPlayers.remove(player.getUuid());
                 }
- //               onUpdate.run();
+                //               onUpdate.run();
             });
             return attendingProperty;
         });
@@ -158,6 +159,32 @@ public class PlayerRosterTableView extends VBox {
         filterPanel.setAlignment(Pos.CENTER_LEFT);
 
         this.getChildren().addAll(new Label("Current Roster"), filterPanel, searchField, pagination);
+    }
+
+    /**
+     * A new method to show only players on a specific player's blacklist.
+     * @param editingPlayer The player whose blacklist we want to see.
+     */
+    public void showBlacklistedPlayers(Player editingPlayer) {
+        searchField.setDisable(true);
+        houseFilterBox.setDisable(true);
+        dmFilterCheckBox.setDisable(true);
+        attendingFilterCheckbox.setDisable(true);
+        this.attendingCol.setEditable(false); // Disable the checkbox column!
+
+        filteredData.setPredicate(player -> editingPlayer.getBlacklist().containsKey(player.getUuid()));
+    }
+
+    /**
+     * A new method to restore the view to the standard filters.
+     */
+    public void showAllPlayers() {
+        searchField.setDisable(false);
+        houseFilterBox.setDisable(false);
+        dmFilterCheckBox.setDisable(false);
+        attendingFilterCheckbox.setDisable(false);
+        this.attendingCol.setEditable(true); // Re-enable the checkbox column!
+        applyFilter();
     }
 
     private void applyFilter() {
