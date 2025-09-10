@@ -38,7 +38,7 @@ public class PlayerManagementStage extends Stage {
 
         this.onUpdate = onUpdate;
         this.playerFormView = new PlayerFormView();
-        this.playerRosterTableView = new PlayerRosterTableView();
+        this.playerRosterTableView = new PlayerRosterTableView(attendingPlayers);
 
         root.getItems().addAll(playerFormView, playerRosterTableView);
         root.setDividerPositions(0.35);
