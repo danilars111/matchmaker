@@ -4,31 +4,6 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
-import javafx.scene.Node;
-import javafx.scene.control.Label;
-import javafx.scene.control.Pagination;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
-import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
-import javafx.util.Callback;
-import org.poolen.backend.db.entities.Character;
-import org.poolen.backend.db.entities.Player;
-import org.poolen.backend.db.store.PlayerStore;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
-import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -41,6 +16,8 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -53,11 +30,10 @@ public class PlayerRosterTableView extends VBox {
     private final TextField searchField;
     private final Pagination pagination;
     private final ObservableList<Player> allPlayers;
-    private final FilteredList<Player> filteredData; // Make this a member variable
+    private final FilteredList<Player> filteredData;
+    private final Map<UUID, Player> attendingPlayers; // Keep a reference to the attending players
     private static final PlayerStore playerStore = PlayerStore.getInstance();
-    private Map<UUID, Player> attendingPlayers = new HashMap<>();
     private int rowsPerPage = 15;
-    private List<Player> roster;
 
     // --- The new filter controls! ---
     private final ComboBox<House> houseFilterBox;
@@ -74,7 +50,8 @@ public class PlayerRosterTableView extends VBox {
         this.allPlayers = FXCollections.observableArrayList();
         this.houseFilterBox = new ComboBox<>();
         this.dmFilterCheckBox = new CheckBox("Show DMs Only");
-        this.attendingFilterCheckbox = new CheckBox("Show Attending Players Only");
+        this.attendingFilterCheckbox = new CheckBox("Show Attending Only");
+        this.attendingPlayers = attendingPlayers; // Store the map passed in
 
         // --- Layout and Resizing ---
         VBox.setVgrow(this.pagination, Priority.ALWAYS);
@@ -82,6 +59,8 @@ public class PlayerRosterTableView extends VBox {
         this.setMinWidth(420);
         playerTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         searchField.setPromptText("Search by name or UUID...");
+
+        playerTable.setStyle(".virtual-flow .scroll-bar:vertical {-fx-max-width: 0; -fx-padding: 0;}");
 
 
         // --- Table Columns (created once) ---
@@ -143,7 +122,6 @@ public class PlayerRosterTableView extends VBox {
             }
         });
 
-        setRoster(playerStore.getAllPlayers());
         updateRoster();
 
         // Create a new filter panel for our beautiful new controls
@@ -162,13 +140,6 @@ public class PlayerRosterTableView extends VBox {
         boolean attendingOnly = attendingFilterCheckbox.isSelected();
         String searchText = searchField.getText();
 
-        if(attendingOnly) {
-            setRoster(attendingPlayers.values().stream().toList());
-        } else {
-            setRoster(playerStore.getAllPlayers());
-        }
-        updateRoster();
-
         filteredData.setPredicate(player -> {
             // Text search filter
             boolean textMatch = true;
@@ -181,13 +152,16 @@ public class PlayerRosterTableView extends VBox {
             // DM filter
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
 
+            // Attending filter - the new, elegant logic!
+            boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
+
             // House filter
             boolean houseMatch = true;
             if (selectedHouse != null) {
                 houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
             }
 
-            return textMatch && dmMatch && houseMatch;
+            return textMatch && dmMatch && houseMatch && attendingMatch;
         });
     }
 
@@ -227,10 +201,6 @@ public class PlayerRosterTableView extends VBox {
     }
 
     public void updateRoster() {
-        allPlayers.setAll(roster);
-    }
-
-    public void setRoster(List<Player> roster) {
-        this.roster = roster;
+        allPlayers.setAll(playerStore.getAllPlayers());
     }
 }
