@@ -82,13 +82,10 @@ public class PlayerRosterTableView extends VBox {
             return attendingProperty;
         });
 
-        // We use the standard CheckBoxTableCell factory...
         Callback<TableColumn<Player, Boolean>, TableCell<Player, Boolean>> cellFactory = CheckBoxTableCell.forTableColumn(attendingCol);
-        // ...but we wrap it in our own to add the new styling!
         attendingCol.setCellFactory(col -> {
             TableCell<Player, Boolean> cell = cellFactory.call(col);
-            // This makes the checkbox itself appear larger and easier to click!
-            cell.setStyle("-fx-font-size: 1.3em;");
+            cell.setStyle("-fx-font-size: 1.5em;");
             cell.setAlignment(Pos.CENTER);
             return cell;
         });
@@ -110,7 +107,7 @@ public class PlayerRosterTableView extends VBox {
             return new SimpleStringProperty(characters);
         });
 
-        playerTable.getColumns().addAll(attendingCol, nameCol, dmCol, charCol);
+        playerTable.getColumns().addAll(nameCol, dmCol, charCol, attendingCol);
 
         this.filteredData = new FilteredList<>(allPlayers, p -> true);
 
@@ -153,13 +150,12 @@ public class PlayerRosterTableView extends VBox {
         Button refreshButton = new Button("🔄");
         refreshButton.setOnAction(e -> updateRoster());
 
-        // --- The new, more elegant filter panel layout! ---
+        // --- filter panel layout! ---
         HBox filterPanel = new HBox(10);
         Region spacer = new Region(); // Our clever little invisible spacer
         HBox.setHgrow(spacer, Priority.ALWAYS); // It grows to push the button to the right
         filterPanel.getChildren().addAll(houseFilterBox, attendingFilterCheckbox, dmFilterCheckBox, spacer, refreshButton);
         filterPanel.setAlignment(Pos.CENTER_LEFT);
-        // --------------------------------------------------
 
         this.getChildren().addAll(new Label("Current Roster"), filterPanel, searchField, pagination);
     }
@@ -208,13 +204,16 @@ public class PlayerRosterTableView extends VBox {
     }
 
     public void setOnPlayerDoubleClick(Consumer<Player> onPlayerDoubleClick) {
-        playerTable.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                Player selectedPlayer = playerTable.getSelectionModel().getSelectedItem();
-                if (selectedPlayer != null) {
-                    onPlayerDoubleClick.accept(selectedPlayer);
+        playerTable.setRowFactory(tv -> {
+            TableRow<Player> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                // The event only fires if a non-empty row is double-clicked.
+                if (event.getClickCount() == 2 && (!row.isEmpty())) {
+                    Player rowData = row.getItem();
+                    onPlayerDoubleClick.accept(rowData);
                 }
-            }
+            });
+            return row;
         });
     }
 
