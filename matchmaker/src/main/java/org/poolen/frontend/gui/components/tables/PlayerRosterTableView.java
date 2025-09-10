@@ -135,7 +135,7 @@ public class PlayerRosterTableView extends VBox {
             if (newHeight.doubleValue() > 0) {
                 double headerHeight = 30.0;
                 double indicatorHeight = 30.0;
-                double rowHeight = 24.0;
+                double rowHeight = 26.0;
                 double availableTableHeight = newHeight.doubleValue() - indicatorHeight;
                 int newRows = (int) ((availableTableHeight - headerHeight) / rowHeight);
 
