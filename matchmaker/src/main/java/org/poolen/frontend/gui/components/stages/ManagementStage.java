@@ -15,6 +15,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
+import org.poolen.frontend.gui.components.tabs.SettingsTab;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,23 +32,28 @@ public class ManagementStage extends Stage {
 
     public ManagementStage(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
         initModality(Modality.APPLICATION_MODAL);
-        setTitle("League Management");
+        setTitle("Management");
 
         TabPane tabPane = new TabPane();
 
         // Create our beautiful tabs
         Tab playerTab = new PlayerManagementTab(attendingPlayers, onUpdate);
-        Tab settingsTab = new Tab("Settings");
-        settingsTab.setContent(new Label("Settings will go here!"));
-        Tab dmToolsTab = new Tab("DM Tools");
-        dmToolsTab.setContent(new Label("DM Tools will go here!"));
+        Tab characterTab = new Tab("Character Management");
+        characterTab.setContent(new Label("Group management will go here!"));
+        Tab groupTab = new Tab("Group Management");
+        groupTab.setContent(new Label("Group management will go here!"));
+        Tab settingsTab = new SettingsTab();
+        Tab persistenceTab = new Tab("Persistence");
+        persistenceTab.setContent(new Label("Persistence will go here!"));
 
         // Make them all detachable using the simpler button method
         makeTabDetachable(playerTab);
+        makeTabDetachable(characterTab);
+        makeTabDetachable(groupTab);
         makeTabDetachable(settingsTab);
-        makeTabDetachable(dmToolsTab);
+        makeTabDetachable(persistenceTab);
 
-        tabPane.getTabs().addAll(playerTab, settingsTab, dmToolsTab);
+        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab, persistenceTab);
 
         // We add a listener for when the main window is asked to close.
         this.setOnCloseRequest(event -> {

@@ -15,6 +15,7 @@ public abstract class Settings {
     public static final String MAIN_CHARACTER_MULTIPLIER = "%s_mainCharacterMultiplier".formatted(BASE_MATCHMAKING);
     public static final String RECENCY_GRUDGE = "%s_recencyGrudge".formatted(BASE_MATCHMAKING);
     public static final String MAX_REUNION_BONUS = "%s_maxReunionBonus".formatted(BASE_MATCHMAKING);
+    public static final String BASE_MATCHMAKING_HOUSE = "%s_house".formatted(BASE_MATCHMAKING);
 
     // HOUSE PRIORITIES:
     private static final String BASE_HOUSE_PRIORITIES = "%s_housePriorities".formatted(BASE);

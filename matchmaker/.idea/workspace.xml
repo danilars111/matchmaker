@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/ManagementStage.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/constants/Settings.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/constants/Settings.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -92,7 +92,7 @@
       <workItem from="1756968769250" duration="694000" />
       <workItem from="1756984740230" duration="58795000" />
       <workItem from="1757424861093" duration="4356000" />
-      <workItem from="1757488458456" duration="14649000" />
+      <workItem from="1757488458456" duration="18277000" />
     </task>
     <servers />
   </component>
