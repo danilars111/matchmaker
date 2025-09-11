@@ -2,9 +2,9 @@ package org.poolen.backend.db.entities;
 
 import org.poolen.backend.db.constants.House;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,28 +14,32 @@ import java.util.stream.Collectors;
 public class Group {
     private Player dungeonMaster;
     private Map<UUID, Player> party;
-    private House house;
-    private Date date;
+    private List<House> houses;
+    private LocalDate date;
 
-    public Group(Player dungeonMaster, House house, Date date) {
+    public Group(Player dungeonMaster, List<House> houses, LocalDate date) {
         this.dungeonMaster = dungeonMaster;
-        this.house = house;
+        this.houses = new ArrayList<>(houses); // Create a mutable copy
         this.date = date;
         this.party = new HashMap<>();
     }
 
     @Override
     public String toString() {
-        // Build a string with all the lovely details!
         String partyMembers = party.values().stream()
                 .map(Player::getName)
                 .collect(Collectors.joining(", "));
 
+        // The toString method now elegantly lists all the themes!
+        String houseThemes = houses.stream()
+                .map(House::toString)
+                .collect(Collectors.joining(" & "));
+
         return String.format(
-                "DM: %s | Date: %s | House: %s\nParty Members: [%s]",
+                "DM: %s | Date: %s | House(s): %s\nParty Members: [%s]",
                 dungeonMaster.getName(),
                 date,
-                house,
+                houseThemes,
                 partyMembers
         );
     }
@@ -60,19 +64,30 @@ public class Group {
         this.party.remove(player.getUuid());
     }
 
-    public House getHouse() {
-        return house;
+    public List<House> getHouses() {
+        return houses;
     }
 
-    public void setHouse(House house) {
-        this.house = house;
+    public void setHouses(List<House> houses) {
+        this.houses = houses;
     }
 
-    public Date getDate() {
+    public void addHouse(House house) {
+        if (!this.houses.contains(house)) {
+            this.houses.add(house);
+        }
+    }
+
+    public void removeHouse(House house) {
+        this.houses.remove(house);
+    }
+
+    public LocalDate getDate() {
         return date;
     }
 
-    public void setDate(Date date) {
+    public void setDate(LocalDate date) {
         this.date = date;
     }
 }
+

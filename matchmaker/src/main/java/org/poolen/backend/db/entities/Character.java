@@ -8,7 +8,9 @@ public class Character {
     private UUID uuid;
     private String name;
     private House house;
+    private Player player;
     private boolean isMain;
+    private boolean isRetired;
 
     public Character(String name, House house) {
         this.uuid = UUID.randomUUID();
@@ -17,7 +19,7 @@ public class Character {
     }
 
     public UUID getUuid() {
-        return uuid;
+        return this.uuid;
     }
 
     public void setUuid(UUID uuid) {
@@ -25,7 +27,7 @@ public class Character {
     }
 
     public String getName() {
-        return name;
+        return this.name;
     }
 
     public void setName(String name) {
@@ -45,6 +47,36 @@ public class Character {
     }
 
     public void setMain(boolean main) {
-        isMain = main;
+        this.isMain = main;
+
+        if (this.player != null && main) {
+            // Demote any other character that thinks it's the main.
+            for (Character otherChar : this.player.getCharacters()) {
+                if (otherChar != this && otherChar.isMain()) {
+                    otherChar.setMain(false); // Recursion is fine here, as it will just flip the boolean.
+                }
+            }
+            // Now, ensure this character is at the front of the line!
+            this.player.getCharacters().remove(this);
+            this.player.getCharacters().add(0, this);
+        }
+    }
+    public Player getPlayer() {
+        return player;
+    }
+
+    public void setPlayer(Player player) {
+        this.player = player;
+    }
+
+    public boolean isRetired() {
+        return isRetired;
+    }
+
+    public void setRetired(boolean retired) {
+        this.isRetired = retired;
+        if(this.isMain) {
+            this.isMain = false;
+        }
     }
 }

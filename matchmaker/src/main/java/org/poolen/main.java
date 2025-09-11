@@ -19,7 +19,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -93,7 +92,7 @@ public class main {
         List<Group> groups = new ArrayList<>();
 
         for(int i = 0; i < dms.size(); i++) {
-            groups.add(new Group(dms.get(i), suggestedGroups.get(i), new Date()));
+            groups.add(new Group(dms.get(i), List.of(suggestedGroups.get(i)), LocalDate.now()));
         }
 
 

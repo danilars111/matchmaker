@@ -1,4 +1,4 @@
-package org.poolen.backend.engine.matcher;
+package org.poolen.backend.engine;
 
 import com.google.ortools.graph.LinearSumAssignment;
 import org.poolen.backend.db.constants.House;

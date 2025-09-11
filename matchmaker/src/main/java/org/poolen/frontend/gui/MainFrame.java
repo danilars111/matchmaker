@@ -14,17 +14,12 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
-import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
-import org.poolen.backend.engine.GroupSuggester;
-import org.poolen.backend.engine.HybridMatchmaker;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
-import org.poolen.frontend.gui.components.stages.PlayerManagementStage;
 
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -111,8 +106,7 @@ public class MainFrame extends Application {
      * It handles everything from player lists to suggestions and final group generation.
      */
     public void updateUI() {
-        // Update the player count label
-        long dmCount = attendingPlayers.values().stream().filter(Player::isDungeonMaster).count();
+ /*       long dmCount = attendingPlayers.values().stream().filter(Player::isDungeonMaster).count();
         long playerCount = attendingPlayers.size() - dmCount;
         playerLabel.setText("Attending Adventurers (" + playerCount + " Players, " + dmCount + " DMs)");
 
@@ -144,7 +138,7 @@ public class MainFrame extends Application {
         // For now, we'll assign houses cyclically for simplicity.
         List<Group> initialGroups = new ArrayList<>();
         for(int i = 0; i < dms.size(); i++) {
-            initialGroups.add(new Group(dms.get(i), houseThemes.get(i), new Date()));
+            initialGroups.add(new Group(dms.get(i), houseThemes.get(i), LocalDate.now()));
         }
 
         HybridMatchmaker matchmaker = new HybridMatchmaker(initialGroups, attendingPlayers);
@@ -168,7 +162,7 @@ public class MainFrame extends Application {
             groupPane.setCollapsible(false);
             groupBox.getChildren().addAll(dmLabel, groupMembers);
             groupsDisplay.getChildren().add(groupPane);
-        }
+        }*/
     }
 
     // Mock data for demonstration

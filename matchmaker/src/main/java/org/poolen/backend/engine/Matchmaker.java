@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class HybridMatchmaker {
+public class Matchmaker {
     private List<Group> groups;
     private final List<Player> players;
 
@@ -46,7 +46,7 @@ public class HybridMatchmaker {
     }
 
 
-    public HybridMatchmaker(List<Group> groups, Map<UUID, Player> attendingPlayers) {
+    public Matchmaker(List<Group> groups, Map<UUID, Player> attendingPlayers) {
         this.groups = new ArrayList<>(groups);
         this.players = attendingPlayers.values().stream()
                 .filter(p -> !p.isDungeonMaster())
@@ -223,7 +223,6 @@ public class HybridMatchmaker {
         }
 
         double bestScoreForPlayer = HOUSE_DEFAULT_SCORE;
-        double houseBonus = settingsStore.getSetting(Settings.HOUSE_BONUS);
         List<House> groupHouses = group.getHouses(); // Get the list of themes for the group
 
         // Iterate through all of the player's characters to find their best possible score
@@ -237,7 +236,7 @@ public class HybridMatchmaker {
             boolean isPerfectMatch = groupHouses.contains(playerHouse);
 
             if (isPerfectMatch) {
-                bestScoreForThisCharacter = houseBonus;
+                bestScoreForThisCharacter = HOUSE_MATCH_BONUS;
             } else {
                 // If not a perfect match, find the best possible tiered score.
                 double bestTieredScore = HOUSE_DEFAULT_SCORE;
@@ -249,13 +248,13 @@ public class HybridMatchmaker {
                         int priorityIndex = preferences.indexOf(groupHouse);
                         switch (priorityIndex) {
                             case 0:
-                                currentTieredScore = houseBonus * settingsStore.getSetting(Settings.HOUSE_SECOND_CHOICE_MULTIPLIER);
+                                currentTieredScore = HOUSE_MATCH_BONUS * settingsStore.getSetting(Settings.HOUSE_SECOND_CHOICE_MULTIPLIER);
                                 break;
                             case 1:
-                                currentTieredScore = houseBonus * settingsStore.getSetting(Settings.HOUSE_THIRD_CHOICE_MULTIPLIER);
+                                currentTieredScore = HOUSE_MATCH_BONUS * settingsStore.getSetting(Settings.HOUSE_THIRD_CHOICE_MULTIPLIER);
                                 break;
                             case 2:
-                                currentTieredScore = houseBonus * settingsStore.getSetting(Settings.HOUSE_FOURTH_CHOICE_MULTIPLIER);
+                                currentTieredScore = HOUSE_MATCH_BONUS * settingsStore.getSetting(Settings.HOUSE_FOURTH_CHOICE_MULTIPLIER);
                                 break;
                             default:
                                 currentTieredScore = HOUSE_DEFAULT_SCORE;
