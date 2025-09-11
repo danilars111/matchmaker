@@ -8,7 +8,17 @@ import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.Pagination;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableColumn.SortType;
+import javafx.scene.control.TableRow;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.HBox;
@@ -21,6 +31,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -45,6 +56,10 @@ public class PlayerRosterTableView extends VBox {
     private final FilteredList<Player> filteredData;
     private static final PlayerStore playerStore = PlayerStore.getInstance();
     private int rowsPerPage = 15;
+
+    // --- Sort Persistence
+    private TableColumn sortColumn = null;
+    private SortType sortType = null;
 
     // --- Mode-specific variables ---
     private final RosterMode mode;
@@ -228,6 +243,11 @@ public class PlayerRosterTableView extends VBox {
         boolean selectedOnly = (mode == RosterMode.GROUP_ASSIGNMENT && modeSpecificFilterCheckbox.isSelected());
         String searchText = searchField.getText();
 
+        if (!playerTable.getSortOrder().isEmpty()) {
+            sortColumn = playerTable.getSortOrder().get(0);
+            sortType = sortColumn.getSortType();
+        }
+
         filteredData.setPredicate(player -> {
             boolean textMatch = true;
             if (searchText != null && !searchText.isEmpty()) {
@@ -252,9 +272,15 @@ public class PlayerRosterTableView extends VBox {
                 }
                 return textMatch && houseMatch && selectedMatch;
             }
-
             return textMatch && dmMatch && houseMatch && attendingMatch;
         });
+
+        if (sortColumn!=null) {
+            playerTable.getSortOrder().add(sortColumn);
+            sortColumn.setSortType(sortType);
+            sortColumn.setSortable(true); // This performs a sort
+        }
+        playerTable.sort();
     }
 
     public void updateRoster() {
