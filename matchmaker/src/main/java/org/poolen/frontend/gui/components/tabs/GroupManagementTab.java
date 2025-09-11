@@ -67,6 +67,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             if (isPlayerRosterVisible) {
                 root.getItems().set(1, rosterView); // Show our beautiful roster
                 groupForm.getShowPlayersButton().setText("Hide Players");
+                rightPane.getChildren().clear();
             } else {
                 groups.forEach(group -> tmpGroupLabels.add(new Label(group.toString())));
                 tmpGroupLabels.forEach(label -> rightPane.getChildren().add(label));
