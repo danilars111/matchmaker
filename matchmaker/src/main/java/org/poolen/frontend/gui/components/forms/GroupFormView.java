@@ -138,6 +138,14 @@ public class GroupFormView extends GridPane {
         return dmComboBox.getValue();
     }
 
+    /**
+     * Exposes the ComboBox so its value property can be listened to.
+     * @return The Dungeon Master ComboBox.
+     */
+    public ComboBox<Player> getDmComboBox() {
+        return dmComboBox;
+    }
+
     public List<House> getSelectedHouses() {
         return houseCheckBoxes.entrySet().stream()
                 .filter(entry -> entry.getValue().isSelected())
@@ -191,4 +199,3 @@ public class GroupFormView extends GridPane {
         return lowerCase.substring(0, 1).toUpperCase() + lowerCase.substring(1);
     }
 }
-

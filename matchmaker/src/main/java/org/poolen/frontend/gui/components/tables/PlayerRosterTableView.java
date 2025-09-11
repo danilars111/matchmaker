@@ -49,7 +49,8 @@ public class PlayerRosterTableView extends VBox {
     // --- Mode-specific variables ---
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
-    private Group currentGroup; // Used in GROUP_ASSIGNMENT mode
+    private Group currentGroup; // Used in GROUP_ASSIGNMENT mode (editing)
+    private Player dmForNewGroup; // Used in GROUP_ASSIGNMENT mode (creating)
     private TableColumn<Player, Boolean> interactiveColumn; // Attending or Selected
     private CheckBox modeSpecificFilterCheckbox; // Attending or Selected filter
     private final ComboBox<House> houseFilterBox;
@@ -184,8 +185,25 @@ public class PlayerRosterTableView extends VBox {
         return col;
     }
 
+    /**
+     * Sets the context to an existing group for editing.
+     * @param group The group to edit.
+     */
     public void displayForGroup(Group group) {
         this.currentGroup = group;
+        this.dmForNewGroup = null; // We're editing, so clear the temporary DM
+        applyFilter();
+        playerTable.refresh();
+    }
+
+    /**
+     * Sets the DM to be filtered out when creating a new group.
+     * @param dm The selected Dungeon Master for the new group.
+     */
+    public void setDmForNewGroup(Player dm) {
+        this.currentGroup = null; // We're creating, so clear the edit-mode group
+        this.dmForNewGroup = dm;
+        applyFilter();
         playerTable.refresh();
     }
 
@@ -226,9 +244,13 @@ public class PlayerRosterTableView extends VBox {
                 houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
             }
 
-            // In group assignment mode, we don't care about the attending filter, only the selected one.
             if (mode == RosterMode.GROUP_ASSIGNMENT) {
-                return textMatch && dmMatch && houseMatch && selectedMatch;
+                Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
+
+                if (dmToExclude != null && player.equals(dmToExclude)) {
+                    return false;
+                }
+                return textMatch && houseMatch && selectedMatch;
             }
 
             return textMatch && dmMatch && houseMatch && attendingMatch;
@@ -239,10 +261,7 @@ public class PlayerRosterTableView extends VBox {
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             sourcePlayers.setAll(playerStore.getAllPlayers());
         } else { // GROUP_ASSIGNMENT
-            List<Player> assignable = attendingPlayers.values().stream()
-                    .filter(p -> !p.isDungeonMaster())
-                    .collect(Collectors.toList());
-            sourcePlayers.setAll(assignable);
+            sourcePlayers.setAll(attendingPlayers.values());
         }
     }
 
@@ -314,3 +333,4 @@ public class PlayerRosterTableView extends VBox {
         });
     }
 }
+
