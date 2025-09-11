@@ -99,7 +99,8 @@ public class PlayerRosterTableView extends VBox {
         HBox filterPanel = new HBox(10);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        filterPanel.getChildren().addAll(houseFilterBox, dmFilterCheckBox, spacer, refreshButton);
+        // We will now add the DM checkbox conditionally based on the mode!
+        filterPanel.getChildren().addAll(houseFilterBox, spacer, refreshButton);
         filterPanel.setAlignment(Pos.CENTER_LEFT);
 
         this.filteredData = new FilteredList<>(sourcePlayers, p -> true);
@@ -137,7 +138,9 @@ public class PlayerRosterTableView extends VBox {
 
     private void setupForPlayerManagement(Runnable onPlayerListChanged, HBox filterPanel) {
         modeSpecificFilterCheckbox = new CheckBox("Show Attending Only");
-        filterPanel.getChildren().add(1, modeSpecificFilterCheckbox);
+        // We add our beautiful, mode-specific controls at index 1, right after the house filter!
+        filterPanel.getChildren().add(1, dmFilterCheckBox);
+        filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
         interactiveColumn = createAttendingColumn(onPlayerListChanged);
     }
 
@@ -311,4 +314,3 @@ public class PlayerRosterTableView extends VBox {
         });
     }
 }
-
