@@ -27,7 +27,8 @@ public class PlayerManagementTab extends Tab {
         SplitPane root = new SplitPane();
 
         PlayerFormView formView = new PlayerFormView();
-        PlayerRosterTableView rosterView = new PlayerRosterTableView(attendingPlayers, onPlayerListChanged);
+        PlayerRosterTableView rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.PLAYER_MANAGEMENT,
+                attendingPlayers, onPlayerListChanged);
 
         root.getItems().addAll(formView, rosterView);
         root.setDividerPositions(0.35);
@@ -60,7 +61,7 @@ public class PlayerManagementTab extends Tab {
                 playerToProcess.setDungeonMaster(formView.isDungeonMaster());
             }
 
-            onPlayerListChanged.run(); // Announce the news!
+            onPlayerListChanged.run();
             rosterView.updateRoster();
             formView.clearForm();
         });

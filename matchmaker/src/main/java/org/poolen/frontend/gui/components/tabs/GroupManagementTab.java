@@ -22,26 +22,26 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final SplitPane root;
     private boolean isPlayerRosterVisible = false;
 
-    public GroupManagementTab(Map<UUID, Player> attendingPlayers, Runnable notifyPlayerUpdateListeners) {
+    public GroupManagementTab(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super("Group Management");
         this.attendingPlayers = attendingPlayers;
 
         this.root = new SplitPane();
         this.groupForm = new GroupFormView(attendingPlayers);
 
-        // The right side starts empty, waiting for its grand entrance!
+        // The right side starts as a beautiful, mysterious placeholder.
         VBox rightPane = new VBox(10);
         rightPane.getChildren().add(new Label("A beautiful list of groups or players will go here!"));
 
         root.getItems().addAll(groupForm, rightPane);
         root.setDividerPositions(0.4);
 
-        // --- The new button logic! ---
+        // --- The restored button logic! ---
         groupForm.getShowPlayersButton().setOnAction(e -> {
             isPlayerRosterVisible = !isPlayerRosterVisible;
             if (isPlayerRosterVisible) {
-                // When we show the roster, we create a fresh instance of it.
-                PlayerRosterTableView rosterView = new PlayerRosterTableView(attendingPlayers, notifyPlayerUpdateListeners);
+                // When we show the roster, we create a fresh instance of it in the correct mode.
+                PlayerRosterTableView rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, onPlayerListChanged);
                 // We replace the placeholder with our beautiful table.
                 root.getItems().set(1, rosterView);
                 groupForm.getShowPlayersButton().setText("Hide Players");
@@ -62,6 +62,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.setContent(root);
     }
 
+    /**
+     * This is the heart of our beautiful real-time update system!
+     */
     @Override
     public void onPlayerUpdate() {
         System.out.println("Heard a player update! Refreshing DM list in Group Management...");

@@ -17,46 +17,57 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
 import org.poolen.backend.db.constants.House;
+import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * A reusable JavaFX component that displays a filterable and paginated table of all players from the PlayerStore.
+ * A highly reusable JavaFX component that displays a filterable and paginated table of players.
+ * It can operate in two modes: PLAYER_MANAGEMENT and GROUP_ASSIGNMENT.
  */
 public class PlayerRosterTableView extends VBox {
+
+    public enum RosterMode {
+        PLAYER_MANAGEMENT,
+        GROUP_ASSIGNMENT
+    }
 
     private final TableView<Player> playerTable;
     private final TextField searchField;
     private final Pagination pagination;
-    private final ObservableList<Player> allPlayers;
+    private final ObservableList<Player> sourcePlayers;
     private final FilteredList<Player> filteredData;
-    private final Map<UUID, Player> attendingPlayers;
     private static final PlayerStore playerStore = PlayerStore.getInstance();
     private int rowsPerPage = 15;
 
+    // --- Mode-specific variables ---
+    private final RosterMode mode;
+    private final Map<UUID, Player> attendingPlayers;
+    private Group currentGroup; // Used in GROUP_ASSIGNMENT mode
+    private TableColumn<Player, Boolean> interactiveColumn; // Attending or Selected
+    private CheckBox modeSpecificFilterCheckbox; // Attending or Selected filter
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
-    private final CheckBox attendingFilterCheckbox;
-    private final TableColumn<Player, Boolean> attendingCol; // Now a member variable!
 
 
-    public PlayerRosterTableView(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
-        super(10); // Spacing for the VBox
+    public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
+        super(10);
         this.setPadding(new Insets(10));
+        this.mode = mode;
+        this.attendingPlayers = attendingPlayers;
 
         this.playerTable = new TableView<>();
         this.searchField = new TextField();
         this.pagination = new Pagination();
-        this.allPlayers = FXCollections.observableArrayList();
+        this.sourcePlayers = FXCollections.observableArrayList();
         this.houseFilterBox = new ComboBox<>();
         this.dmFilterCheckBox = new CheckBox("Show DMs Only");
-        this.attendingFilterCheckbox = new CheckBox("Show Attending Only");
-        this.attendingPlayers = attendingPlayers;
 
         VBox.setVgrow(this.pagination, Priority.ALWAYS);
         this.playerTable.setMaxWidth(Double.MAX_VALUE);
@@ -65,61 +76,50 @@ public class PlayerRosterTableView extends VBox {
         searchField.setPromptText("Search by name or UUID...");
         playerTable.setEditable(true);
 
-
-        // --- The "Attending" Checkbox Column! ---
-        this.attendingCol = new TableColumn<>("Attending");
-
-        attendingCol.setCellValueFactory(cellData -> {
-            Player player = cellData.getValue();
-            SimpleBooleanProperty attendingProperty = new SimpleBooleanProperty(attendingPlayers.containsKey(player.getUuid()));
-            attendingProperty.addListener((obs, wasAttending, isNowAttending) -> {
-                if (isNowAttending) {
-                    attendingPlayers.put(player.getUuid(), player);
-                } else {
-                    attendingPlayers.remove(player.getUuid());
-                }
-                onPlayerListChanged.run();
-            });
-            return attendingProperty;
-        });
-
-        Callback<TableColumn<Player, Boolean>, TableCell<Player, Boolean>> cellFactory = CheckBoxTableCell.forTableColumn(attendingCol);
-        attendingCol.setCellFactory(col -> {
-            TableCell<Player, Boolean> cell = cellFactory.call(col);
-            cell.setStyle("-fx-font-size: 1.5em;");
-            cell.setAlignment(Pos.CENTER);
-            return cell;
-        });
-        attendingCol.setEditable(true);
-
-
+        // --- Column Definitions ---
         TableColumn<Player, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
-
         TableColumn<Player, Boolean> dmCol = new TableColumn<>("DM");
         dmCol.setCellValueFactory(new PropertyValueFactory<>("dungeonMaster"));
-
         TableColumn<Player, String> charCol = new TableColumn<>("Characters");
-        charCol.setCellValueFactory(cellData -> {
-            Player player = cellData.getValue();
-            String characters = player.getCharacters().stream()
-                    .map(c -> c.getHouse().toString())
-                    .collect(Collectors.joining(", "));
-            return new SimpleStringProperty(characters);
-        });
+        charCol.setCellValueFactory(cellData -> new SimpleStringProperty(
+                cellData.getValue().getCharacters().stream()
+                        .map(c -> c.getHouse().toString())
+                        .collect(Collectors.joining(", "))
+        ));
 
-        playerTable.getColumns().addAll(nameCol, dmCol, charCol, attendingCol);
-
-        this.filteredData = new FilteredList<>(allPlayers, p -> true);
-
+        // --- Filter Setup ---
         houseFilterBox.getItems().add(null);
         houseFilterBox.getItems().addAll(House.values());
         houseFilterBox.setPromptText("Filter by House");
 
+        Button refreshButton = new Button("🔄");
+        refreshButton.setOnAction(e -> updateRoster());
+
+        HBox filterPanel = new HBox(10);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        filterPanel.getChildren().addAll(houseFilterBox, dmFilterCheckBox, spacer, refreshButton);
+        filterPanel.setAlignment(Pos.CENTER_LEFT);
+
+        this.filteredData = new FilteredList<>(sourcePlayers, p -> true);
+
+        // --- Mode-Specific Setup ---
+        if (mode == RosterMode.PLAYER_MANAGEMENT) {
+            setupForPlayerManagement(onPlayerListChanged, filterPanel);
+            playerTable.getColumns().addAll(nameCol, dmCol, charCol, interactiveColumn);
+        } else { // GROUP_ASSIGNMENT
+            setupForGroupAssignment(filterPanel);
+            playerTable.getColumns().addAll(nameCol, charCol, interactiveColumn);
+        }
+
+        // --- Universal Listeners ---
         searchField.textProperty().addListener((obs, old, val) -> applyFilter());
         houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
         dmFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-        attendingFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        if (modeSpecificFilterCheckbox != null) {
+            modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        }
 
         filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends Player> c) -> {
             updatePageCount(filteredData.size());
@@ -128,69 +128,83 @@ public class PlayerRosterTableView extends VBox {
         });
 
         pagination.setPageFactory(createPageFactory(filteredData));
-
-        pagination.heightProperty().addListener((obs, oldHeight, newHeight) -> {
-            if (newHeight.doubleValue() > 0) {
-                double headerHeight = 30.0;
-                double indicatorHeight = 30.0;
-                double rowHeight = 26.0;
-                double availableTableHeight = newHeight.doubleValue() - indicatorHeight;
-                int newRows = (int) ((availableTableHeight - headerHeight) / rowHeight);
-
-                if (newRows > 0 && newRows != this.rowsPerPage) {
-                    this.rowsPerPage = newRows;
-                    updatePageCount(filteredData.size());
-                    pagination.setPageFactory(null);
-                    pagination.setPageFactory(createPageFactory(filteredData));
-                }
-            }
-        });
+        pagination.heightProperty().addListener((obs, oldH, newH) -> handleResize());
 
         updateRoster();
 
-        Button refreshButton = new Button("🔄");
-        refreshButton.setOnAction(e -> updateRoster());
-
-        // --- filter panel layout! ---
-        HBox filterPanel = new HBox(10);
-        Region spacer = new Region(); // Our clever little invisible spacer
-        HBox.setHgrow(spacer, Priority.ALWAYS); // It grows to push the button to the right
-        filterPanel.getChildren().addAll(houseFilterBox, attendingFilterCheckbox, dmFilterCheckBox, spacer, refreshButton);
-        filterPanel.setAlignment(Pos.CENTER_LEFT);
-
-        this.getChildren().addAll(new Label("Current Roster"), filterPanel, searchField, pagination);
+        this.getChildren().addAll(new Label("Roster"), filterPanel, searchField, pagination);
     }
 
-    /**
-     * A new method to show only players on a specific player's blacklist.
-     * @param editingPlayer The player whose blacklist we want to see.
-     */
-    public void showBlacklistedPlayers(Player editingPlayer) {
-        searchField.setDisable(true);
-        houseFilterBox.setDisable(true);
-        dmFilterCheckBox.setDisable(true);
-        attendingFilterCheckbox.setDisable(true);
-        this.attendingCol.setEditable(false); // Disable the checkbox column!
+    private void setupForPlayerManagement(Runnable onPlayerListChanged, HBox filterPanel) {
+        modeSpecificFilterCheckbox = new CheckBox("Show Attending Only");
+        filterPanel.getChildren().add(1, modeSpecificFilterCheckbox);
+        interactiveColumn = createAttendingColumn(onPlayerListChanged);
+    }
 
+    private void setupForGroupAssignment(HBox filterPanel) {
+        modeSpecificFilterCheckbox = new CheckBox("Show Selected Only");
+        filterPanel.getChildren().add(1, modeSpecificFilterCheckbox);
+        interactiveColumn = createSelectedColumn();
+    }
+
+    private TableColumn<Player, Boolean> createAttendingColumn(Runnable onPlayerListChanged) {
+        TableColumn<Player, Boolean> col = new TableColumn<>("Attending");
+        col.setCellValueFactory(cellData -> {
+            Player player = cellData.getValue();
+            SimpleBooleanProperty property = new SimpleBooleanProperty(attendingPlayers.containsKey(player.getUuid()));
+            property.addListener((obs, was, isNow) -> {
+                if (isNow) attendingPlayers.put(player.getUuid(), player);
+                else attendingPlayers.remove(player.getUuid());
+                onPlayerListChanged.run();
+            });
+            return property;
+        });
+        setCheckboxCellStyle(col);
+        return col;
+    }
+
+    private TableColumn<Player, Boolean> createSelectedColumn() {
+        TableColumn<Player, Boolean> col = new TableColumn<>("Selected");
+        col.setCellValueFactory(cellData -> {
+            Player player = cellData.getValue();
+            boolean isSelected = currentGroup != null && currentGroup.getParty().containsKey(player.getUuid());
+            SimpleBooleanProperty property = new SimpleBooleanProperty(isSelected);
+            property.addListener((obs, was, isNow) -> {
+                if (currentGroup != null) {
+                    if (isNow) currentGroup.addPartyMember(player);
+                    else currentGroup.removePartyMember(player);
+                }
+            });
+            return property;
+        });
+        setCheckboxCellStyle(col);
+        return col;
+    }
+
+    public void displayForGroup(Group group) {
+        this.currentGroup = group;
+        playerTable.refresh();
+    }
+
+    public void showBlacklistedPlayers(Player editingPlayer) {
+        getFilterPanel().getChildren().forEach(node -> node.setDisable(true));
+        searchField.setDisable(true);
+        interactiveColumn.setEditable(false);
         filteredData.setPredicate(player -> editingPlayer.getBlacklist().containsKey(player.getUuid()));
     }
 
-    /**
-     * A new method to restore the view to the standard filters.
-     */
     public void showAllPlayers() {
+        getFilterPanel().getChildren().forEach(node -> node.setDisable(false));
         searchField.setDisable(false);
-        houseFilterBox.setDisable(false);
-        dmFilterCheckBox.setDisable(false);
-        attendingFilterCheckbox.setDisable(false);
-        this.attendingCol.setEditable(true); // Re-enable the checkbox column!
+        interactiveColumn.setEditable(true);
         applyFilter();
     }
 
     private void applyFilter() {
         House selectedHouse = houseFilterBox.getValue();
         boolean dmsOnly = dmFilterCheckBox.isSelected();
-        boolean attendingOnly = attendingFilterCheckbox.isSelected();
+        boolean attendingOnly = (mode == RosterMode.PLAYER_MANAGEMENT && modeSpecificFilterCheckbox.isSelected());
+        boolean selectedOnly = (mode == RosterMode.GROUP_ASSIGNMENT && modeSpecificFilterCheckbox.isSelected());
         String searchText = searchField.getText();
 
         filteredData.setPredicate(player -> {
@@ -203,12 +217,34 @@ public class PlayerRosterTableView extends VBox {
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
             boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
+            boolean selectedMatch = !selectedOnly || (currentGroup != null && currentGroup.getParty().containsKey(player.getUuid()));
             boolean houseMatch = true;
             if (selectedHouse != null) {
                 houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
             }
+
+            // In group assignment mode, we don't care about the attending filter, only the selected one.
+            if (mode == RosterMode.GROUP_ASSIGNMENT) {
+                return textMatch && dmMatch && houseMatch && selectedMatch;
+            }
+
             return textMatch && dmMatch && houseMatch && attendingMatch;
         });
+    }
+
+    public void updateRoster() {
+        if (mode == RosterMode.PLAYER_MANAGEMENT) {
+            sourcePlayers.setAll(playerStore.getAllPlayers());
+        } else { // GROUP_ASSIGNMENT
+            List<Player> assignable = attendingPlayers.values().stream()
+                    .filter(p -> !p.isDungeonMaster())
+                    .collect(Collectors.toList());
+            sourcePlayers.setAll(assignable);
+        }
+    }
+
+    private HBox getFilterPanel() {
+        return (HBox) this.getChildren().get(1);
     }
 
     private Callback<Integer, Node> createPageFactory(FilteredList<Player> data) {
@@ -234,7 +270,6 @@ public class PlayerRosterTableView extends VBox {
         playerTable.setRowFactory(tv -> {
             TableRow<Player> row = new TableRow<>();
             row.setOnMouseClicked(event -> {
-                // The event only fires if a non-empty row is double-clicked.
                 if (event.getClickCount() == 2 && (!row.isEmpty())) {
                     Player rowData = row.getItem();
                     onPlayerDoubleClick.accept(rowData);
@@ -248,8 +283,32 @@ public class PlayerRosterTableView extends VBox {
         return playerTable.getSelectionModel().getSelectedItem();
     }
 
-    public void updateRoster() {
-        allPlayers.setAll(playerStore.getAllPlayers());
+    private void handleResize() {
+        double newHeight = pagination.getHeight();
+        if (newHeight > 0) {
+            double headerHeight = 30.0;
+            double indicatorHeight = 30.0;
+            double rowHeight = 26.0;
+            double availableTableHeight = newHeight - indicatorHeight;
+            int newRows = (int) ((availableTableHeight - headerHeight) / rowHeight);
+
+            if (newRows > 0 && newRows != this.rowsPerPage) {
+                this.rowsPerPage = newRows;
+                updatePageCount(filteredData.size());
+                pagination.setPageFactory(null);
+                pagination.setPageFactory(createPageFactory(filteredData));
+            }
+        }
+    }
+
+    private void setCheckboxCellStyle(TableColumn<Player, Boolean> column) {
+        Callback<TableColumn<Player, Boolean>, TableCell<Player, Boolean>> cellFactory = CheckBoxTableCell.forTableColumn(column);
+        column.setCellFactory(col -> {
+            TableCell<Player, Boolean> cell = cellFactory.call(col);
+            cell.setStyle("-fx-font-size: 1.5em;");
+            cell.setAlignment(Pos.CENTER);
+            return cell;
+        });
     }
 }
 
