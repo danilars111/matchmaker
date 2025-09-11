@@ -20,7 +20,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final GroupFormView groupForm;
     private final Map<UUID, Player> attendingPlayers;
     private final SplitPane root;
-    private PlayerRosterTableView rosterView; // Keep a reference to our lovely table
+    private boolean isPlayerRosterVisible = false;
 
     public GroupManagementTab(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super("Group Management");
@@ -29,34 +29,29 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.root = new SplitPane();
         this.groupForm = new GroupFormView(attendingPlayers);
 
-        VBox rightPanePlaceholder = new VBox(10);
-        rightPanePlaceholder.getChildren().add(new Label("A beautiful list of groups or players will go here!"));
+        // The right side starts as a beautiful, mysterious placeholder.
+        VBox rightPane = new VBox(10);
+        rightPane.getChildren().add(new Label("A beautiful list of groups or players will go here!"));
 
-        root.getItems().addAll(groupForm, rightPanePlaceholder);
+        root.getItems().addAll(groupForm, rightPane);
         root.setDividerPositions(0.4);
 
+        // --- The restored button logic! ---
         groupForm.getShowPlayersButton().setOnAction(e -> {
-            if (rosterView == null) {
-                // Create and show the roster
-                rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, onPlayerListChanged);
-                rosterView.setDmForNewGroup(groupForm.getSelectedDm()); // Set initial DM
+            isPlayerRosterVisible = !isPlayerRosterVisible;
+            if (isPlayerRosterVisible) {
+                // When we show the roster, we create a fresh instance of it in the correct mode.
+                PlayerRosterTableView rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, onPlayerListChanged);
+                // We replace the placeholder with our beautiful table.
                 root.getItems().set(1, rosterView);
                 groupForm.getShowPlayersButton().setText("Hide Players");
             } else {
-                // Hide the roster and put back the placeholder
-                root.getItems().set(1, rightPanePlaceholder);
+                // When we hide it, we put the placeholder back.
+                root.getItems().set(1, rightPane);
                 groupForm.getShowPlayersButton().setText("Show Players");
-                rosterView = null;
             }
         });
-
-        // Add our beautiful new listener!
-        groupForm.getDmComboBox().valueProperty().addListener((obs, oldDm, newDm) -> {
-            if (rosterView != null) {
-                rosterView.setDmForNewGroup(newDm);
-            }
-        });
-
+        // -----------------------------
 
         this.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
             if (isNowSelected) {
@@ -76,3 +71,4 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupForm.updateDmList(attendingPlayers);
     }
 }
+

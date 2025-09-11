@@ -22,6 +22,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -84,14 +85,35 @@ public class GroupFormView extends GridPane {
         updateDmList(attendingPlayers);
 
         this.houseCheckBoxes = new EnumMap<>(House.class);
-        VBox houseBox = new VBox(5);
-        Arrays.stream(House.values())
+        // --- The new, beautiful two-column layout! ---
+        GridPane houseGrid = new GridPane();
+        houseGrid.setHgap(10);
+        houseGrid.setVgap(5);
+
+        ColumnConstraints gridCol1 = new ColumnConstraints();
+        gridCol1.setPercentWidth(50);
+        ColumnConstraints gridCol2 = new ColumnConstraints();
+        gridCol2.setPercentWidth(50);
+        houseGrid.getColumnConstraints().addAll(gridCol1, gridCol2);
+
+        List<House> sortedHouses = Arrays.stream(House.values())
                 .sorted(Comparator.comparing(this::formatHouseName))
-                .forEach(house -> {
-                    CheckBox cb = new CheckBox(formatHouseName(house));
-                    houseCheckBoxes.put(house, cb);
-                    houseBox.getChildren().add(cb);
-                });
+                .collect(Collectors.toList());
+
+        int midpoint = (sortedHouses.size() + 1) / 2;
+
+        for (int i = 0; i < sortedHouses.size(); i++) {
+            House house = sortedHouses.get(i);
+            CheckBox cb = new CheckBox(formatHouseName(house));
+            houseCheckBoxes.put(house, cb);
+
+            if (i < midpoint) {
+                houseGrid.add(cb, 0, i);
+            } else {
+                houseGrid.add(cb, 1, i - midpoint);
+            }
+        }
+        // ---------------------------------------------
 
         showPlayersButton = new Button("Show Players");
         showPlayersButton.setMaxWidth(Double.MAX_VALUE);
@@ -113,8 +135,8 @@ public class GroupFormView extends GridPane {
         add(new Label("Dungeon Master:"), 0, 2);
         add(dmComboBox, 0, 3);
         add(new Label("House Themes:"), 0, 4);
-        add(houseBox, 0, 5);
-        add(showPlayersButton, 0, 6); // Add the new button
+        add(houseGrid, 0, 5); // Add the new grid
+        add(showPlayersButton, 0, 6);
         add(spacer, 0, 7);
         add(mainActionsBox, 0, 8);
 
@@ -133,17 +155,15 @@ public class GroupFormView extends GridPane {
         }
     }
 
+    public void setOnDmSelection(Consumer<Player> onDmSelected) {
+        dmComboBox.valueProperty().addListener((obs, oldDm, newDm) -> {
+            onDmSelected.accept(newDm);
+        });
+    }
+
     // --- Public Getters ---
     public Player getSelectedDm() {
         return dmComboBox.getValue();
-    }
-
-    /**
-     * Exposes the ComboBox so its value property can be listened to.
-     * @return The Dungeon Master ComboBox.
-     */
-    public ComboBox<Player> getDmComboBox() {
-        return dmComboBox;
     }
 
     public List<House> getSelectedHouses() {
@@ -199,3 +219,4 @@ public class GroupFormView extends GridPane {
         return lowerCase.substring(0, 1).toUpperCase() + lowerCase.substring(1);
     }
 }
+

@@ -9,6 +9,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.TableColumn.SortType;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.HBox;
@@ -21,7 +22,6 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,8 +46,10 @@ public class PlayerRosterTableView extends VBox {
     private final FilteredList<Player> filteredData;
     private static final PlayerStore playerStore = PlayerStore.getInstance();
     private int rowsPerPage = 15;
-    // A beautiful little place to remember how you like things sorted, just like you wanted!
-    private List<TableColumn<Player, ?>> savedSortOrder = new ArrayList<>();
+
+    // --- Your beautiful sorting fix! ---
+    private TableColumn<Player, ?> sortColumn = null;
+    private SortType sortType = null;
 
     // --- Mode-specific variables ---
     private final RosterMode mode;
@@ -71,7 +73,7 @@ public class PlayerRosterTableView extends VBox {
         this.pagination = new Pagination();
         this.sourcePlayers = FXCollections.observableArrayList();
         this.houseFilterBox = new ComboBox<>();
-        this.dmFilterCheckBox = new CheckBox("Show DMs Only");
+        this.dmFilterCheckBox = new CheckBox("Show DMs");
 
         VBox.setVgrow(this.pagination, Priority.ALWAYS);
         this.playerTable.setMaxWidth(Double.MAX_VALUE);
@@ -155,18 +157,18 @@ public class PlayerRosterTableView extends VBox {
 
         updateRoster();
 
-        this.getChildren().addAll(new Label("Roster"), filterPanel, searchField, pagination);
+        this.getChildren().addAll(filterPanel, searchField, pagination);
     }
 
     private void setupForPlayerManagement(Runnable onPlayerListChanged, HBox filterPanel) {
-        modeSpecificFilterCheckbox = new CheckBox("Show Attending Only");
+        modeSpecificFilterCheckbox = new CheckBox("Show Attending");
         filterPanel.getChildren().add(1, dmFilterCheckBox);
         filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
         interactiveColumn = createAttendingColumn(onPlayerListChanged);
     }
 
     private void setupForGroupAssignment(HBox filterPanel) {
-        modeSpecificFilterCheckbox = new CheckBox("Show Selected Only");
+        modeSpecificFilterCheckbox = new CheckBox("Show Selected");
         filterPanel.getChildren().add(1, modeSpecificFilterCheckbox);
         interactiveColumn = createSelectedColumn();
     }
@@ -240,6 +242,11 @@ public class PlayerRosterTableView extends VBox {
         boolean selectedOnly = (mode == RosterMode.GROUP_ASSIGNMENT && modeSpecificFilterCheckbox.isSelected());
         String searchText = searchField.getText();
 
+        if (!playerTable.getSortOrder().isEmpty()) {
+            sortColumn = playerTable.getSortOrder().get(0);
+            sortType = sortColumn.getSortType();
+        }
+
         filteredData.setPredicate(player -> {
             boolean textMatch = true;
             if (searchText != null && !searchText.isEmpty()) {
@@ -267,26 +274,20 @@ public class PlayerRosterTableView extends VBox {
 
             return textMatch && dmMatch && houseMatch && attendingMatch;
         });
+
+        if (sortColumn != null) {
+            playerTable.getSortOrder().add(sortColumn);
+            sortColumn.setSortType(sortType);
+            sortColumn.setSortable(true); // This performs a sort
+        }
+        playerTable.sort();
     }
 
-    /**
-     * Updates the roster with fresh data and re-applies the last used sort order.
-     */
     public void updateRoster() {
-        // --- Save the current sort order ---
-        savedSortOrder = new ArrayList<>(playerTable.getSortOrder());
-
-        // --- Update the source data ---
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             sourcePlayers.setAll(playerStore.getAllPlayers());
         } else { // GROUP_ASSIGNMENT
             sourcePlayers.setAll(attendingPlayers.values());
-        }
-
-        // --- Restore the saved sort order ---
-        if (!savedSortOrder.isEmpty()) {
-            playerTable.getSortOrder().setAll(savedSortOrder);
-            playerTable.sort(); // This performs the sort on the currently visible page
         }
     }
 
@@ -299,6 +300,7 @@ public class PlayerRosterTableView extends VBox {
             int fromIndex = pageIndex * this.rowsPerPage;
             int toIndex = Math.min(fromIndex + this.rowsPerPage, data.size());
             playerTable.setItems(FXCollections.observableArrayList(data.subList(fromIndex, toIndex)));
+            playerTable.refresh(); // We tell the table to redraw its rows, fixing our numbers!
             return playerTable;
         };
     }

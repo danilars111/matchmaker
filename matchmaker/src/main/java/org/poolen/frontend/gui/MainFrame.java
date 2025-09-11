@@ -92,14 +92,14 @@ public class MainFrame extends Application {
         });
 
         addPlayerButton.setOnAction(event -> {
-            ManagementStage managementStage = new ManagementStage(this.attendingPlayers, this::updateUI);
+            ManagementStage managementStage = new ManagementStage(this.attendingPlayers);
             managementStage.show();
         });
 
         Scene scene = new Scene(root, 1000, 600);
 /*        primaryStage.setScene(scene);
         primaryStage.show();*/
-        ManagementStage managementStage = new ManagementStage(this.attendingPlayers, this::updateUI);
+        ManagementStage managementStage = new ManagementStage(createMockData());
         managementStage.show();
 
     }

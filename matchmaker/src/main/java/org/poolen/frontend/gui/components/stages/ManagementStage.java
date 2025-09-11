@@ -33,7 +33,7 @@ public class ManagementStage extends Stage {
     // A list of all the lovely components that are listening for player updates!
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
 
-    public ManagementStage(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
+    public ManagementStage(Map<UUID, Player> attendingPlayers) {
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
