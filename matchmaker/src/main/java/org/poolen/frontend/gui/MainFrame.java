@@ -97,8 +97,11 @@ public class MainFrame extends Application {
         });
 
         Scene scene = new Scene(root, 1000, 600);
-        primaryStage.setScene(scene);
-        primaryStage.show();
+/*        primaryStage.setScene(scene);
+        primaryStage.show();*/
+        ManagementStage managementStage = new ManagementStage(this.attendingPlayers, this::updateUI);
+        managementStage.show();
+
     }
 
     /**
