@@ -12,12 +12,15 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class Group {
+
+    private UUID uuid;
     private Player dungeonMaster;
     private Map<UUID, Player> party;
     private List<House> houses;
     private LocalDate date;
 
     public Group(Player dungeonMaster, List<House> houses, LocalDate date) {
+        this.uuid = UUID.randomUUID();
         this.dungeonMaster = dungeonMaster;
         this.houses = new ArrayList<>(houses); // Create a mutable copy
         this.date = date;
@@ -88,6 +91,10 @@ public class Group {
 
     public void setDate(LocalDate date) {
         this.date = date;
+    }
+
+    public UUID getUuid() {
+        return uuid;
     }
 }
 

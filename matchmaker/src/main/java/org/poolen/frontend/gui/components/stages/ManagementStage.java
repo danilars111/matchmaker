@@ -14,8 +14,10 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
+import org.poolen.frontend.gui.listeners.PlayerUpdateListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +29,9 @@ import java.util.UUID;
  */
 public class ManagementStage extends Stage {
 
-    // A list to keep track of all our beautiful detached windows!
     private static final List<Stage> detachedStages = new ArrayList<>();
+    // A list of all the lovely components that are listening for player updates!
+    private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
 
     public ManagementStage(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
         initModality(Modality.APPLICATION_MODAL);
@@ -36,17 +39,20 @@ public class ManagementStage extends Stage {
 
         TabPane tabPane = new TabPane();
 
-        // Create our beautiful tabs
-        Tab playerTab = new PlayerManagementTab(attendingPlayers, onUpdate);
+        // --- The new, event-driven magic! ---
+        // We create the tabs...
+        PlayerManagementTab playerTab = new PlayerManagementTab(attendingPlayers, this::notifyPlayerUpdateListeners);
+        GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, this::notifyPlayerUpdateListeners);
+        // ...and we register the group tab as a listener!
+        addPlayerUpdateListener(groupTab);
+        // ------------------------------------
+
         Tab characterTab = new Tab("Character Management");
-        characterTab.setContent(new Label("Group management will go here!"));
-        Tab groupTab = new Tab("Group Management");
-        groupTab.setContent(new Label("Group management will go here!"));
+        characterTab.setContent(new Label("Character management will go here!"));
         Tab settingsTab = new SettingsTab();
         Tab persistenceTab = new Tab("Persistence");
         persistenceTab.setContent(new Label("Persistence will go here!"));
 
-        // Make them all detachable using the simpler button method
         makeTabDetachable(playerTab);
         makeTabDetachable(characterTab);
         makeTabDetachable(groupTab);
@@ -55,23 +61,15 @@ public class ManagementStage extends Stage {
 
         tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab, persistenceTab);
 
-        // We add a listener for when the main window is asked to close.
         this.setOnCloseRequest(event -> {
             Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
                     "Are you sure you want to close the management window? This will close all detached tabs as well.",
                     ButtonType.YES, ButtonType.CANCEL);
-
-            // --- The New Positioning Logic! ---
-            // This tells the alert box which window it belongs to.
             confirmation.initOwner(this);
-            // ---------------------------------
-
             confirmation.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.YES) {
-                    // Close all the detached child windows first.
                     new ArrayList<>(detachedStages).forEach(Stage::close);
                 } else {
-                    // If the user clicks cancel, we consume the event to stop the window from closing.
                     event.consume();
                 }
             });
@@ -81,13 +79,20 @@ public class ManagementStage extends Stage {
         setScene(scene);
     }
 
-    /**
-     * A beautiful, robust helper to make any tab detachable with a button.
-     * @param tab The tab to make detachable.
-     */
+    public void addPlayerUpdateListener(PlayerUpdateListener listener) {
+        this.playerUpdateListeners.add(listener);
+    }
+
+    public void notifyPlayerUpdateListeners() {
+        // Tell all our listeners that something has changed!
+        for (PlayerUpdateListener listener : playerUpdateListeners) {
+            listener.onPlayerUpdate();
+        }
+    }
+
+
     private void makeTabDetachable(Tab tab) {
         tab.setClosable(false);
-
         Label title = new Label(tab.getText());
         Button detachButton = new Button("↗");
         detachButton.setStyle("-fx-font-size: 8px; -fx-padding: 2 4 2 4;");
@@ -101,7 +106,6 @@ public class ManagementStage extends Stage {
                 detachButton.visibleProperty().unbind();
             }
         });
-
         tab.setGraphic(header);
         tab.setText(null);
 
@@ -110,23 +114,18 @@ public class ManagementStage extends Stage {
             if (parent != null && parent.getTabs().size() > 1) {
                 int originalIndex = parent.getTabs().indexOf(tab);
                 parent.getTabs().remove(tab);
-
                 Stage detachedStage = new Stage();
                 detachedStage.setTitle(title.getText());
-
                 StackPane contentPane = new StackPane();
                 if (tab.getContent() != null) {
                     contentPane.getChildren().add(tab.getContent());
                 }
                 detachedStage.setScene(new Scene(contentPane, 800, 500));
-
                 double parentX = ManagementStage.this.getX();
                 double parentY = ManagementStage.this.getY();
                 detachedStage.setX(parentX + 30);
                 detachedStage.setY(parentY + 60);
-
                 detachedStages.add(detachedStage);
-
                 detachedStage.setOnCloseRequest(closeEvent -> {
                     detachedStages.remove(detachedStage);
                     if (!parent.getTabs().contains(tab)) {
@@ -134,9 +133,9 @@ public class ManagementStage extends Stage {
                         parent.getTabs().add(insertionIndex, tab);
                     }
                 });
-
                 detachedStage.show();
             }
         });
     }
 }
+

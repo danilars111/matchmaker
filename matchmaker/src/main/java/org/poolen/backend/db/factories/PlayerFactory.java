@@ -1,13 +1,14 @@
 package org.poolen.backend.db.factories;
 
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.store.PlayerStore;
 
 /**
  * A factory for creating Player objects, ensuring consistent creation logic.
  * This follows the Singleton pattern to ensure there's only one factory.
  */
 public class PlayerFactory {
-
+    private static final PlayerStore playerStore = PlayerStore.getInstance();
     private static final PlayerFactory INSTANCE = new PlayerFactory();
 
     // Private constructor to enforce the singleton pattern
@@ -30,6 +31,7 @@ public class PlayerFactory {
      */
     public Player create(String name, boolean isDungeonMaster) {
         Player newPlayer = new Player(name, isDungeonMaster);
+        playerStore.addPlayer(newPlayer);
         return newPlayer;
     }
 }

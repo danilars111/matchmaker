@@ -45,7 +45,7 @@ public class PlayerRosterTableView extends VBox {
     private final TableColumn<Player, Boolean> attendingCol; // Now a member variable!
 
 
-    public PlayerRosterTableView(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
+    public PlayerRosterTableView(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super(10); // Spacing for the VBox
         this.setPadding(new Insets(10));
 
@@ -78,7 +78,7 @@ public class PlayerRosterTableView extends VBox {
                 } else {
                     attendingPlayers.remove(player.getUuid());
                 }
-                //               onUpdate.run();
+                onPlayerListChanged.run();
             });
             return attendingProperty;
         });

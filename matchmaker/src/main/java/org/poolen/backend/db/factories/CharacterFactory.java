@@ -3,6 +3,8 @@ package org.poolen.backend.db.factories;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.store.CharacterStore;
+import org.poolen.backend.db.store.PlayerStore;
 
 /**
  * A factory for creating Character objects and associating them with players.
@@ -10,8 +12,9 @@ import org.poolen.backend.db.entities.Player;
  * This follows the Singleton pattern.
  */
 public class CharacterFactory {
-
+    private static final CharacterStore characterStore = CharacterStore.getInstance();
     private static final CharacterFactory INSTANCE = new CharacterFactory();
+
 
     // Private constructor to enforce the singleton pattern
     private CharacterFactory() {}
@@ -65,7 +68,7 @@ public class CharacterFactory {
             // An alt character just gets added to the end.
             player.addCharacter(newCharacter);
         }
-
+        characterStore.addCharacter(newCharacter);
         return newCharacter;
     }
 }

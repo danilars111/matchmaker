@@ -6,12 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Character.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Character.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Group.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Group.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/GroupSuggester.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/GroupSuggester.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/Matchmaker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/engine/Matchmaker.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/factories/CharacterFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/factories/CharacterFactory.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/factories/PlayerFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/factories/PlayerFactory.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/PlayerManagementStage.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tables/PlayerRosterTableView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tables/PlayerRosterTableView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/PlayerManagementTab.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/PlayerManagementTab.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,6 +23,7 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Class" />
+        <option value="Interface" />
       </list>
     </option>
   </component>
@@ -103,7 +105,7 @@
       <workItem from="1756984740230" duration="58795000" />
       <workItem from="1757424861093" duration="4356000" />
       <workItem from="1757488458456" duration="18884000" />
-      <workItem from="1757576373631" duration="4726000" />
+      <workItem from="1757576373631" duration="8924000" />
     </task>
     <servers />
   </component>
@@ -117,6 +119,16 @@
           <url>file://$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java</url>
           <line>120</line>
           <option name="timeStamp" value="46" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/GroupManagementTab.java</url>
+          <line>68</line>
+          <option name="timeStamp" value="49" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java</url>
+          <line>87</line>
+          <option name="timeStamp" value="51" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

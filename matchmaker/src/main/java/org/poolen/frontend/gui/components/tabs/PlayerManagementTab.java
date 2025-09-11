@@ -21,18 +21,17 @@ public class PlayerManagementTab extends Tab {
     private boolean isShowingBlacklist = false;
     private static final PlayerStore playerStore = PlayerStore.getInstance();
 
-    public PlayerManagementTab(Map<UUID, Player> attendingPlayers, Runnable onUpdate) {
-        super("Player Management"); // Set the tab's title
+    public PlayerManagementTab(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
+        super("Player Management");
 
         SplitPane root = new SplitPane();
 
         PlayerFormView formView = new PlayerFormView();
-        PlayerRosterTableView rosterView = new PlayerRosterTableView(attendingPlayers, onUpdate);
+        PlayerRosterTableView rosterView = new PlayerRosterTableView(attendingPlayers, onPlayerListChanged);
 
         root.getItems().addAll(formView, rosterView);
         root.setDividerPositions(0.35);
 
-        // --- Event Handlers ---
         rosterView.setOnPlayerDoubleClick(player -> {
             if (isShowingBlacklist) {
                 formView.getBlacklistButton().fire();
@@ -61,7 +60,7 @@ public class PlayerManagementTab extends Tab {
                 playerToProcess.setDungeonMaster(formView.isDungeonMaster());
             }
 
-            onUpdate.run();
+            onPlayerListChanged.run(); // Announce the news!
             rosterView.updateRoster();
             formView.clearForm();
         });
@@ -77,7 +76,7 @@ public class PlayerManagementTab extends Tab {
                     if (response == ButtonType.YES) {
                         playerStore.removePlayer(playerToDelete);
                         attendingPlayers.remove(playerToDelete.getUuid());
-                        onUpdate.run();
+                        onPlayerListChanged.run(); // Announce the news!
                         rosterView.updateRoster();
                         formView.clearForm();
                     }
@@ -91,10 +90,8 @@ public class PlayerManagementTab extends Tab {
                 new Alert(Alert.AlertType.WARNING, "You must be editing a player to view their blacklist.").showAndWait();
                 return;
             }
-
             isShowingBlacklist = !isShowingBlacklist;
             formView.setBlacklistMode(isShowingBlacklist);
-
             if (isShowingBlacklist) {
                 rosterView.showBlacklistedPlayers(editor);
             } else {
@@ -105,7 +102,6 @@ public class PlayerManagementTab extends Tab {
         formView.getBlacklistButton().setOnAction(e -> {
             Player editor = formView.getPlayerBeingEdited();
             Player selected = rosterView.getSelectedPlayer();
-
             if (editor == null) {
                 new Alert(Alert.AlertType.WARNING, "Double-click a player to edit them before managing their blacklist.").showAndWait();
                 return;
@@ -118,30 +114,27 @@ public class PlayerManagementTab extends Tab {
                 new Alert(Alert.AlertType.ERROR, "A player cannot blacklist themselves!").showAndWait();
                 return;
             }
-
             if (isShowingBlacklist) {
                 Optional<ButtonType> response = new Alert(Alert.AlertType.CONFIRMATION,
                         "Remove " + selected.getName() + " from " + editor.getName() + "'s blacklist?",
                         ButtonType.YES, ButtonType.NO).showAndWait();
-
                 if (response.isPresent() && response.get() == ButtonType.YES) {
                     editor.unblacklist(selected);
-                    onUpdate.run();
+                    onPlayerListChanged.run(); // Announce the news!
                     rosterView.showBlacklistedPlayers(editor);
                 }
             } else {
                 Optional<ButtonType> response = new Alert(Alert.AlertType.CONFIRMATION,
                         "Are you sure you want " + editor.getName() + " to blacklist " + selected.getName() + "?",
                         ButtonType.YES, ButtonType.NO).showAndWait();
-
                 if (response.isPresent() && response.get() == ButtonType.YES) {
                     editor.blacklist(selected);
-                    onUpdate.run();
+                    onPlayerListChanged.run(); // Announce the news!
                 }
             }
         });
 
-        // The SplitPane is the content of our beautiful new tab!
         this.setContent(root);
     }
 }
+
