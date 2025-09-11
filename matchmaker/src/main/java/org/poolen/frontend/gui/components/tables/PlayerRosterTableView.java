@@ -8,17 +8,7 @@ import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.Pagination;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableColumn.SortType;
-import javafx.scene.control.TableRow;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.HBox;
@@ -56,10 +46,8 @@ public class PlayerRosterTableView extends VBox {
     private final FilteredList<Player> filteredData;
     private static final PlayerStore playerStore = PlayerStore.getInstance();
     private int rowsPerPage = 15;
-
-    // --- Sort Persistence
-    private TableColumn sortColumn = null;
-    private SortType sortType = null;
+    // A beautiful little place to remember how you like things sorted, just like you wanted!
+    private List<TableColumn<Player, ?>> savedSortOrder = new ArrayList<>();
 
     // --- Mode-specific variables ---
     private final RosterMode mode;
@@ -93,6 +81,26 @@ public class PlayerRosterTableView extends VBox {
         playerTable.setEditable(true);
 
         // --- Column Definitions ---
+        TableColumn<Player, Void> rowNumCol = new TableColumn<>("#");
+        rowNumCol.setSortable(false);
+        rowNumCol.setPrefWidth(40);
+        rowNumCol.setMaxWidth(40);
+        rowNumCol.setMinWidth(40);
+        rowNumCol.setStyle("-fx-alignment: CENTER;");
+        rowNumCol.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setText(null);
+                } else {
+                    int pageIndex = pagination.getCurrentPageIndex();
+                    int rowIndex = getIndex();
+                    setText(String.valueOf((pageIndex * rowsPerPage) + rowIndex + 1));
+                }
+            }
+        });
+
         TableColumn<Player, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
         TableColumn<Player, Boolean> dmCol = new TableColumn<>("DM");
@@ -115,7 +123,6 @@ public class PlayerRosterTableView extends VBox {
         HBox filterPanel = new HBox(10);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        // We will now add the DM checkbox conditionally based on the mode!
         filterPanel.getChildren().addAll(houseFilterBox, spacer, refreshButton);
         filterPanel.setAlignment(Pos.CENTER_LEFT);
 
@@ -124,10 +131,10 @@ public class PlayerRosterTableView extends VBox {
         // --- Mode-Specific Setup ---
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             setupForPlayerManagement(onPlayerListChanged, filterPanel);
-            playerTable.getColumns().addAll(nameCol, dmCol, charCol, interactiveColumn);
+            playerTable.getColumns().addAll(rowNumCol, nameCol, dmCol, charCol, interactiveColumn);
         } else { // GROUP_ASSIGNMENT
             setupForGroupAssignment(filterPanel);
-            playerTable.getColumns().addAll(nameCol, charCol, interactiveColumn);
+            playerTable.getColumns().addAll(rowNumCol, nameCol, charCol, interactiveColumn);
         }
 
         // --- Universal Listeners ---
@@ -140,7 +147,6 @@ public class PlayerRosterTableView extends VBox {
 
         filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends Player> c) -> {
             updatePageCount(filteredData.size());
-            pagination.setPageFactory(null);
             pagination.setPageFactory(createPageFactory(filteredData));
         });
 
@@ -154,7 +160,6 @@ public class PlayerRosterTableView extends VBox {
 
     private void setupForPlayerManagement(Runnable onPlayerListChanged, HBox filterPanel) {
         modeSpecificFilterCheckbox = new CheckBox("Show Attending Only");
-        // We add our beautiful, mode-specific controls at index 1, right after the house filter!
         filterPanel.getChildren().add(1, dmFilterCheckBox);
         filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
         interactiveColumn = createAttendingColumn(onPlayerListChanged);
@@ -200,23 +205,15 @@ public class PlayerRosterTableView extends VBox {
         return col;
     }
 
-    /**
-     * Sets the context to an existing group for editing.
-     * @param group The group to edit.
-     */
     public void displayForGroup(Group group) {
         this.currentGroup = group;
-        this.dmForNewGroup = null; // We're editing, so clear the temporary DM
+        this.dmForNewGroup = null;
         applyFilter();
         playerTable.refresh();
     }
 
-    /**
-     * Sets the DM to be filtered out when creating a new group.
-     * @param dm The selected Dungeon Master for the new group.
-     */
     public void setDmForNewGroup(Player dm) {
-        this.currentGroup = null; // We're creating, so clear the edit-mode group
+        this.currentGroup = null;
         this.dmForNewGroup = dm;
         applyFilter();
         playerTable.refresh();
@@ -243,11 +240,6 @@ public class PlayerRosterTableView extends VBox {
         boolean selectedOnly = (mode == RosterMode.GROUP_ASSIGNMENT && modeSpecificFilterCheckbox.isSelected());
         String searchText = searchField.getText();
 
-        if (!playerTable.getSortOrder().isEmpty()) {
-            sortColumn = playerTable.getSortOrder().get(0);
-            sortType = sortColumn.getSortType();
-        }
-
         filteredData.setPredicate(player -> {
             boolean textMatch = true;
             if (searchText != null && !searchText.isEmpty()) {
@@ -272,22 +264,29 @@ public class PlayerRosterTableView extends VBox {
                 }
                 return textMatch && houseMatch && selectedMatch;
             }
+
             return textMatch && dmMatch && houseMatch && attendingMatch;
         });
-
-        if (sortColumn!=null) {
-            playerTable.getSortOrder().add(sortColumn);
-            sortColumn.setSortType(sortType);
-            sortColumn.setSortable(true); // This performs a sort
-        }
-        playerTable.sort();
     }
 
+    /**
+     * Updates the roster with fresh data and re-applies the last used sort order.
+     */
     public void updateRoster() {
+        // --- Save the current sort order ---
+        savedSortOrder = new ArrayList<>(playerTable.getSortOrder());
+
+        // --- Update the source data ---
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             sourcePlayers.setAll(playerStore.getAllPlayers());
         } else { // GROUP_ASSIGNMENT
             sourcePlayers.setAll(attendingPlayers.values());
+        }
+
+        // --- Restore the saved sort order ---
+        if (!savedSortOrder.isEmpty()) {
+            playerTable.getSortOrder().setAll(savedSortOrder);
+            playerTable.sort(); // This performs the sort on the currently visible page
         }
     }
 
@@ -295,7 +294,7 @@ public class PlayerRosterTableView extends VBox {
         return (HBox) this.getChildren().get(1);
     }
 
-    private Callback<Integer, Node> createPageFactory(FilteredList<Player> data) {
+    private Callback<Integer, Node> createPageFactory(List<Player> data) {
         return pageIndex -> {
             int fromIndex = pageIndex * this.rowsPerPage;
             int toIndex = Math.min(fromIndex + this.rowsPerPage, data.size());
@@ -343,7 +342,6 @@ public class PlayerRosterTableView extends VBox {
             if (newRows > 0 && newRows != this.rowsPerPage) {
                 this.rowsPerPage = newRows;
                 updatePageCount(filteredData.size());
-                pagination.setPageFactory(null);
                 pagination.setPageFactory(createPageFactory(filteredData));
             }
         }
