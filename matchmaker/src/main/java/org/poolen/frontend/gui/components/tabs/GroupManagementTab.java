@@ -165,11 +165,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             });
             groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), new ArrayList<>(newPartyMap.values())));
         } else {
-            dmsToReassignAsDm.forEach((source, dm) -> source.moveDungeonMasterTo(dm, groupToEdit));
-            playersToPromoteToDm.forEach((source, player) -> {
-                source.removePartyMember(player);
-                groupToEdit.setDungeonMaster(player);
-            });
+            // First, handle removing players/DMs from their original groups
+            dmsToReassignAsDm.keySet().forEach(Group::removeDungeonMaster);
+            playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
+
+            // Now, update the group being edited with the new information from the form
+            groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
             groupToEdit.setHouses(groupForm.getSelectedHouses());
         }
         cleanUp();
@@ -367,4 +368,3 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         updateDmList();
     }
 }
-
