@@ -17,11 +17,16 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
+import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.views.tables.GroupTableView;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 /**
@@ -47,8 +52,11 @@ public class GroupDisplayView extends BorderPane {
     private Runnable onSuggestionRequestHandler;
     private Consumer<List<House>> onSuggestedGroupsCreateHandler;
     private Runnable onAutoPopulateHandler;
+    private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
+    private Map<UUID, Player> attendingPlayers;
+    private Set<Player> allAssignedDms;
     private final List<GroupTableView> groupCards = new ArrayList<>();
     private static final double ESTIMATED_CARD_WIDTH = 200.0;
     private int lastColumnCount = -1;
@@ -123,8 +131,11 @@ public class GroupDisplayView extends BorderPane {
         });
     }
 
-    public void updateGroups(List<Group> groups) {
+    public void updateGroups(List<Group> groups, Map<UUID, Player> attendingPlayers, Set<Player> allAssignedDms) {
         this.currentGroups = groups;
+        this.attendingPlayers = attendingPlayers;
+        this.allAssignedDms = allAssignedDms;
+
         if (groups.isEmpty()) {
             header.setVisible(false);
             footer.setVisible(false);
@@ -193,6 +204,9 @@ public class GroupDisplayView extends BorderPane {
             if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
             if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
             if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
+            if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
+            if (attendingPlayers != null && allAssignedDms != null) groupCard.setDmList(attendingPlayers, allAssignedDms);
+
             groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
             groupCards.add(groupCard);
             GridPane.setValignment(groupCard, VPos.TOP);
@@ -246,6 +260,10 @@ public class GroupDisplayView extends BorderPane {
 
     public void setOnAutoPopulate(Runnable handler) {
         this.onAutoPopulateHandler = handler;
+    }
+
+    public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
+        this.onDmUpdateRequestHandler = handler;
     }
 }
 

@@ -1,10 +1,16 @@
 package org.poolen.frontend.gui.components.views.tables;
 
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Separator;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
@@ -20,13 +26,19 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
+import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
+import javafx.util.Callback;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 
-import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -35,25 +47,24 @@ import java.util.stream.Collectors;
  */
 public class GroupTableView extends TitledPane {
 
-    // --- A special format to carry our precious player data during the drag! ---
     private static final DataFormat PLAYER_TRANSFER_FORMAT = new DataFormat("application/x-player-transfer");
+    private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
 
     private final TableView<Player> partyTable;
-    private final Label dateLabel;
     private final Button editButton;
     private final Button deleteButton;
-    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy");
     private Group currentGroup;
     private PlayerMoveHandler onPlayerMoveHandler;
+    private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
 
     private final Label dmNameLabel;
     private final Label themesLabel;
     private final Label partySizeLabel;
+    private final ComboBox<Object> dmComboBox;
 
     public GroupTableView() {
         super();
 
-        // --- Our beautiful new title bar ---
         dmNameLabel = new Label();
         dmNameLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
         themesLabel = new Label();
@@ -74,17 +85,34 @@ public class GroupTableView extends TitledPane {
         this.setText(null);
 
         // --- Information Header ---
-        dateLabel = new Label();
+        dmComboBox = new ComboBox<>();
+        dmComboBox.setMaxWidth(Double.MAX_VALUE);
+        setupDmComboBoxCellFactory();
+
+        dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null || oldVal == newVal) return;
+            if (newVal instanceof Player && oldVal instanceof Player && ((Player) newVal).getUuid().equals(((Player) oldVal).getUuid())) return;
+            if (newVal.equals(UNASSIGNED_PLACEHOLDER) && oldVal == null) return;
+
+            Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
+            if (onDmUpdateRequestHandler != null) {
+                boolean success = onDmUpdateRequestHandler.apply(this.currentGroup, selectedPlayer);
+                if (!success) {
+                    Platform.runLater(() -> dmComboBox.setValue(oldVal));
+                }
+            }
+        });
+
         editButton = new Button("Edit");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        HBox infoHeader = new HBox(5, dateLabel, headerSpacer, editButton);
+        HBox infoHeader = new HBox(5, dmComboBox, headerSpacer, editButton);
         infoHeader.setAlignment(Pos.CENTER_LEFT);
         infoHeader.setPadding(new Insets(5, 10, 0, 10));
 
         // --- Party Roster Table ---
         partyTable = new TableView<>();
-        setupDragAndDrop(); // We teach our table its beautiful new dance moves!
+        setupDragAndDrop();
 
         TableColumn<Player, Void> rowNumCol = new TableColumn<>("#");
         rowNumCol.setSortable(false);
@@ -107,7 +135,6 @@ public class GroupTableView extends TitledPane {
         partyTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         partyTable.setPrefHeight(150);
 
-        // --- Final Layout ---
         VBox contentBox = new VBox(10, infoHeader, partyTable);
         contentBox.setPadding(new Insets(10));
         contentBox.setStyle("-fx-background-color: #f9f9f9;");
@@ -127,13 +154,76 @@ public class GroupTableView extends TitledPane {
         if (themes.isEmpty()) themes = "No themes";
         themesLabel.setText("• " + themes);
         partySizeLabel.setText(group.getParty().size() + " players");
-        String date = group.getDate() != null ? group.getDate().format(dateFormatter) : "N/A";
-        dateLabel.setText(date);
         partyTable.setItems(FXCollections.observableArrayList(group.getParty().values()));
+
+        if (group.getDungeonMaster() == null) {
+            dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
+        } else {
+            dmComboBox.setValue(group.getDungeonMaster());
+        }
+    }
+
+    public void setDmList(Map<UUID, Player> attendingPlayers, Set<Player> unavailablePlayers) {
+        Object selectedDm = dmComboBox.getValue();
+        ObservableList<Object> items = FXCollections.observableArrayList();
+        items.add(UNASSIGNED_PLACEHOLDER);
+
+        List<Player> allDms = attendingPlayers.values().stream()
+                .filter(Player::isDungeonMaster)
+                .sorted(Comparator.comparing(Player::getName))
+                .toList();
+
+        Player currentDmForThisGroup = currentGroup != null ? currentGroup.getDungeonMaster() : null;
+
+        List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm) || dm.equals(currentDmForThisGroup)).toList();
+        List<Player> trulyUnavailableDms = allDms.stream().filter(dm -> unavailablePlayers.contains(dm) && !dm.equals(currentDmForThisGroup)).toList();
+
+        items.addAll(availableDms);
+        if (!trulyUnavailableDms.isEmpty()) {
+            items.add(new Separator());
+            items.addAll(trulyUnavailableDms);
+        }
+
+        dmComboBox.setItems(items);
+        if (selectedDm != null && items.contains(selectedDm)) {
+            dmComboBox.setValue(selectedDm);
+        } else if (currentDmForThisGroup != null) {
+            dmComboBox.setValue(currentDmForThisGroup);
+        } else {
+            dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
+        }
+    }
+
+    private void setupDmComboBoxCellFactory() {
+        Callback<ListView<Object>, ListCell<Object>> cellFactory = lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(Object item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else if (item instanceof Separator) {
+                    setText(null);
+                    Region separatorLine = new Region();
+                    separatorLine.setStyle("-fx-border-style: solid; -fx-border-width: 1 0 0 0; -fx-border-color: #c0c0c0;");
+                    separatorLine.setMaxHeight(1);
+                    setGraphic(separatorLine);
+                    setPadding(new Insets(5, 0, 5, 0));
+                    setDisable(true);
+                } else if (item.equals(UNASSIGNED_PLACEHOLDER)) {
+                    setText(UNASSIGNED_PLACEHOLDER);
+                    setFont(Font.font("System", FontPosture.ITALIC, 12));
+                } else {
+                    setText(((Player) item).getName());
+                    setFont(Font.getDefault());
+                }
+            }
+        };
+        dmComboBox.setCellFactory(cellFactory);
+        dmComboBox.setButtonCell(cellFactory.call(null));
     }
 
     private void setupDragAndDrop() {
-        // --- This card can now receive players! ---
         this.setOnDragOver(event -> {
             if (event.getGestureSource() != this && event.getDragboard().hasContent(PLAYER_TRANSFER_FORMAT)) {
                 event.acceptTransferModes(TransferMode.MOVE);
@@ -158,7 +248,6 @@ public class GroupTableView extends TitledPane {
             event.consume();
         });
 
-        // --- Each row can now be dragged! ---
         partyTable.setRowFactory(tv -> {
             TableRow<Player> row = new TableRow<>();
             row.setOnDragDetected(event -> {
@@ -166,7 +255,6 @@ public class GroupTableView extends TitledPane {
                     Dragboard db = row.startDragAndDrop(TransferMode.MOVE);
                     db.setDragView(row.snapshot(null, null));
                     ClipboardContent content = new ClipboardContent();
-                    // We put the source group and player UUIDs on the clipboard
                     content.put(PLAYER_TRANSFER_FORMAT, currentGroup.getUuid() + ":" + row.getItem().getUuid());
                     db.setContent(content);
                     event.consume();
@@ -190,5 +278,9 @@ public class GroupTableView extends TitledPane {
 
     public void setOnPlayerMove(PlayerMoveHandler handler) {
         this.onPlayerMoveHandler = handler;
+    }
+
+    public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
+        this.onDmUpdateRequestHandler = handler;
     }
 }
