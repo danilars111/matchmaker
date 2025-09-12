@@ -1,4 +1,4 @@
-package org.poolen.frontend.gui.components.forms;
+package org.poolen.frontend.gui.components.views.forms;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;

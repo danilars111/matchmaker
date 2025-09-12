@@ -1,4 +1,4 @@
-package org.poolen.frontend.gui.components.tables;
+package org.poolen.frontend.gui.components.views.tables;
 
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -55,13 +55,12 @@ public class PlayerRosterTableView extends VBox {
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
     private Group currentGroup; // Used in GROUP_ASSIGNMENT mode (editing)
+    private Map<UUID, Player> partyForNewGroup; // Used when creating a new group
     private Player dmForNewGroup; // Used in GROUP_ASSIGNMENT mode (creating)
-    private Map<UUID, Player> partyForNewGroup; // The map for our new party!
     private TableColumn<Player, Boolean> interactiveColumn; // Attending or Selected
     private CheckBox modeSpecificFilterCheckbox; // Attending or Selected filter
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
-    private final Runnable onPlayerListChanged;
 
 
     public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
@@ -69,7 +68,6 @@ public class PlayerRosterTableView extends VBox {
         this.setPadding(new Insets(10));
         this.mode = mode;
         this.attendingPlayers = attendingPlayers;
-        this.onPlayerListChanged = onPlayerListChanged;
 
         this.playerTable = new TableView<>();
         this.searchField = new TextField();
@@ -196,19 +194,27 @@ public class PlayerRosterTableView extends VBox {
         TableColumn<Player, Boolean> col = new TableColumn<>("Selected");
         col.setCellValueFactory(cellData -> {
             Player player = cellData.getValue();
-            // We cleverly decide which map to use!
-            Map<UUID, Player> targetParty = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
-
-            // If we don't have a map (like when the roster is hidden), we can't do anything.
-            if (targetParty == null) return new SimpleBooleanProperty(false);
-
-            boolean isSelected = targetParty.containsKey(player.getUuid());
+            Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
+            boolean isSelected = partyMap != null && partyMap.containsKey(player.getUuid());
             SimpleBooleanProperty property = new SimpleBooleanProperty(isSelected);
+
             property.addListener((obs, was, isNow) -> {
-                if (isNow) targetParty.put(player.getUuid(), player);
-                else targetParty.remove(player.getUuid());
-                // We announce the change, just as you wanted!
-                onPlayerListChanged.run();
+                if (currentGroup != null) {
+                    // Editing an existing group, so we use the polite methods!
+                    if (isNow) {
+                        currentGroup.addPartyMember(player);
+                    } else {
+                        currentGroup.removePartyMember(player);
+                    }
+                    playerTable.refresh(); // We refresh the table to see the change
+                } else if (partyForNewGroup != null) {
+                    // Creating a new group, we can change the map directly.
+                    if (isNow) {
+                        partyForNewGroup.put(player.getUuid(), player);
+                    } else {
+                        partyForNewGroup.remove(player.getUuid());
+                    }
+                }
             });
             return property;
         });
@@ -216,37 +222,25 @@ public class PlayerRosterTableView extends VBox {
         return col;
     }
 
-    /**
-     * Sets the context to an existing group for editing.
-     * @param group The group to edit.
-     */
+
     public void displayForGroup(Group group) {
         this.currentGroup = group;
-        this.dmForNewGroup = null;
         this.partyForNewGroup = null;
-        applyFilter();
+        this.dmForNewGroup = null;
         playerTable.refresh();
     }
 
-    /**
-     * Sets the DM to be filtered out when creating a new group.
-     * @param dm The selected Dungeon Master for the new group.
-     */
-    public void setDmForNewGroup(Player dm) {
+    public void setPartyForNewGroup(Map<UUID, Player> partyMap) {
         this.currentGroup = null;
+        this.partyForNewGroup = partyMap;
+        playerTable.refresh();
+    }
+
+    public void setDmForNewGroup(Player dm) {
         this.dmForNewGroup = dm;
         applyFilter();
         playerTable.refresh();
     }
-
-    /**
-     * Gives the table the map it should use to store selected players for a new group.
-     * @param party The map to use.
-     */
-    public void setPartyForNewGroup(Map<UUID, Player> party) {
-        this.partyForNewGroup = party;
-    }
-
 
     public void showBlacklistedPlayers(Player editingPlayer) {
         getFilterPanel().getChildren().forEach(node -> node.setDisable(true));
@@ -270,7 +264,7 @@ public class PlayerRosterTableView extends VBox {
         String searchText = searchField.getText();
 
         if (!playerTable.getSortOrder().isEmpty()) {
-            sortColumn = playerTable.getSortOrder().get(0);
+            sortColumn = (TableColumn<Player, ?>) playerTable.getSortOrder().get(0);
             sortType = sortColumn.getSortType();
         }
 
@@ -284,20 +278,15 @@ public class PlayerRosterTableView extends VBox {
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
             boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
-
-            // We decide which party map to use for the "Selected Only" filter
-            Map<UUID, Player> targetParty = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
-            boolean selectedMatch = !selectedOnly || (targetParty != null && targetParty.containsKey(player.getUuid()));
-
+            Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
+            boolean selectedMatch = !selectedOnly || (partyMap != null && partyMap.containsKey(player.getUuid()));
             boolean houseMatch = true;
             if (selectedHouse != null) {
                 houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
             }
 
             if (mode == RosterMode.GROUP_ASSIGNMENT) {
-                // We also decide which DM to exclude based on our mode
                 Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
-
                 if (dmToExclude != null && player.equals(dmToExclude)) {
                     return false;
                 }
@@ -310,7 +299,7 @@ public class PlayerRosterTableView extends VBox {
         if (sortColumn != null) {
             playerTable.getSortOrder().add(sortColumn);
             sortColumn.setSortType(sortType);
-            sortColumn.setSortable(true); // This performs a sort
+            sortColumn.setSortable(true);
         }
         playerTable.sort();
     }
@@ -318,7 +307,7 @@ public class PlayerRosterTableView extends VBox {
     public void updateRoster() {
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             sourcePlayers.setAll(playerStore.getAllPlayers());
-        } else { // GROUP_ASSIGNMENT
+        } else {
             sourcePlayers.setAll(attendingPlayers.values());
         }
     }
@@ -332,7 +321,7 @@ public class PlayerRosterTableView extends VBox {
             int fromIndex = pageIndex * this.rowsPerPage;
             int toIndex = Math.min(fromIndex + this.rowsPerPage, data.size());
             playerTable.setItems(FXCollections.observableArrayList(data.subList(fromIndex, toIndex)));
-            playerTable.refresh(); // We tell the table to redraw its rows, fixing our numbers!
+            playerTable.refresh();
             return playerTable;
         };
     }
@@ -391,5 +380,4 @@ public class PlayerRosterTableView extends VBox {
         });
     }
 }
-
 

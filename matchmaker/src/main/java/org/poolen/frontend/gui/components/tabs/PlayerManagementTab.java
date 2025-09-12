@@ -6,8 +6,8 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.frontend.gui.components.forms.PlayerFormView;
-import org.poolen.frontend.gui.components.tables.PlayerRosterTableView;
+import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
+import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 
 import java.util.Map;
 import java.util.Optional;

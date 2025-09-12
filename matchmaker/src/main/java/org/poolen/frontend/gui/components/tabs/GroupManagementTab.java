@@ -1,15 +1,13 @@
 package org.poolen.frontend.gui.components.tabs;
 
-import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
-import javafx.scene.layout.VBox;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
-import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.frontend.gui.components.forms.GroupFormView;
-import org.poolen.frontend.gui.components.tables.PlayerRosterTableView;
+import org.poolen.frontend.gui.components.views.forms.GroupFormView;
+import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
+import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.listeners.PlayerUpdateListener;
 
 import java.time.LocalDate;
@@ -27,14 +25,13 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private static final GroupFactory groupFactory = GroupFactory.getInstance();
     private final GroupFormView groupForm;
     private final SplitPane root;
-    private final PlayerRosterTableView rosterView; // Our one and only roster view!
+    private final PlayerRosterTableView rosterView;
     private boolean isPlayerRosterVisible = false;
 
-    // --- A beautiful map just for our new party, as you wanted! ---
-    private Map<UUID, Player> newPartyMap;
-    private Map<UUID, Player> attendingPlayers;
-    private List<Group> groups = new ArrayList<>();
-    private List<Label> tmpGroupLabels = new ArrayList<>();
+    private final Map<UUID, Player> newPartyMap;
+    private final Map<UUID, Player> attendingPlayers;
+    private final List<Group> groups = new ArrayList<>();
+    private final GroupDisplayView groupDisplayView;
 
     public GroupManagementTab(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super("Group Management");
@@ -42,65 +39,74 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.root = new SplitPane();
         this.attendingPlayers = attendingPlayers;
         this.groupForm = new GroupFormView(attendingPlayers);
-
-        VBox rightPane = new VBox(10);
-        groups.forEach(group -> rightPane.getChildren().add(new Label(group.toString())));
-       // rightPane.getChildren().add(new Label("A beautiful list of groups or players will go here!"));
-
-        // --- We create our roster once and for all! ---
+        this.groupDisplayView = new GroupDisplayView();
         this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, onPlayerListChanged);
-
-        // We still create a fresh map for our new party!
         this.newPartyMap = new HashMap<>();
 
-        cleanUp(); // We start with a clean slate
+        cleanUp();
 
-        // We tell our persistent roster about the new map and the selected DM
-        rosterView.setPartyForNewGroup(newPartyMap);
-        rosterView.setDmForNewGroup(groupForm.getSelectedDm());
-
-        root.getItems().addAll(groupForm, rightPane);
+        root.getItems().addAll(groupForm, groupDisplayView);
         root.setDividerPositions(0.4);
 
-        groupForm.getShowPlayersButton().setOnAction(e -> {
-            isPlayerRosterVisible = !isPlayerRosterVisible;
-            if (isPlayerRosterVisible) {
-                root.getItems().set(1, rosterView); // Show our beautiful roster
-                groupForm.getShowPlayersButton().setText("Hide Players");
-                rightPane.getChildren().clear();
-            } else {
-                groups.forEach(group -> tmpGroupLabels.add(new Label(group.toString())));
-                tmpGroupLabels.forEach(label -> rightPane.getChildren().add(label));
-                root.getItems().set(1, rightPane);
-                groupForm.getShowPlayersButton().setText("Show Players");
-                tmpGroupLabels.clear();
-            }
-        });
+        // --- Event Wiring ---
+        groupForm.getShowPlayersButton().setOnAction(e -> toggleRosterView());
 
-        // When the DM changes, we tell our roster to update its filter.
         groupForm.setOnDmSelection(rosterView::setDmForNewGroup);
 
-        // When the cancel button is clicked, we just clear the form.
-        groupForm.getCancelButton().setOnAction(e ->  cleanUp() );
+        groupForm.getCancelButton().setOnAction(e -> cleanUp());
 
-        groupForm.getActionButton().setOnAction(e -> {
-            groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), newPartyMap.values().stream().toList()));
-            cleanUp();
-        });
+        groupForm.getActionButton().setOnAction(e -> handleGroupAction());
 
-        this.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
-            if (isNowSelected) {
-                groupForm.updateDmList(attendingPlayers);
-            }
+        groupDisplayView.setOnGroupEdit(this::prepareForEdit);
+
+        this.selectedProperty().addListener((obs, was, isNow) -> {
+            if (isNow) groupForm.updateDmList(attendingPlayers);
         });
 
         this.setContent(root);
     }
 
+    private void toggleRosterView() {
+        isPlayerRosterVisible = !isPlayerRosterVisible;
+        if (isPlayerRosterVisible) {
+            root.getItems().set(1, rosterView);
+            groupForm.getShowPlayersButton().setText("Hide Players");
+        } else {
+            groupDisplayView.updateGroups(groups);
+            root.getItems().set(1, groupDisplayView);
+            groupForm.getShowPlayersButton().setText("Show Players");
+        }
+    }
+
+    private void handleGroupAction() {
+        Group groupToEdit = groupForm.getGroupBeingEdited();
+        if (groupToEdit == null) { // Creating a new group
+            groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), newPartyMap.values().stream().toList()));
+        } else { // Updating an existing group
+            groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
+            groupToEdit.setHouses(groupForm.getSelectedHouses());
+            // The party is already updated in real-time by the checkboxes
+        }
+        cleanUp();
+    }
+
+    private void prepareForEdit(Group groupToEdit) {
+        groupForm.populateForm(groupToEdit);
+        rosterView.displayForGroup(groupToEdit); // Tell roster to use the group's real party map
+        if (!isPlayerRosterVisible) {
+            toggleRosterView();
+        }
+    }
+
     private void cleanUp() {
-        groupForm.getShowPlayersButton().fire();
+        if (isPlayerRosterVisible) {
+            toggleRosterView();
+        }
         groupForm.clearForm();
         newPartyMap.clear();
+        rosterView.setPartyForNewGroup(newPartyMap); // Reset roster to use the new party map
+        rosterView.setDmForNewGroup(null);
+        groupDisplayView.updateGroups(groups);
     }
 
     @Override
