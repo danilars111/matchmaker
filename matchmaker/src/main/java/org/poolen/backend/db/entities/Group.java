@@ -96,5 +96,15 @@ public class Group {
     public UUID getUuid() {
         return uuid;
     }
+
+    public void movePlayerTo(Player player, Group group) {
+        this.removePartyMember(player);
+        group.addPartyMember(player);
+    }
+
+    public void moveDmTo(Player dm, Group group) {
+        this.setDungeonMaster(null);
+        group.setDungeonMaster(dm);
+    }
 }
 

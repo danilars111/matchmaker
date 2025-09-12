@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui.components.views.tables;
 
+import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -21,6 +22,7 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,7 +35,6 @@ import java.util.stream.Collectors;
 
 /**
  * A highly reusable JavaFX component that displays a filterable and paginated table of players.
- * It can operate in two modes: PLAYER_MANAGEMENT and GROUP_ASSIGNMENT.
  */
 public class PlayerRosterTableView extends VBox {
 
@@ -53,7 +54,6 @@ public class PlayerRosterTableView extends VBox {
     private TableColumn<Player, ?> sortColumn = null;
     private SortType sortType = null;
 
-    // --- Mode-specific variables ---
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
     private Group currentGroup;
@@ -61,11 +61,11 @@ public class PlayerRosterTableView extends VBox {
     private Player dmForNewGroup;
     private TableColumn<Player, Boolean> interactiveColumn;
     private CheckBox modeSpecificFilterCheckbox;
-    private CheckBox availableOnlyCheckbox; // Our beautiful new checkbox!
-    private List<Group> allGroups = new ArrayList<>(); // A place to know about all groups
+    private CheckBox availableOnlyCheckbox;
+    private List<Group> allGroups = new ArrayList<>();
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
-
+    private PlayerAddRequestHandler onPlayerAddRequestHandler; // Our new messenger handler!
 
     public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super(10);
@@ -97,13 +97,7 @@ public class PlayerRosterTableView extends VBox {
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) {
-                    setText(null);
-                } else {
-                    int pageIndex = pagination.getCurrentPageIndex();
-                    int rowIndex = getIndex();
-                    setText(String.valueOf((pageIndex * rowsPerPage) + rowIndex + 1));
-                }
+                setText(empty ? null : String.valueOf((pagination.getCurrentPageIndex() * rowsPerPage) + getIndex() + 1));
             }
         });
 
@@ -136,7 +130,7 @@ public class PlayerRosterTableView extends VBox {
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             setupForPlayerManagement(onPlayerListChanged, filterPanel);
             playerTable.getColumns().addAll(rowNumCol, nameCol, dmCol, charCol, interactiveColumn);
-        } else { // GROUP_ASSIGNMENT
+        } else {
             setupForGroupAssignment(filterPanel);
             playerTable.getColumns().addAll(rowNumCol, nameCol, charCol, interactiveColumn);
         }
@@ -144,12 +138,10 @@ public class PlayerRosterTableView extends VBox {
         searchField.textProperty().addListener((obs, old, val) -> applyFilter());
         houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
         dmFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-        if (modeSpecificFilterCheckbox != null) {
+        if (modeSpecificFilterCheckbox != null)
             modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-        }
-        if (availableOnlyCheckbox != null) {
+        if (availableOnlyCheckbox != null)
             availableOnlyCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-        }
 
         filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends Player> c) -> {
             updatePageCount(filteredData.size());
@@ -158,9 +150,7 @@ public class PlayerRosterTableView extends VBox {
 
         pagination.setPageFactory(createPageFactory(filteredData));
         pagination.heightProperty().addListener((obs, oldH, newH) -> handleResize());
-
         updateRoster();
-
         this.getChildren().addAll(filterPanel, searchField, pagination);
     }
 
@@ -174,7 +164,7 @@ public class PlayerRosterTableView extends VBox {
     private void setupForGroupAssignment(HBox filterPanel) {
         modeSpecificFilterCheckbox = new CheckBox("Selected");
         availableOnlyCheckbox = new CheckBox("Available");
-        availableOnlyCheckbox.setSelected(true); // Pre-checked, just as you wanted!
+        availableOnlyCheckbox.setSelected(true);
         filterPanel.getChildren().add(1, availableOnlyCheckbox);
         filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
         interactiveColumn = createSelectedColumn();
@@ -205,13 +195,22 @@ public class PlayerRosterTableView extends VBox {
             SimpleBooleanProperty property = new SimpleBooleanProperty(isSelected);
 
             property.addListener((obs, was, isNow) -> {
-                if (currentGroup != null) {
-                    if (isNow) currentGroup.addPartyMember(player);
-                    else currentGroup.removePartyMember(player);
-                    playerTable.refresh();
-                } else if (partyForNewGroup != null) {
-                    if (isNow) partyForNewGroup.put(player.getUuid(), player);
-                    else partyForNewGroup.remove(player.getUuid());
+                if (isNow) { // We are trying to add a player
+                    if (onPlayerAddRequestHandler != null) {
+                        // We politely ask permission!
+                        boolean success = onPlayerAddRequestHandler.onPlayerAddRequest(player);
+                        if (!success) {
+                            // If we're told no, we un-check the box!
+                            Platform.runLater(() -> property.set(false));
+                        }
+                    }
+                } else { // We are removing a player, which is always allowed.
+                    if (currentGroup != null) {
+                        currentGroup.removePartyMember(player);
+                        playerTable.refresh();
+                    } else if (partyForNewGroup != null) {
+                        partyForNewGroup.remove(player.getUuid());
+                    }
                 }
             });
             return property;
@@ -219,7 +218,6 @@ public class PlayerRosterTableView extends VBox {
         setCheckboxCellStyle(col);
         return col;
     }
-
 
     public void displayForGroup(Group group) {
         this.currentGroup = group;
@@ -243,6 +241,10 @@ public class PlayerRosterTableView extends VBox {
     public void setAllGroups(List<Group> groups) {
         this.allGroups = groups;
         applyFilter();
+    }
+
+    public void setOnPlayerAddRequest(PlayerAddRequestHandler handler) {
+        this.onPlayerAddRequestHandler = handler;
     }
 
     public void showBlacklistedPlayers(Player editingPlayer) {
@@ -271,24 +273,17 @@ public class PlayerRosterTableView extends VBox {
         }
 
         filteredData.setPredicate(player -> {
-            boolean textMatch = true;
-            if (searchText != null && !searchText.isEmpty()) {
-                String lowerCaseFilter = searchText.toLowerCase();
-                textMatch = player.getName().toLowerCase().contains(lowerCaseFilter) ||
-                        player.getUuid().toString().toLowerCase().contains(lowerCaseFilter);
-            }
+            boolean textMatch = searchText == null || searchText.isEmpty() ||
+                    player.getName().toLowerCase().contains(searchText.toLowerCase()) ||
+                    player.getUuid().toString().toLowerCase().contains(searchText.toLowerCase());
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
             boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
-            boolean houseMatch = true;
-            if (selectedHouse != null) {
-                houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
-            }
+            boolean houseMatch = selectedHouse == null || player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
 
             if (mode == RosterMode.GROUP_ASSIGNMENT) {
                 boolean selectedOnly = modeSpecificFilterCheckbox.isSelected();
                 boolean availableOnly = availableOnlyCheckbox.isSelected();
-
                 Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
                 boolean selectedMatch = !selectedOnly || (partyMap != null && partyMap.containsKey(player.getUuid()));
 
@@ -296,19 +291,15 @@ public class PlayerRosterTableView extends VBox {
                 if (availableOnly) {
                     Set<UUID> assignedPlayerIds = new HashSet<>();
                     for (Group group : allGroups) {
-                        // When editing, we don't count players in the group we're currently editing as "unavailable"
-                        if (currentGroup != null && currentGroup.equals(group)) {
-                            continue;
-                        }
+                        if (currentGroup != null && currentGroup.equals(group)) continue;
                         assignedPlayerIds.addAll(group.getParty().keySet());
                     }
                     availableMatch = !assignedPlayerIds.contains(player.getUuid());
                 }
 
                 Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
-                if (dmToExclude != null && player.equals(dmToExclude)) {
-                    return false;
-                }
+                if (dmToExclude != null && player.equals(dmToExclude)) return false;
+
                 return textMatch && houseMatch && selectedMatch && availableMatch;
             }
 
