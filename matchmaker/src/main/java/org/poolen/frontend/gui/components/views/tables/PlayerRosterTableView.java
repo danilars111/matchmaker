@@ -22,8 +22,11 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -47,18 +50,19 @@ public class PlayerRosterTableView extends VBox {
     private static final PlayerStore playerStore = PlayerStore.getInstance();
     private int rowsPerPage = 15;
 
-    // --- Your beautiful sorting fix! ---
     private TableColumn<Player, ?> sortColumn = null;
     private SortType sortType = null;
 
     // --- Mode-specific variables ---
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
-    private Group currentGroup; // Used in GROUP_ASSIGNMENT mode (editing)
-    private Map<UUID, Player> partyForNewGroup; // Used when creating a new group
-    private Player dmForNewGroup; // Used in GROUP_ASSIGNMENT mode (creating)
-    private TableColumn<Player, Boolean> interactiveColumn; // Attending or Selected
-    private CheckBox modeSpecificFilterCheckbox; // Attending or Selected filter
+    private Group currentGroup;
+    private Map<UUID, Player> partyForNewGroup;
+    private Player dmForNewGroup;
+    private TableColumn<Player, Boolean> interactiveColumn;
+    private CheckBox modeSpecificFilterCheckbox;
+    private CheckBox availableOnlyCheckbox; // Our beautiful new checkbox!
+    private List<Group> allGroups = new ArrayList<>(); // A place to know about all groups
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
 
@@ -74,7 +78,7 @@ public class PlayerRosterTableView extends VBox {
         this.pagination = new Pagination();
         this.sourcePlayers = FXCollections.observableArrayList();
         this.houseFilterBox = new ComboBox<>();
-        this.dmFilterCheckBox = new CheckBox("Show DMs Only");
+        this.dmFilterCheckBox = new CheckBox("DMs");
 
         VBox.setVgrow(this.pagination, Priority.ALWAYS);
         this.playerTable.setMaxWidth(Double.MAX_VALUE);
@@ -83,7 +87,6 @@ public class PlayerRosterTableView extends VBox {
         searchField.setPromptText("Search by name or UUID...");
         playerTable.setEditable(true);
 
-        // --- Column Definitions ---
         TableColumn<Player, Void> rowNumCol = new TableColumn<>("#");
         rowNumCol.setSortable(false);
         rowNumCol.setPrefWidth(40);
@@ -115,7 +118,6 @@ public class PlayerRosterTableView extends VBox {
                         .collect(Collectors.joining(", "))
         ));
 
-        // --- Filter Setup ---
         houseFilterBox.getItems().add(null);
         houseFilterBox.getItems().addAll(House.values());
         houseFilterBox.setPromptText("Filter by House");
@@ -131,7 +133,6 @@ public class PlayerRosterTableView extends VBox {
 
         this.filteredData = new FilteredList<>(sourcePlayers, p -> true);
 
-        // --- Mode-Specific Setup ---
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             setupForPlayerManagement(onPlayerListChanged, filterPanel);
             playerTable.getColumns().addAll(rowNumCol, nameCol, dmCol, charCol, interactiveColumn);
@@ -140,12 +141,14 @@ public class PlayerRosterTableView extends VBox {
             playerTable.getColumns().addAll(rowNumCol, nameCol, charCol, interactiveColumn);
         }
 
-        // --- Universal Listeners ---
         searchField.textProperty().addListener((obs, old, val) -> applyFilter());
         houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
         dmFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
         if (modeSpecificFilterCheckbox != null) {
             modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        }
+        if (availableOnlyCheckbox != null) {
+            availableOnlyCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
         }
 
         filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends Player> c) -> {
@@ -162,15 +165,18 @@ public class PlayerRosterTableView extends VBox {
     }
 
     private void setupForPlayerManagement(Runnable onPlayerListChanged, HBox filterPanel) {
-        modeSpecificFilterCheckbox = new CheckBox("Show Attending Only");
+        modeSpecificFilterCheckbox = new CheckBox("Attending");
         filterPanel.getChildren().add(1, dmFilterCheckBox);
         filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
         interactiveColumn = createAttendingColumn(onPlayerListChanged);
     }
 
     private void setupForGroupAssignment(HBox filterPanel) {
-        modeSpecificFilterCheckbox = new CheckBox("Show Selected Only");
-        filterPanel.getChildren().add(1, modeSpecificFilterCheckbox);
+        modeSpecificFilterCheckbox = new CheckBox("Selected");
+        availableOnlyCheckbox = new CheckBox("Available");
+        availableOnlyCheckbox.setSelected(true); // Pre-checked, just as you wanted!
+        filterPanel.getChildren().add(1, availableOnlyCheckbox);
+        filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
         interactiveColumn = createSelectedColumn();
     }
 
@@ -200,20 +206,12 @@ public class PlayerRosterTableView extends VBox {
 
             property.addListener((obs, was, isNow) -> {
                 if (currentGroup != null) {
-                    // Editing an existing group, so we use the polite methods!
-                    if (isNow) {
-                        currentGroup.addPartyMember(player);
-                    } else {
-                        currentGroup.removePartyMember(player);
-                    }
-                    playerTable.refresh(); // We refresh the table to see the change
+                    if (isNow) currentGroup.addPartyMember(player);
+                    else currentGroup.removePartyMember(player);
+                    playerTable.refresh();
                 } else if (partyForNewGroup != null) {
-                    // Creating a new group, we can change the map directly.
-                    if (isNow) {
-                        partyForNewGroup.put(player.getUuid(), player);
-                    } else {
-                        partyForNewGroup.remove(player.getUuid());
-                    }
+                    if (isNow) partyForNewGroup.put(player.getUuid(), player);
+                    else partyForNewGroup.remove(player.getUuid());
                 }
             });
             return property;
@@ -242,6 +240,11 @@ public class PlayerRosterTableView extends VBox {
         playerTable.refresh();
     }
 
+    public void setAllGroups(List<Group> groups) {
+        this.allGroups = groups;
+        applyFilter();
+    }
+
     public void showBlacklistedPlayers(Player editingPlayer) {
         getFilterPanel().getChildren().forEach(node -> node.setDisable(true));
         searchField.setDisable(true);
@@ -260,7 +263,6 @@ public class PlayerRosterTableView extends VBox {
         House selectedHouse = houseFilterBox.getValue();
         boolean dmsOnly = dmFilterCheckBox.isSelected();
         boolean attendingOnly = (mode == RosterMode.PLAYER_MANAGEMENT && modeSpecificFilterCheckbox.isSelected());
-        boolean selectedOnly = (mode == RosterMode.GROUP_ASSIGNMENT && modeSpecificFilterCheckbox.isSelected());
         String searchText = searchField.getText();
 
         if (!playerTable.getSortOrder().isEmpty()) {
@@ -278,19 +280,36 @@ public class PlayerRosterTableView extends VBox {
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
             boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
-            Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
-            boolean selectedMatch = !selectedOnly || (partyMap != null && partyMap.containsKey(player.getUuid()));
             boolean houseMatch = true;
             if (selectedHouse != null) {
                 houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
             }
 
             if (mode == RosterMode.GROUP_ASSIGNMENT) {
+                boolean selectedOnly = modeSpecificFilterCheckbox.isSelected();
+                boolean availableOnly = availableOnlyCheckbox.isSelected();
+
+                Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
+                boolean selectedMatch = !selectedOnly || (partyMap != null && partyMap.containsKey(player.getUuid()));
+
+                boolean availableMatch = true;
+                if (availableOnly) {
+                    Set<UUID> assignedPlayerIds = new HashSet<>();
+                    for (Group group : allGroups) {
+                        // When editing, we don't count players in the group we're currently editing as "unavailable"
+                        if (currentGroup != null && currentGroup.equals(group)) {
+                            continue;
+                        }
+                        assignedPlayerIds.addAll(group.getParty().keySet());
+                    }
+                    availableMatch = !assignedPlayerIds.contains(player.getUuid());
+                }
+
                 Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
                 if (dmToExclude != null && player.equals(dmToExclude)) {
                     return false;
                 }
-                return textMatch && houseMatch && selectedMatch;
+                return textMatch && houseMatch && selectedMatch && availableMatch;
             }
 
             return textMatch && dmMatch && houseMatch && attendingMatch;

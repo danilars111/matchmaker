@@ -10,6 +10,7 @@ import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
+import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.time.LocalDate;
@@ -60,7 +61,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         groupDisplayView.setOnGroupEdit(this::prepareForEdit);
         groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
-        groupDisplayView.setOnPlayerMove(this::handlePlayerMove); // Our beautiful new choreographer!
+        groupDisplayView.setOnPlayerMove(this::handlePlayerMove);
 
         this.selectedProperty().addListener((obs, was, isNow) -> {
             if (isNow) groupForm.updateDmList(attendingPlayers);
@@ -83,18 +84,15 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private void handleGroupAction() {
         Group groupToEdit = groupForm.getGroupBeingEdited();
-        if (groupToEdit == null) { // Creating a new group
+        if (groupToEdit == null) {
             groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), newPartyMap.values().stream().toList()));
-        } else { // Updating an existing group
+        } else {
             groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
             groupToEdit.setHouses(groupForm.getSelectedHouses());
         }
         cleanUp();
     }
 
-    /**
-     * Our beautiful new choreographer method that handles moving a player between groups.
-     */
     private void handlePlayerMove(UUID sourceGroupUuid, UUID playerUuid, Group targetGroup) {
         Optional<Group> sourceGroupOpt = groups.stream().filter(g -> g.getUuid().equals(sourceGroupUuid)).findFirst();
         if (sourceGroupOpt.isEmpty()) return;
@@ -105,7 +103,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         if (playerToMove != null) {
             sourceGroup.removePartyMember(playerToMove);
             targetGroup.addPartyMember(playerToMove);
-            groupDisplayView.updateGroups(groups); // Refresh the whole display!
+            groupDisplayView.updateGroups(groups);
+            rosterView.setAllGroups(groups); // Keep the roster informed!
         }
     }
 
@@ -117,7 +116,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         confirmation.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
                 groups.remove(groupToDelete);
-                groupDisplayView.updateGroups(groups);
+                cleanUp();
             }
         });
     }
@@ -154,6 +153,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         newPartyMap.clear();
         rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
+        rosterView.setAllGroups(groups); // Always keep the roster's knowledge of groups up to date!
         groupDisplayView.updateGroups(groups);
     }
 
