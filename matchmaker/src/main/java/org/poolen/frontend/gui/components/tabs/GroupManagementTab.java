@@ -4,12 +4,14 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
+import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
+import org.poolen.backend.engine.GroupSuggester;
+import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
-import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
 import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
@@ -41,7 +43,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final List<Group> groups = new ArrayList<>();
     private final GroupDisplayView groupDisplayView;
 
-    // --- Beautiful maps to handle our reassignments! ---
     private final Map<Group, Player> dmsToReassignAsDm = new HashMap<>();
     private final Map<Group, Player> playersToPromoteToDm = new HashMap<>();
     private final Map<Group, Player> dmsToReassignAsPlayer = new HashMap<>();
@@ -73,6 +74,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupDisplayView.setOnGroupEdit(this::prepareForEdit);
         groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
         groupDisplayView.setOnPlayerMove(this::handlePlayerMove);
+        groupDisplayView.setOnSuggestionRequest(() -> {
+            GroupSuggester suggester = new GroupSuggester(attendingPlayers.values());
+            List<House> suggestions = suggester.suggestGroupThemes();
+            groupDisplayView.displaySuggestions(suggestions);
+        });
+        groupDisplayView.setOnSuggestedGroupsCreate(this::handleCreateSuggestedGroups);
 
         rosterView.setOnPlayerAddRequest(this::handlePlayerAddRequest);
 
@@ -108,22 +115,25 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
     }
 
+    private void handleCreateSuggestedGroups(List<House> themes) {
+        for (House theme : themes) {
+            groups.add(groupFactory.create(null, List.of(theme), LocalDate.now(), new ArrayList<>()));
+        }
+        cleanUp();
+    }
+
     private void handleGroupAction() {
         Group groupToEdit = groupForm.getGroupBeingEdited();
-        if (groupToEdit == null) { // Creating a new group
-            // Handle DMs being demoted to players in our new group
+        if (groupToEdit == null) {
             dmsToReassignAsPlayer.keySet().forEach(Group::removeDungeonMaster);
-            // Handle players being promoted to DM of our new group
             playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
-            // Handle DMs being reassigned as DM for our new group
             dmsToReassignAsDm.keySet().forEach(Group::removeDungeonMaster);
-            // Handle regular players being moved from other parties
             new ArrayList<>(newPartyMap.values()).forEach(player -> {
                 Group source = findGroupForPlayer(player);
                 if (source != null) source.removePartyMember(player);
             });
             groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), new ArrayList<>(newPartyMap.values())));
-        } else { // Updating an existing group
+        } else {
             dmsToReassignAsDm.forEach((source, dm) -> source.moveDungeonMasterTo(dm, groupToEdit));
             playersToPromoteToDm.forEach((source, player) -> {
                 source.removePartyMember(player);
