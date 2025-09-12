@@ -8,6 +8,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.frontend.gui.components.views.tables.GroupTableView;
+import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +22,7 @@ public class GroupDisplayView extends ScrollPane {
     private final GridPane groupGrid;
     private Consumer<Group> onGroupEditHandler;
     private Consumer<Group> onGroupDeleteHandler;
-    private GroupTableView.PlayerMoveHandler onPlayerMoveHandler; // Our new handler!
+    private PlayerMoveHandler onPlayerMoveHandler; // Our new handler!
     private List<Group> currentGroups = new ArrayList<>();
     private static final double ESTIMATED_CARD_WIDTH = 350.0;
     private int lastColumnCount = -1;
@@ -98,7 +99,7 @@ public class GroupDisplayView extends ScrollPane {
         this.onGroupDeleteHandler = handler;
     }
 
-    public void setOnPlayerMove(GroupTableView.PlayerMoveHandler handler) {
+    public void setOnPlayerMove(PlayerMoveHandler handler) {
         this.onPlayerMoveHandler = handler;
     }
 }

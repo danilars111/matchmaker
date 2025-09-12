@@ -1,4 +1,4 @@
-package org.poolen.frontend.gui.listeners;
+package org.poolen.frontend.gui.interfaces;
 
 /**
  * A simple interface for components that need to be notified

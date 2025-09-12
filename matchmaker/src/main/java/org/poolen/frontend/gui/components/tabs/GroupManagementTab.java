@@ -10,7 +10,7 @@ import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
-import org.poolen.frontend.gui.listeners.PlayerUpdateListener;
+import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.time.LocalDate;
 import java.util.ArrayList;

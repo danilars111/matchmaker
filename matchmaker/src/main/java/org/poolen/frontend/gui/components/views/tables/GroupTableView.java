@@ -23,6 +23,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -36,11 +37,6 @@ public class GroupTableView extends TitledPane {
 
     // --- A special format to carry our precious player data during the drag! ---
     private static final DataFormat PLAYER_TRANSFER_FORMAT = new DataFormat("application/x-player-transfer");
-
-    @FunctionalInterface
-    public interface PlayerMoveHandler {
-        void onMove(UUID sourceGroupUuid, UUID playerUuid, Group targetGroup);
-    }
 
     private final TableView<Player> partyTable;
     private final Label dateLabel;

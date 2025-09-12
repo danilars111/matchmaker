@@ -17,7 +17,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
-import org.poolen.frontend.gui.listeners.PlayerUpdateListener;
+import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.util.ArrayList;
 import java.util.List;
