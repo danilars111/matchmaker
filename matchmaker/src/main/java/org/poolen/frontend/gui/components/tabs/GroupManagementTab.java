@@ -10,9 +10,6 @@ import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
-import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
-import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
-import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.time.LocalDate;
@@ -98,8 +95,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             dmsToReassign.keySet().forEach(Group::removeDungeonMaster);
             groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), new ArrayList<>(newPartyMap.values())));
         } else {
-            dmsToReassign.keySet().forEach(Group::removeDungeonMaster);
-            groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
+            dmsToReassign.keySet().forEach(group -> group.moveDungeonMasterTo(groupForm.getSelectedDm(), groupToEdit));
             groupToEdit.setHouses(groupForm.getSelectedHouses());
         }
         cleanUp();

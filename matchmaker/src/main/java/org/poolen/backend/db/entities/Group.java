@@ -107,7 +107,7 @@ public class Group {
     }
 
     public void moveDungeonMasterTo(Player dm, Group group) {
-        this.setDungeonMaster(null);
+        this.removeDungeonMaster();
         group.setDungeonMaster(dm);
     }
 }
