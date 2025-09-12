@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -59,7 +60,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         groupDisplayView.setOnGroupEdit(this::prepareForEdit);
         groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
-
+        groupDisplayView.setOnPlayerMove(this::handlePlayerMove); // Our beautiful new choreographer!
 
         this.selectedProperty().addListener((obs, was, isNow) -> {
             if (isNow) groupForm.updateDmList(attendingPlayers);
@@ -87,9 +88,25 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         } else { // Updating an existing group
             groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
             groupToEdit.setHouses(groupForm.getSelectedHouses());
-            // The party is already updated in real-time by the checkboxes
         }
         cleanUp();
+    }
+
+    /**
+     * Our beautiful new choreographer method that handles moving a player between groups.
+     */
+    private void handlePlayerMove(UUID sourceGroupUuid, UUID playerUuid, Group targetGroup) {
+        Optional<Group> sourceGroupOpt = groups.stream().filter(g -> g.getUuid().equals(sourceGroupUuid)).findFirst();
+        if (sourceGroupOpt.isEmpty()) return;
+
+        Group sourceGroup = sourceGroupOpt.get();
+        Player playerToMove = sourceGroup.getParty().get(playerUuid);
+
+        if (playerToMove != null) {
+            sourceGroup.removePartyMember(playerToMove);
+            targetGroup.addPartyMember(playerToMove);
+            groupDisplayView.updateGroups(groups); // Refresh the whole display!
+        }
     }
 
     private void handleDeleteFromCard(Group groupToDelete) {
@@ -139,8 +156,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.setDmForNewGroup(null);
         groupDisplayView.updateGroups(groups);
     }
-
-
 
     @Override
     public void onPlayerUpdate() {

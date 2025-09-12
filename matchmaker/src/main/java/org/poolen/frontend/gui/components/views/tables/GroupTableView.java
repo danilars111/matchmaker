@@ -7,9 +7,14 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.DataFormat;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -20,6 +25,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -28,12 +34,21 @@ import java.util.stream.Collectors;
  */
 public class GroupTableView extends TitledPane {
 
+    // --- A special format to carry our precious player data during the drag! ---
+    private static final DataFormat PLAYER_TRANSFER_FORMAT = new DataFormat("application/x-player-transfer");
+
+    @FunctionalInterface
+    public interface PlayerMoveHandler {
+        void onMove(UUID sourceGroupUuid, UUID playerUuid, Group targetGroup);
+    }
+
     private final TableView<Player> partyTable;
     private final Label dateLabel;
     private final Button editButton;
     private final Button deleteButton;
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy");
     private Group currentGroup;
+    private PlayerMoveHandler onPlayerMoveHandler;
 
     private final Label dmNameLabel;
     private final Label themesLabel;
@@ -57,9 +72,6 @@ public class GroupTableView extends TitledPane {
         HBox mainTitleInfo = new HBox(10, dmNameLabel, themesLabel, partySizeLabel);
         HBox titleBox = new HBox(10, mainTitleInfo, titleSpacer, deleteButton);
         titleBox.setAlignment(Pos.CENTER_LEFT);
-
-        // This is the magic line that gives our HBox the space it needs to grow!
-        // We bind its width to the parent TitledPane's width, subtracting a little for padding and the arrow.
         titleBox.prefWidthProperty().bind(this.widthProperty().subtract(40));
 
         this.setGraphic(titleBox);
@@ -76,6 +88,8 @@ public class GroupTableView extends TitledPane {
 
         // --- Party Roster Table ---
         partyTable = new TableView<>();
+        setupDragAndDrop(); // We teach our table its beautiful new dance moves!
+
         TableColumn<Player, Void> rowNumCol = new TableColumn<>("#");
         rowNumCol.setSortable(false);
         rowNumCol.setPrefWidth(40);
@@ -102,60 +116,84 @@ public class GroupTableView extends TitledPane {
         contentBox.setPadding(new Insets(10));
         contentBox.setStyle("-fx-background-color: #f9f9f9;");
 
-
         this.setContent(contentBox);
         this.setCollapsible(true);
         this.setExpanded(true);
     }
 
-    /**
-     * Populates the entire component with the details of a given group.
-     * @param group The group to display.
-     */
     public void setGroup(Group group) {
         this.currentGroup = group;
-        // --- Populate the beautiful new title bar ---
         String dmName = group.getDungeonMaster() != null ? group.getDungeonMaster().getName() : "N/A";
         dmNameLabel.setText(dmName);
-
         String themes = group.getHouses().stream()
                 .map(house -> house.name().substring(0, 2))
                 .collect(Collectors.joining(", "));
         if (themes.isEmpty()) themes = "No themes";
         themesLabel.setText("• " + themes);
-
         partySizeLabel.setText(group.getParty().size() + " players");
-
-
         String date = group.getDate() != null ? group.getDate().format(dateFormatter) : "N/A";
         dateLabel.setText(date);
-
-        // --- Populate the party table ---
         partyTable.setItems(FXCollections.observableArrayList(group.getParty().values()));
     }
 
-    /**
-     * Sets the action to be performed when the edit button is clicked.
-     * @param onEdit A consumer that accepts the group to be edited.
-     */
-    public void setOnEditAction(Consumer<Group> onEdit) {
-        editButton.setOnAction(e -> {
-            if (currentGroup != null) {
-                onEdit.accept(currentGroup);
+    private void setupDragAndDrop() {
+        // --- This card can now receive players! ---
+        this.setOnDragOver(event -> {
+            if (event.getGestureSource() != this && event.getDragboard().hasContent(PLAYER_TRANSFER_FORMAT)) {
+                event.acceptTransferModes(TransferMode.MOVE);
             }
+            event.consume();
+        });
+
+        this.setOnDragDropped(event -> {
+            Dragboard db = event.getDragboard();
+            boolean success = false;
+            if (db.hasContent(PLAYER_TRANSFER_FORMAT)) {
+                String[] data = ((String) db.getContent(PLAYER_TRANSFER_FORMAT)).split(":");
+                UUID sourceGroupUuid = UUID.fromString(data[0]);
+                UUID playerUuid = UUID.fromString(data[1]);
+
+                if (onPlayerMoveHandler != null) {
+                    onPlayerMoveHandler.onMove(sourceGroupUuid, playerUuid, this.currentGroup);
+                    success = true;
+                }
+            }
+            event.setDropCompleted(success);
+            event.consume();
+        });
+
+        // --- Each row can now be dragged! ---
+        partyTable.setRowFactory(tv -> {
+            TableRow<Player> row = new TableRow<>();
+            row.setOnDragDetected(event -> {
+                if (!row.isEmpty()) {
+                    Dragboard db = row.startDragAndDrop(TransferMode.MOVE);
+                    db.setDragView(row.snapshot(null, null));
+                    ClipboardContent content = new ClipboardContent();
+                    // We put the source group and player UUIDs on the clipboard
+                    content.put(PLAYER_TRANSFER_FORMAT, currentGroup.getUuid() + ":" + row.getItem().getUuid());
+                    db.setContent(content);
+                    event.consume();
+                }
+            });
+            return row;
         });
     }
 
-    /**
-     * Sets the action to be performed when the delete button is clicked.
-     * @param onDelete A consumer that accepts the group to be deleted.
-     */
+    public void setOnEditAction(Consumer<Group> onEdit) {
+        editButton.setOnAction(e -> {
+            if (currentGroup != null) onEdit.accept(currentGroup);
+        });
+    }
+
     public void setOnDeleteAction(Consumer<Group> onDelete) {
         deleteButton.setOnAction(e -> {
-            if (currentGroup != null) {
-                onDelete.accept(currentGroup);
-            }
+            if (currentGroup != null) onDelete.accept(currentGroup);
         });
+    }
+
+    public void setOnPlayerMove(PlayerMoveHandler handler) {
+        this.onPlayerMoveHandler = handler;
     }
 }
 

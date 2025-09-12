@@ -20,10 +20,11 @@ public class GroupDisplayView extends ScrollPane {
 
     private final GridPane groupGrid;
     private Consumer<Group> onGroupEditHandler;
-    private Consumer<Group> onGroupDeleteHandler; // Our new handler!
+    private Consumer<Group> onGroupDeleteHandler;
+    private GroupTableView.PlayerMoveHandler onPlayerMoveHandler; // Our new handler!
     private List<Group> currentGroups = new ArrayList<>();
-    private static final double ESTIMATED_CARD_WIDTH = 350.0; // A sensible estimate for a card's width
-    private int lastColumnCount = -1; // We'll use this to prevent unnecessary, flashy redraws!
+    private static final double ESTIMATED_CARD_WIDTH = 350.0;
+    private int lastColumnCount = -1;
 
     public GroupDisplayView() {
         super();
@@ -35,7 +36,6 @@ public class GroupDisplayView extends ScrollPane {
         this.setContent(groupGrid);
         this.setFitToWidth(true);
 
-        // We'll listen for width changes to magically reflow our grid!
         this.widthProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal.doubleValue() > 0) {
                 updateGridLayout(newVal.doubleValue());
@@ -43,43 +43,27 @@ public class GroupDisplayView extends ScrollPane {
         });
     }
 
-    /**
-     * Stores a new list of groups and triggers a layout update.
-     * @param groups The list of groups to display.
-     */
     public void updateGroups(List<Group> groups) {
         this.currentGroups = groups;
-        // By resetting this, we force the grid layout to recalculate and redraw.
         this.lastColumnCount = -1;
         updateGridLayout(this.getWidth());
     }
 
-    /**
-     * A much cleverer method that only redraws the grid when the number of columns
-     * needs to change, preventing that nasty flashing effect!
-     * @param currentWidth The current width of this component.
-     */
     private void updateGridLayout(double currentWidth) {
         if (currentGroups == null || currentWidth <= 0) return;
 
-        // We calculate how many columns can fit, ensuring at least one!
         int newMaxCols = (int) (currentWidth / ESTIMATED_CARD_WIDTH);
         if (newMaxCols < 1) newMaxCols = 1;
-
-        // We won't create more columns than we have groups!
         if (currentGroups.size() > 0) {
             newMaxCols = Math.min(newMaxCols, currentGroups.size());
         }
 
-        // If the number of columns hasn't changed, we do nothing! No more flashing!
         if (newMaxCols == lastColumnCount) return;
         this.lastColumnCount = newMaxCols;
 
         groupGrid.getChildren().clear();
         groupGrid.getColumnConstraints().clear();
 
-        // --- Our beautiful new resizing logic! ---
-        // We tell each column that it's allowed to grow to fill any extra space.
         for (int i = 0; i < newMaxCols; i++) {
             ColumnConstraints colConst = new ColumnConstraints();
             colConst.setHgrow(Priority.ALWAYS);
@@ -92,37 +76,30 @@ public class GroupDisplayView extends ScrollPane {
         for (Group group : currentGroups) {
             GroupTableView groupCard = new GroupTableView();
             groupCard.setGroup(group);
-            if (onGroupEditHandler != null) {
-                groupCard.setOnEditAction(onGroupEditHandler);
-            }
-            if (onGroupDeleteHandler != null) {
-                groupCard.setOnDeleteAction(onGroupDeleteHandler);
-            }
+            if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
+            if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
+            if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler); // We pass it along!
             GridPane.setValignment(groupCard, VPos.TOP);
             groupGrid.add(groupCard, col, row);
 
             col++;
-            if (col >= newMaxCols) { // We use our beautiful, dynamic number!
+            if (col >= newMaxCols) {
                 col = 0;
                 row++;
             }
         }
     }
 
-    /**
-     * Sets the master handler for when any group's edit button is clicked.
-     * @param handler The action to perform, accepting the group to be edited.
-     */
     public void setOnGroupEdit(Consumer<Group> handler) {
         this.onGroupEditHandler = handler;
     }
 
-    /**
-     * Sets the master handler for when any group's delete button is clicked.
-     * @param handler The action to perform, accepting the group to be deleted.
-     */
     public void setOnGroupDelete(Consumer<Group> handler) {
         this.onGroupDeleteHandler = handler;
+    }
+
+    public void setOnPlayerMove(GroupTableView.PlayerMoveHandler handler) {
+        this.onPlayerMoveHandler = handler;
     }
 }
 
