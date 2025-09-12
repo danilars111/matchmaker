@@ -9,6 +9,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.backend.engine.GroupSuggester;
+import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
@@ -40,7 +41,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private final Map<UUID, Player> newPartyMap;
     private final Map<UUID, Player> attendingPlayers;
-    private final List<Group> groups = new ArrayList<>();
+    private List<Group> groups = new ArrayList<>();
     private final GroupDisplayView groupDisplayView;
 
     private final Map<Group, Player> dmsToReassignAsDm = new HashMap<>();
@@ -80,6 +81,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             groupDisplayView.displaySuggestions(suggestions);
         });
         groupDisplayView.setOnSuggestedGroupsCreate(this::handleCreateSuggestedGroups);
+        groupDisplayView.setOnAutoPopulate(this::handleAutoPopulate);
 
         rosterView.setOnPlayerAddRequest(this::handlePlayerAddRequest);
 
@@ -113,6 +115,32 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             root.getItems().set(1, groupDisplayView);
             groupForm.getShowPlayersButton().setText("Show Players");
         }
+    }
+
+    private void handleAutoPopulate() {
+        boolean anyGroupWithoutDm = groups.stream().anyMatch(g -> g.getDungeonMaster() == null);
+        if (anyGroupWithoutDm) {
+            Alert errorAlert = new Alert(Alert.AlertType.ERROR, "Please assign a Dungeon Master to every group before auto-populating.");
+            errorAlert.initOwner(this.getTabPane().getScene().getWindow());
+            errorAlert.showAndWait();
+            return;
+        }
+
+        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                "This will clear all current party members and generate new ones. Are you sure?",
+                ButtonType.YES, ButtonType.NO);
+        confirmation.initOwner(this.getTabPane().getScene().getWindow());
+        confirmation.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.YES) {
+                // Clear all existing party members for a clean slate.
+                for (Group group : groups) {
+                    new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
+                }
+                Matchmaker matchmaker = new Matchmaker(this.groups, this.attendingPlayers);
+                this.groups = matchmaker.match(); // The matchmaker returns the populated list.
+                cleanUp();
+            }
+        });
     }
 
     private void handleCreateSuggestedGroups(List<House> themes) {

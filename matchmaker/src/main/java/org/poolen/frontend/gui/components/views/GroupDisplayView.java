@@ -8,6 +8,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -28,14 +29,17 @@ public class GroupDisplayView extends ScrollPane {
     private final GridPane groupGrid;
     private final StackPane contentPane;
     private final Button suggestButton;
-    private final Button createSuggestedButton; // Our beautiful new button!
+    private final Button createSuggestedButton;
+    private final Button autoPopulateButton; // Our beautiful new button!
     private final VBox suggestionDisplayBox;
     private final VBox suggestionContainer;
+    private final VBox gridContainer; // A new container for our grid and its buttons!
     private Consumer<Group> onGroupEditHandler;
     private Consumer<Group> onGroupDeleteHandler;
     private PlayerMoveHandler onPlayerMoveHandler;
     private Runnable onSuggestionRequestHandler;
-    private Consumer<List<House>> onSuggestedGroupsCreateHandler; // Our new handler!
+    private Consumer<List<House>> onSuggestedGroupsCreateHandler;
+    private Runnable onAutoPopulateHandler; // Our new handler!
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
     private static final double ESTIMATED_CARD_WIDTH = 350.0;
@@ -48,18 +52,16 @@ public class GroupDisplayView extends ScrollPane {
         groupGrid.setVgap(10);
         groupGrid.setPadding(new Insets(10));
 
-        // --- New Suggestion UI ---
+        // --- Suggestion UI ---
         suggestButton = new Button("Suggest Groups");
         suggestButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         suggestButton.setOnAction(e -> {
-            if (onSuggestionRequestHandler != null) {
-                onSuggestionRequestHandler.run();
-            }
+            if (onSuggestionRequestHandler != null) onSuggestionRequestHandler.run();
         });
 
         createSuggestedButton = new Button("Create Suggested Groups");
         createSuggestedButton.setStyle("-fx-font-size: 14px; -fx-background-color: #008CBA; -fx-text-fill: white;");
-        createSuggestedButton.setVisible(false); // We hide it until we have suggestions!
+        createSuggestedButton.setVisible(false);
         createSuggestedButton.setOnAction(e -> {
             if (onSuggestedGroupsCreateHandler != null && !currentSuggestions.isEmpty()) {
                 onSuggestedGroupsCreateHandler.accept(currentSuggestions);
@@ -69,35 +71,43 @@ public class GroupDisplayView extends ScrollPane {
         suggestionDisplayBox = new VBox(5);
         suggestionDisplayBox.setAlignment(Pos.CENTER);
         suggestionDisplayBox.setPadding(new Insets(10));
-
         suggestionContainer = new VBox(20, suggestButton, suggestionDisplayBox, createSuggestedButton);
         suggestionContainer.setAlignment(Pos.CENTER);
         suggestionContainer.setPadding(new Insets(20));
 
-        // --- Content Pane to switch between views ---
-        contentPane = new StackPane(groupGrid, suggestionContainer);
+        // --- Grid UI ---
+        autoPopulateButton = new Button("Auto-Populate Groups");
+        autoPopulateButton.setStyle("-fx-font-size: 14px; -fx-background-color: #f44336; -fx-text-fill: white;");
+        autoPopulateButton.setOnAction(e -> {
+            if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
+        });
+        HBox buttonBar = new HBox(autoPopulateButton);
+        buttonBar.setAlignment(Pos.CENTER);
+        buttonBar.setPadding(new Insets(10, 0, 0, 0));
 
+        gridContainer = new VBox(10, buttonBar, groupGrid);
+        gridContainer.setAlignment(Pos.TOP_CENTER);
+
+        contentPane = new StackPane(gridContainer, suggestionContainer);
         this.setContent(contentPane);
         this.setFitToWidth(true);
 
         this.widthProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal.doubleValue() > 0) {
-                updateGridLayout(newVal.doubleValue());
-            }
+            if (newVal.doubleValue() > 0) updateGridLayout(newVal.doubleValue());
         });
     }
 
     public void updateGroups(List<Group> groups) {
         this.currentGroups = groups;
         if (groups.isEmpty()) {
-            groupGrid.setVisible(false);
+            gridContainer.setVisible(false);
             suggestionContainer.setVisible(true);
             suggestionDisplayBox.getChildren().clear();
-            createSuggestedButton.setVisible(false); // We hide the button when there are no groups.
+            createSuggestedButton.setVisible(false);
         } else {
-            groupGrid.setVisible(true);
+            gridContainer.setVisible(true);
             suggestionContainer.setVisible(false);
-            this.lastColumnCount = -1; // Force a redraw
+            this.lastColumnCount = -1;
             updateGridLayout(this.getWidth());
         }
     }
@@ -117,7 +127,7 @@ public class GroupDisplayView extends ScrollPane {
                 themeLabel.setStyle("-fx-font-size: 14px;");
                 suggestionDisplayBox.getChildren().add(themeLabel);
             }
-            createSuggestedButton.setVisible(true); // We show our beautiful new button!
+            createSuggestedButton.setVisible(true);
         }
     }
 
@@ -179,6 +189,10 @@ public class GroupDisplayView extends ScrollPane {
 
     public void setOnSuggestedGroupsCreate(Consumer<List<House>> handler) {
         this.onSuggestedGroupsCreateHandler = handler;
+    }
+
+    public void setOnAutoPopulate(Runnable handler) {
+        this.onAutoPopulateHandler = handler;
     }
 }
 
