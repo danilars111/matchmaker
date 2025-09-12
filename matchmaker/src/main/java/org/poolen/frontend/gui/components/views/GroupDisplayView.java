@@ -1,6 +1,7 @@
 package org.poolen.frontend.gui.components.views;
 
 import javafx.geometry.Insets;
+import javafx.geometry.VPos;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.GridPane;
 import org.poolen.backend.db.entities.Group;
@@ -45,6 +46,8 @@ public class GroupDisplayView extends ScrollPane {
             if (onGroupEditHandler != null) {
                 groupCard.setOnEditAction(onGroupEditHandler);
             }
+            // --- Our beautiful alignment fix! ---
+            GridPane.setValignment(groupCard, VPos.TOP);
             groupGrid.add(groupCard, col, row);
 
             col++;
