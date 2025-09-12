@@ -7,6 +7,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TitledPane;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -26,7 +27,7 @@ import java.util.function.Consumer;
 /**
  * A reusable view component that displays multiple groups or a suggestion prompt.
  */
-public class GroupDisplayView extends ScrollPane {
+public class GroupDisplayView extends BorderPane {
 
     private final GridPane groupGrid;
     private final StackPane contentPane;
@@ -37,7 +38,9 @@ public class GroupDisplayView extends ScrollPane {
     private final Button collapseAllButton;
     private final VBox suggestionDisplayBox;
     private final VBox suggestionContainer;
-    private final VBox gridContainer;
+    private final HBox header;
+    private final HBox footer;
+    private final ScrollPane gridScrollPane;
     private Consumer<Group> onGroupEditHandler;
     private Consumer<Group> onGroupDeleteHandler;
     private PlayerMoveHandler onPlayerMoveHandler;
@@ -80,31 +83,40 @@ public class GroupDisplayView extends ScrollPane {
         suggestionContainer.setAlignment(Pos.CENTER);
         suggestionContainer.setPadding(new Insets(20));
 
-        // --- Grid UI ---
+        // --- Header ---
         expandAllButton = new Button("Expand All");
         expandAllButton.setOnAction(e -> setAllCardsExpanded(true));
         collapseAllButton = new Button("Collapse All");
         collapseAllButton.setOnAction(e -> setAllCardsExpanded(false));
 
-        Region topBarSpacer = new Region();
-        HBox.setHgrow(topBarSpacer, Priority.ALWAYS);
-        HBox topBar = new HBox(10, topBarSpacer, expandAllButton, collapseAllButton);
-        topBar.setPadding(new Insets(0, 10, 0, 10));
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        header = new HBox(10, headerSpacer, expandAllButton, collapseAllButton);
+        header.setPadding(new Insets(10));
+        header.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
 
+
+        // --- Footer ---
         autoPopulateButton = new Button("Auto-Populate Groups");
         autoPopulateButton.setStyle("-fx-font-size: 14px; -fx-background-color: #f44336; -fx-text-fill: white;");
         autoPopulateButton.setOnAction(e -> {
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
-        HBox bottomBar = new HBox(autoPopulateButton);
-        bottomBar.setPadding(new Insets(0, 10, 0, 10));
+        footer = new HBox(autoPopulateButton);
+        footer.setPadding(new Insets(10));
+        footer.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-border-width: 1 0 0 0;");
 
-        gridContainer = new VBox(10, topBar, groupGrid, bottomBar);
-        gridContainer.setAlignment(Pos.TOP_CENTER);
+        // --- Center Content ---
+        gridScrollPane = new ScrollPane(groupGrid);
+        gridScrollPane.setFitToWidth(true);
+        gridScrollPane.setStyle("-fx-background-color: transparent;");
 
-        contentPane = new StackPane(gridContainer, suggestionContainer);
-        this.setContent(contentPane);
-        this.setFitToWidth(true);
+        contentPane = new StackPane(gridScrollPane, suggestionContainer);
+
+        // --- Assemble BorderPane ---
+        this.setTop(header);
+        this.setCenter(contentPane);
+        this.setBottom(footer);
 
         this.widthProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal.doubleValue() > 0) updateGridLayout(newVal.doubleValue());
@@ -114,12 +126,18 @@ public class GroupDisplayView extends ScrollPane {
     public void updateGroups(List<Group> groups) {
         this.currentGroups = groups;
         if (groups.isEmpty()) {
-            gridContainer.setVisible(false);
+            header.setVisible(false);
+            footer.setVisible(false);
+            gridScrollPane.setVisible(false);
+
             suggestionContainer.setVisible(true);
             suggestionDisplayBox.getChildren().clear();
             createSuggestedButton.setVisible(false);
         } else {
-            gridContainer.setVisible(true);
+            header.setVisible(true);
+            footer.setVisible(true);
+            gridScrollPane.setVisible(true);
+
             suggestionContainer.setVisible(false);
             this.lastColumnCount = -1;
             updateGridLayout(this.getWidth());
@@ -230,3 +248,4 @@ public class GroupDisplayView extends ScrollPane {
         this.onAutoPopulateHandler = handler;
     }
 }
+
