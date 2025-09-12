@@ -10,6 +10,7 @@ import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
+import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
 import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
@@ -37,6 +38,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Map<UUID, Player> attendingPlayers;
     private final List<Group> groups = new ArrayList<>();
     private final GroupDisplayView groupDisplayView;
+    private final Map<Group, Player> dmsToReassign = new HashMap<>();
 
     public GroupManagementTab(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super("Group Management");
@@ -56,6 +58,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         // --- Event Wiring ---
         groupForm.getShowPlayersButton().setOnAction(e -> toggleRosterView());
         groupForm.setOnDmSelection(rosterView::setDmForNewGroup);
+        groupForm.setOnDmSelectionRequest(this::handleDmSelectionRequest);
         groupForm.getCancelButton().setOnAction(e -> cleanUp());
         groupForm.getActionButton().setOnAction(e -> handleGroupAction());
         groupForm.getDeleteButton().setOnAction(e -> handleDeleteFromForm());
@@ -87,16 +90,15 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private void handleGroupAction() {
         Group groupToEdit = groupForm.getGroupBeingEdited();
-        if (groupToEdit == null) { // Creating a new group
-            // First, we commit to reassigning any players from other groups.
+        if (groupToEdit == null) {
             for (Player playerToAssign : newPartyMap.values()) {
                 Group sourceGroup = findGroupForPlayer(playerToAssign);
-                if (sourceGroup != null) {
-                    sourceGroup.removePartyMember(playerToAssign);
-                }
+                if (sourceGroup != null) sourceGroup.removePartyMember(playerToAssign);
             }
+            dmsToReassign.keySet().forEach(Group::removeDungeonMaster);
             groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), new ArrayList<>(newPartyMap.values())));
-        } else { // Updating an existing group
+        } else {
+            dmsToReassign.keySet().forEach(Group::removeDungeonMaster);
             groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
             groupToEdit.setHouses(groupForm.getSelectedHouses());
         }
@@ -156,28 +158,46 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 Group targetGroup = groupForm.getGroupBeingEdited();
-                if (targetGroup != null) { // Editing a group
+                if (targetGroup != null) {
                     sourceGroup.movePlayerTo(player, targetGroup);
-                    rosterView.updateRoster(); // Refresh the view to show the change
+                    rosterView.updateRoster();
                     groupDisplayView.updateGroups(groups);
-                } else { // Creating a new group
-                    // We just "prime" the player for reassignment without moving them yet.
+                } else {
                     newPartyMap.put(player.getUuid(), player);
                 }
-                return true; // Success!
+                return true;
             } else {
-                return false; // User cancelled.
+                return false;
             }
         } else {
-            // Player is available, add them normally.
             Group targetGroup = groupForm.getGroupBeingEdited();
-            if (targetGroup != null) {
-                targetGroup.addPartyMember(player);
-            } else {
-                newPartyMap.put(player.getUuid(), player);
-            }
-            return true; // Success!
+            if (targetGroup != null) targetGroup.addPartyMember(player);
+            else newPartyMap.put(player.getUuid(), player);
+            return true;
         }
+    }
+
+    private boolean handleDmSelectionRequest(Player selectedDm) {
+        Optional<Group> sourceGroupOpt = groups.stream()
+                .filter(g -> selectedDm.equals(g.getDungeonMaster()) && !g.equals(groupForm.getGroupBeingEdited()))
+                .findFirst();
+
+        if (sourceGroupOpt.isPresent()) {
+            Group sourceGroup = sourceGroupOpt.get();
+            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                    selectedDm.getName() + " is already a DM for another group. Reassign them as a player to this group?",
+                    ButtonType.YES, ButtonType.NO);
+            confirmation.initOwner(this.getTabPane().getScene().getWindow());
+            Optional<ButtonType> response = confirmation.showAndWait();
+
+            if (response.isPresent() && response.get() == ButtonType.YES) {
+                dmsToReassign.put(sourceGroup, selectedDm);
+                return true;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Group findGroupForPlayer(Player player) {
@@ -205,6 +225,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
         groupForm.clearForm();
         newPartyMap.clear();
+        dmsToReassign.clear();
         rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
         rosterView.setAllGroups(groups);

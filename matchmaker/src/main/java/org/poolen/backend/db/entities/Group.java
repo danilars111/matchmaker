@@ -55,6 +55,10 @@ public class Group {
         this.dungeonMaster = dungeonMaster;
     }
 
+    public void removeDungeonMaster() {
+        setDungeonMaster(null);
+    }
+
     public Map<UUID, Player> getParty() {
         return Collections.unmodifiableMap(party);
     }
@@ -102,7 +106,7 @@ public class Group {
         group.addPartyMember(player);
     }
 
-    public void moveDmTo(Player dm, Group group) {
+    public void moveDungeonMasterTo(Player dm, Group group) {
         this.setDungeonMaster(null);
         group.setDungeonMaster(dm);
     }

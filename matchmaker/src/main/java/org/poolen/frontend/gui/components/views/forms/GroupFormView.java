@@ -4,7 +4,13 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.ColumnConstraints;
@@ -15,6 +21,7 @@ import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -36,10 +43,11 @@ public class GroupFormView extends GridPane {
 
     private final Button actionButton;
     private final Button cancelButton;
-    private final Button deleteButton; // Our beautiful new button!
+    private final Button deleteButton;
     private final Button showPlayersButton;
     private Group groupBeingEdited;
     private Consumer<Player> onDmSelectionHandler;
+    private DmSelectRequestHandler onDmSelectionRequestHandler;
 
     public GroupFormView(Map<UUID, Player> attendingPlayers) {
         super();
@@ -47,12 +55,10 @@ public class GroupFormView extends GridPane {
         setVgap(10);
         setPadding(new Insets(20));
 
-        // --- Column Setup ---
         ColumnConstraints col1 = new ColumnConstraints();
         col1.setHgrow(Priority.ALWAYS);
         this.getColumnConstraints().addAll(col1);
 
-        // --- UUID Field ---
         uuidField = new TextField();
         uuidField.setEditable(false);
         uuidField.setStyle("-fx-control-inner-background: #f0f0f0; -fx-text-fill: #555;");
@@ -68,7 +74,6 @@ public class GroupFormView extends GridPane {
         HBox uuidBox = new HBox(5, uuidField, copyButton);
         HBox.setHgrow(uuidField, Priority.ALWAYS);
 
-        // --- DM ComboBox ---
         dmComboBox = new ComboBox<>();
         dmComboBox.setMaxWidth(Double.MAX_VALUE);
         dmComboBox.setCellFactory(lv -> new ListCell<>() {
@@ -85,14 +90,27 @@ public class GroupFormView extends GridPane {
                 setText(empty ? null : item.getName());
             }
         });
+
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (onDmSelectionHandler != null) {
-                onDmSelectionHandler.accept(newVal);
+            if (newVal != null) {
+                boolean selectionAllowed = true;
+                if (onDmSelectionRequestHandler != null) {
+                    selectionAllowed = onDmSelectionRequestHandler.onDmSelectRequest(newVal);
+                }
+
+                if (selectionAllowed) {
+                    if (onDmSelectionHandler != null) {
+                        onDmSelectionHandler.accept(newVal);
+                    }
+                } else {
+                    Platform.runLater(() -> dmComboBox.setValue(oldVal));
+                }
             }
         });
+
+
         updateDmList(attendingPlayers);
 
-        // --- House CheckBoxes ---
         this.houseCheckBoxes = new EnumMap<>(House.class);
         GridPane houseGrid = new GridPane();
         houseGrid.setHgap(10);
@@ -100,7 +118,6 @@ public class GroupFormView extends GridPane {
         List<House> sortedHouses = Arrays.stream(House.values())
                 .sorted(Comparator.comparing(this::formatHouseName))
                 .toList();
-
         for (int i = 0; i < sortedHouses.size(); i++) {
             House house = sortedHouses.get(i);
             CheckBox cb = new CheckBox(formatHouseName(house));
@@ -108,27 +125,27 @@ public class GroupFormView extends GridPane {
             houseGrid.add(cb, i % 2, i / 2);
         }
 
-        // --- Buttons ---
         showPlayersButton = new Button("Show Players");
         showPlayersButton.setMaxWidth(Double.MAX_VALUE);
         showPlayersButton.setStyle("-fx-background-color: #6A5ACD; -fx-text-fill: white;");
 
-        deleteButton = new Button("Delete");
-        deleteButton.setStyle("-fx-background-color: #DC143C; -fx-text-fill: white;");
-        deleteButton.setVisible(false);
-        deleteButton.setMaxWidth(Double.MAX_VALUE);
-
         actionButton = new Button("Create");
         cancelButton = new Button("Cancel");
+        deleteButton = new Button("Delete");
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
+        deleteButton.setStyle("-fx-background-color: #DC143C; -fx-text-fill: white;");
+        deleteButton.setVisible(false);
 
-        HBox mainActionsBox = new HBox(10, cancelButton, actionButton);
+
+        HBox mainActionsBox = new HBox(10, deleteButton, cancelButton, actionButton);
         mainActionsBox.setAlignment(Pos.CENTER_RIGHT);
+        HBox.setHgrow(deleteButton, Priority.NEVER);
+        HBox.setHgrow(cancelButton, Priority.NEVER);
+        HBox.setHgrow(actionButton, Priority.NEVER);
 
         VBox spacer = new VBox();
         GridPane.setVgrow(spacer, Priority.ALWAYS);
 
-        // --- Final Layout ---
         add(new Label("UUID"), 0, 0);
         add(uuidBox, 0, 1);
         add(new Label("Dungeon Master:"), 0, 2);
@@ -136,9 +153,8 @@ public class GroupFormView extends GridPane {
         add(new Label("House Themes:"), 0, 4);
         add(houseGrid, 0, 5);
         add(showPlayersButton, 0, 6);
-        add(deleteButton, 0, 7);
-        add(spacer, 0, 8);
-        add(mainActionsBox, 0, 9);
+        add(spacer, 0, 7);
+        add(mainActionsBox, 0, 8);
 
         Platform.runLater(dmComboBox::requestFocus);
     }
@@ -153,6 +169,14 @@ public class GroupFormView extends GridPane {
         if (selectedDm != null && availableDms.contains(selectedDm)) {
             dmComboBox.setValue(selectedDm);
         }
+    }
+
+    public void setOnDmSelection(Consumer<Player> handler) {
+        this.onDmSelectionHandler = handler;
+    }
+
+    public void setOnDmSelectionRequest(DmSelectRequestHandler handler) {
+        this.onDmSelectionRequestHandler = handler;
     }
 
     public Player getSelectedDm() {
@@ -170,7 +194,7 @@ public class GroupFormView extends GridPane {
         return actionButton;
     }
 
-    public Button getCancelButton() {
+    public ButtonBase getCancelButton() {
         return cancelButton;
     }
 
@@ -184,10 +208,6 @@ public class GroupFormView extends GridPane {
 
     public Group getGroupBeingEdited() {
         return groupBeingEdited;
-    }
-
-    public void setOnDmSelection(Consumer<Player> handler) {
-        this.onDmSelectionHandler = handler;
     }
 
     public void populateForm(Group group) {
