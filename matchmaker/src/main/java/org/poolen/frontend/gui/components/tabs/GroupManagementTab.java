@@ -1,5 +1,7 @@
 package org.poolen.frontend.gui.components.tabs;
 
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Group;
@@ -50,14 +52,14 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         // --- Event Wiring ---
         groupForm.getShowPlayersButton().setOnAction(e -> toggleRosterView());
-
         groupForm.setOnDmSelection(rosterView::setDmForNewGroup);
-
         groupForm.getCancelButton().setOnAction(e -> cleanUp());
-
         groupForm.getActionButton().setOnAction(e -> handleGroupAction());
+        groupForm.getDeleteButton().setOnAction(e -> handleDeleteFromForm());
 
         groupDisplayView.setOnGroupEdit(this::prepareForEdit);
+        groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
+
 
         this.selectedProperty().addListener((obs, was, isNow) -> {
             if (isNow) groupForm.updateDmList(attendingPlayers);
@@ -90,9 +92,38 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         cleanUp();
     }
 
+    private void handleDeleteFromCard(Group groupToDelete) {
+        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                "Are you sure you want to delete this group? This cannot be undone.",
+                ButtonType.YES, ButtonType.NO);
+        confirmation.initOwner(this.getTabPane().getScene().getWindow());
+        confirmation.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.YES) {
+                groups.remove(groupToDelete);
+                groupDisplayView.updateGroups(groups);
+            }
+        });
+    }
+
+    private void handleDeleteFromForm() {
+        Group groupToDelete = groupForm.getGroupBeingEdited();
+        if (groupToDelete != null) {
+            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Are you sure you want to delete this group? This cannot be undone.",
+                    ButtonType.YES, ButtonType.NO);
+            confirmation.initOwner(this.getTabPane().getScene().getWindow());
+            confirmation.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.YES) {
+                    groups.remove(groupToDelete);
+                    cleanUp();
+                }
+            });
+        }
+    }
+
     private void prepareForEdit(Group groupToEdit) {
         groupForm.populateForm(groupToEdit);
-        rosterView.displayForGroup(groupToEdit); // Tell roster to use the group's real party map
+        rosterView.displayForGroup(groupToEdit);
         if (!isPlayerRosterVisible) {
             toggleRosterView();
         }
@@ -104,10 +135,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
         groupForm.clearForm();
         newPartyMap.clear();
-        rosterView.setPartyForNewGroup(newPartyMap); // Reset roster to use the new party map
+        rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
         groupDisplayView.updateGroups(groups);
     }
+
+
 
     @Override
     public void onPlayerUpdate() {

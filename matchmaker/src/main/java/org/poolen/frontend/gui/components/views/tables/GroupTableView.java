@@ -31,10 +31,10 @@ public class GroupTableView extends TitledPane {
     private final TableView<Player> partyTable;
     private final Label dateLabel;
     private final Button editButton;
+    private final Button deleteButton;
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy");
     private Group currentGroup;
 
-    // --- Labels for our beautiful new title bar! ---
     private final Label dmNameLabel;
     private final Label themesLabel;
     private final Label partySizeLabel;
@@ -49,13 +49,21 @@ public class GroupTableView extends TitledPane {
         themesLabel.setStyle("-fx-text-fill: #555;");
         partySizeLabel = new Label();
         partySizeLabel.setStyle("-fx-font-style: italic;");
+        deleteButton = new Button("✖");
+        deleteButton.setStyle("-fx-font-size: 12px; -fx-padding: 2 6 2 6; -fx-background-color: transparent; -fx-text-fill: #808080; -fx-font-weight: bold;");
 
         Region titleSpacer = new Region();
         HBox.setHgrow(titleSpacer, Priority.ALWAYS);
-        HBox titleBox = new HBox(10, dmNameLabel, themesLabel, titleSpacer, partySizeLabel);
+        HBox mainTitleInfo = new HBox(10, dmNameLabel, themesLabel, partySizeLabel);
+        HBox titleBox = new HBox(10, mainTitleInfo, titleSpacer, deleteButton);
         titleBox.setAlignment(Pos.CENTER_LEFT);
+
+        // This is the magic line that gives our HBox the space it needs to grow!
+        // We bind its width to the parent TitledPane's width, subtracting a little for padding and the arrow.
+        titleBox.prefWidthProperty().bind(this.widthProperty().subtract(40));
+
         this.setGraphic(titleBox);
-        this.setText(null); // We use the graphic, so we don't need text!
+        this.setText(null);
 
         // --- Information Header ---
         dateLabel = new Label();
@@ -110,12 +118,10 @@ public class GroupTableView extends TitledPane {
         String dmName = group.getDungeonMaster() != null ? group.getDungeonMaster().getName() : "N/A";
         dmNameLabel.setText(dmName);
 
-        // We'll abbreviate the themes to two letters to save space!
         String themes = group.getHouses().stream()
                 .map(house -> house.name().substring(0, 2))
                 .collect(Collectors.joining(", "));
         if (themes.isEmpty()) themes = "No themes";
-        // And use the dot as a beautiful divider!
         themesLabel.setText("• " + themes);
 
         partySizeLabel.setText(group.getParty().size() + " players");
@@ -136,6 +142,18 @@ public class GroupTableView extends TitledPane {
         editButton.setOnAction(e -> {
             if (currentGroup != null) {
                 onEdit.accept(currentGroup);
+            }
+        });
+    }
+
+    /**
+     * Sets the action to be performed when the delete button is clicked.
+     * @param onDelete A consumer that accepts the group to be deleted.
+     */
+    public void setOnDeleteAction(Consumer<Group> onDelete) {
+        deleteButton.setOnAction(e -> {
+            if (currentGroup != null) {
+                onDelete.accept(currentGroup);
             }
         });
     }
