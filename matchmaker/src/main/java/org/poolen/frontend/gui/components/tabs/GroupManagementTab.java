@@ -1,9 +1,20 @@
 package org.poolen.frontend.gui.components.tabs;
 
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
+import javafx.scene.control.TextArea;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
@@ -13,13 +24,11 @@ import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
-import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
-import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
-import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * A dedicated tab for creating, viewing, and managing groups that listens for player updates.
@@ -43,7 +53,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Map<UUID, Player> attendingPlayers;
     private List<Group> groups = new ArrayList<>();
     private final GroupDisplayView groupDisplayView;
-    private LocalDate eventDate = LocalDate.now();
+    private LocalDate eventDate;
 
     private final Map<Group, Player> dmsToReassignAsDm = new HashMap<>();
     private final Map<Group, Player> playersToPromoteToDm = new HashMap<>();
@@ -59,6 +69,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.groupDisplayView = new GroupDisplayView();
         this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, onPlayerListChanged);
         this.newPartyMap = new HashMap<>();
+        this.eventDate = LocalDate.now();
 
         cleanUp();
 
@@ -79,7 +90,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupDisplayView.setOnGroupEdit(this::prepareForEdit);
         groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
         groupDisplayView.setOnPlayerMove(this::handlePlayerMove);
-        groupDisplayView.setOnDmUpdateRequest(this::handleDmUpdateRequest);
+        groupDisplayView.setOnDmUpdateRequest(this::handleDmUpdateRequestFromCard);
         groupDisplayView.setOnDateSelected(this::handleDateChange);
         groupDisplayView.setOnSuggestionRequest(() -> {
             GroupSuggester suggester = new GroupSuggester(attendingPlayers.values());
@@ -88,6 +99,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         });
         groupDisplayView.setOnSuggestedGroupsCreate(this::handleCreateSuggestedGroups);
         groupDisplayView.setOnAutoPopulate(this::handleAutoPopulate);
+        groupDisplayView.setOnExportRequest(this::handleExportRequest);
 
         rosterView.setOnPlayerAddRequest(this::handlePlayerAddRequest);
 
@@ -99,14 +111,74 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private void handleDateChange(LocalDate newDate) {
-        if (newDate != null) {
-            this.eventDate = newDate;
-            for (Group group : groups) {
-                group.setDate(this.eventDate);
-            }
-            refreshGroupDisplay();
+        this.eventDate = newDate;
+        for (Group group : groups) {
+            group.setDate(newDate);
         }
+        cleanUp();
     }
+
+    private boolean handleDmUpdateRequestFromCard(Group groupToUpdate, Player newDm) {
+        if (newDm == null || newDm.equals(groupToUpdate.getDungeonMaster())) {
+            return false;
+        }
+
+        // --- Check if the selected player is already a DM in another group ---
+        Optional<Group> dmSourceGroupOpt = groups.stream()
+                .filter(g -> newDm.equals(g.getDungeonMaster()) && !g.equals(groupToUpdate))
+                .findFirst();
+
+        if (dmSourceGroupOpt.isPresent()) {
+            Group sourceGroup = dmSourceGroupOpt.get();
+            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                    newDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?",
+                    ButtonType.YES, ButtonType.NO);
+            confirmation.initOwner(this.getTabPane().getScene().getWindow());
+            Optional<ButtonType> response = confirmation.showAndWait();
+
+            if (response.isPresent() && response.get() == ButtonType.YES) {
+                sourceGroup.removeDungeonMaster();
+                groupToUpdate.setDungeonMaster(newDm);
+                cleanUp();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        // --- Check if the selected player is a party member in any group ---
+        Optional<Group> playerSourceGroupOpt = groups.stream()
+                .filter(g -> g.getParty().containsKey(newDm.getUuid()))
+                .findFirst();
+
+        if (playerSourceGroupOpt.isPresent()) {
+            Group playerSourceGroup = playerSourceGroupOpt.get();
+            String message;
+            if (playerSourceGroup.equals(groupToUpdate)) {
+                message = newDm.getName() + " is in this group's party. Promote them to DM? (This will remove them from the party)";
+            } else {
+                message = newDm.getName() + " is in another group's party. Reassign them as DM for this group?";
+            }
+
+            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.YES, ButtonType.NO);
+            confirmation.initOwner(this.getTabPane().getScene().getWindow());
+            Optional<ButtonType> response = confirmation.showAndWait();
+
+            if (response.isPresent() && response.get() == ButtonType.YES) {
+                playerSourceGroup.removePartyMember(newDm);
+                groupToUpdate.setDungeonMaster(newDm);
+                cleanUp();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        groupToUpdate.setDungeonMaster(newDm);
+        cleanUp();
+        return true;
+    }
+
 
     private void updateDmList() {
         Group groupBeingEdited = groupForm.getGroupBeingEdited();
@@ -126,71 +198,10 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             root.getItems().set(1, rosterView);
             groupForm.getShowPlayersButton().setText("Hide Players");
         } else {
-            refreshGroupDisplay();
+            cleanUp();
             root.getItems().set(1, groupDisplayView);
             groupForm.getShowPlayersButton().setText("Show Players");
         }
-    }
-
-    private boolean handleDmUpdateRequest(Group targetGroup, Player newDm) {
-        if (newDm == null) {
-            targetGroup.removeDungeonMaster();
-            cleanUp();
-            return true;
-        }
-
-        Optional<Group> dmSourceGroupOpt = groups.stream()
-                .filter(g -> newDm.equals(g.getDungeonMaster()) && !g.equals(targetGroup))
-                .findFirst();
-
-        if (dmSourceGroupOpt.isPresent()) {
-            Group sourceGroup = dmSourceGroupOpt.get();
-            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
-                    newDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?",
-                    ButtonType.YES, ButtonType.NO);
-            confirmation.initOwner(this.getTabPane().getScene().getWindow());
-            Optional<ButtonType> response = confirmation.showAndWait();
-
-            if (response.isPresent() && response.get() == ButtonType.YES) {
-                sourceGroup.removeDungeonMaster();
-                targetGroup.setDungeonMaster(newDm);
-                cleanUp();
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        Optional<Group> playerSourceGroupOpt = groups.stream()
-                .filter(g -> g.getParty().containsKey(newDm.getUuid()))
-                .findFirst();
-
-        if (playerSourceGroupOpt.isPresent()) {
-            Group playerSourceGroup = playerSourceGroupOpt.get();
-            String message;
-            if (playerSourceGroup.equals(targetGroup)) {
-                message = newDm.getName() + " is in this group's party. Promote them to DM? (This will remove them from the party)";
-            } else {
-                message = newDm.getName() + " is in another group's party. Reassign them as DM for this group?";
-            }
-
-            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.YES, ButtonType.NO);
-            confirmation.initOwner(this.getTabPane().getScene().getWindow());
-            Optional<ButtonType> response = confirmation.showAndWait();
-
-            if (response.isPresent() && response.get() == ButtonType.YES) {
-                playerSourceGroup.removePartyMember(newDm);
-                targetGroup.setDungeonMaster(newDm);
-                cleanUp();
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        targetGroup.setDungeonMaster(newDm);
-        cleanUp();
-        return true;
     }
 
     private void handleAutoPopulate() {
@@ -208,11 +219,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         confirmation.initOwner(this.getTabPane().getScene().getWindow());
         confirmation.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
+                // Clear all existing party members for a clean slate.
                 for (Group group : groups) {
                     new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
                 }
                 Matchmaker matchmaker = new Matchmaker(this.groups, this.attendingPlayers);
-                this.groups = matchmaker.match();
+                this.groups = matchmaker.match(); // The matchmaker returns the populated list.
                 cleanUp();
             }
         });
@@ -227,6 +239,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private void handleGroupAction() {
         Group groupToEdit = groupForm.getGroupBeingEdited();
+        Player selectedDm = groupForm.getSelectedDm();
         if (groupToEdit == null) {
             dmsToReassignAsPlayer.keySet().forEach(Group::removeDungeonMaster);
             playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
@@ -235,12 +248,16 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 Group source = findGroupForPlayer(player);
                 if (source != null) source.removePartyMember(player);
             });
-            groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), eventDate, new ArrayList<>(newPartyMap.values())));
+            groups.add(groupFactory.create(selectedDm, groupForm.getSelectedHouses(), eventDate, new ArrayList<>(newPartyMap.values())));
         } else {
-            dmsToReassignAsDm.keySet().forEach(Group::removeDungeonMaster);
-            playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
-
-            groupToEdit.setDungeonMaster(groupForm.getSelectedDm());
+            dmsToReassignAsDm.forEach((source, dm) -> source.moveDungeonMasterTo(dm, groupToEdit));
+            playersToPromoteToDm.forEach((source, player) -> {
+                source.removePartyMember(player);
+                groupToEdit.setDungeonMaster(player);
+            });
+            if (selectedDm != null && !playersToPromoteToDm.containsValue(selectedDm) && !dmsToReassignAsDm.containsValue(selectedDm)) {
+                groupToEdit.setDungeonMaster(selectedDm);
+            }
             groupToEdit.setHouses(groupForm.getSelectedHouses());
         }
         cleanUp();
@@ -254,7 +271,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         if (playerToMove != null) {
             sourceGroup.removePartyMember(playerToMove);
             targetGroup.addPartyMember(playerToMove);
-            refreshGroupDisplay();
+            groupDisplayView.updateGroups(groups, attendingPlayers, getAllAssignedDms(), eventDate);
             rosterView.setAllGroups(groups);
         }
     }
@@ -321,7 +338,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 if (targetGroup != null) {
                     playerSourceGroup.movePlayerTo(player, targetGroup);
                     rosterView.updateRoster();
-                    refreshGroupDisplay();
+                    groupDisplayView.updateGroups(groups, attendingPlayers, getAllAssignedDms(), eventDate);
                 } else {
                     newPartyMap.put(player.getUuid(), player);
                 }
@@ -386,6 +403,52 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         return true;
     }
 
+    private void handleExportRequest() {
+        if (groups.isEmpty()) {
+            Alert info = new Alert(Alert.AlertType.INFORMATION, "There are no groups to export.");
+            info.initOwner(this.getTabPane().getScene().getWindow());
+            info.showAndWait();
+            return;
+        }
+
+        StringBuilder markdownBuilder = new StringBuilder();
+        groups.stream()
+                .sorted(Comparator.comparing(g -> g.getDungeonMaster() != null ? g.getDungeonMaster().getName() : ""))
+                .forEach(group -> {
+                    markdownBuilder.append(group.toMarkdown()).append("\n");
+                });
+
+        Stage exportStage = new Stage();
+        exportStage.initModality(Modality.APPLICATION_MODAL);
+        exportStage.initOwner(this.getTabPane().getScene().getWindow());
+        exportStage.setTitle("Export Groups to Markdown");
+
+        TextArea markdownArea = new TextArea(markdownBuilder.toString());
+        markdownArea.setEditable(false);
+        markdownArea.setWrapText(true);
+
+        Button copyButton = new Button("Copy to Clipboard");
+        copyButton.setOnAction(e -> {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            ClipboardContent content = new ClipboardContent();
+            content.putString(markdownArea.getText());
+            clipboard.setContent(content);
+        });
+
+        HBox buttonBar = new HBox(copyButton);
+        buttonBar.setAlignment(Pos.CENTER);
+        buttonBar.setPadding(new Insets(10));
+
+        BorderPane layout = new BorderPane();
+        layout.setCenter(markdownArea);
+        layout.setBottom(buttonBar);
+
+        Scene scene = new Scene(layout, 600, 700);
+        exportStage.setScene(scene);
+        exportStage.show();
+    }
+
+
     private Group findGroupForPlayer(Player player) {
         Group groupBeingEdited = groupForm.getGroupBeingEdited();
         for (Group group : groups) {
@@ -416,6 +479,13 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
     }
 
+    private Set<Player> getAllAssignedDms() {
+        return groups.stream()
+                .map(Group::getDungeonMaster)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
     private void cleanUp() {
         if (isPlayerRosterVisible) {
             toggleRosterView();
@@ -428,18 +498,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
         rosterView.setAllGroups(groups);
-        refreshGroupDisplay();
+        groupDisplayView.updateGroups(groups, attendingPlayers, getAllAssignedDms(), eventDate);
         updateDmList();
-    }
-
-    private void refreshGroupDisplay() {
-        Set<Player> allAssignedDms = new HashSet<>();
-        for (Group group : groups) {
-            if (group.getDungeonMaster() != null) {
-                allAssignedDms.add(group.getDungeonMaster());
-            }
-        }
-        groupDisplayView.updateGroups(groups, attendingPlayers, allAssignedDms, eventDate);
     }
 
     @Override

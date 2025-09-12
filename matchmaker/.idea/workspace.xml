@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Group.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Group.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/GroupManagementTab.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/GroupManagementTab.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/GroupDisplayView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/GroupDisplayView.java" afterDir="false" />
     </list>

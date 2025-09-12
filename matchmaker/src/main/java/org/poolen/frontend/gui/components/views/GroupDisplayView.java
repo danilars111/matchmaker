@@ -43,6 +43,7 @@ public class GroupDisplayView extends BorderPane {
     private final Button autoPopulateButton;
     private final Button expandAllButton;
     private final Button collapseAllButton;
+    private final Button exportButton;
     private final DatePicker datePicker;
     private final VBox suggestionDisplayBox;
     private final VBox suggestionContainer;
@@ -55,6 +56,7 @@ public class GroupDisplayView extends BorderPane {
     private Runnable onSuggestionRequestHandler;
     private Consumer<List<House>> onSuggestedGroupsCreateHandler;
     private Runnable onAutoPopulateHandler;
+    private Runnable onExportRequestHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
     private Consumer<LocalDate> onDateSelectedHandler;
     private List<Group> currentGroups = new ArrayList<>();
@@ -122,9 +124,17 @@ public class GroupDisplayView extends BorderPane {
         autoPopulateButton.setOnAction(e -> {
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
-        footer = new HBox(autoPopulateButton);
+        exportButton = new Button("Export Markdown");
+        exportButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+        exportButton.setOnAction(e -> {
+            if (onExportRequestHandler != null) onExportRequestHandler.run();
+        });
+        Region footerSpacer = new Region();
+        HBox.setHgrow(footerSpacer, Priority.ALWAYS);
+        footer = new HBox(10, autoPopulateButton, footerSpacer, exportButton);
         footer.setPadding(new Insets(10));
         footer.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-border-width: 1 0 0 0;");
+        footer.setAlignment(Pos.CENTER_LEFT);
 
         // --- Center Content ---
         gridScrollPane = new ScrollPane(groupGrid);
@@ -281,6 +291,10 @@ public class GroupDisplayView extends BorderPane {
 
     public void setOnDateSelected(Consumer<LocalDate> handler) {
         this.onDateSelectedHandler = handler;
+    }
+
+    public void setOnExportRequest(Runnable handler) {
+        this.onExportRequestHandler = handler;
     }
 }
 

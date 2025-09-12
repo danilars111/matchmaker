@@ -3,8 +3,11 @@ package org.poolen.backend.db.entities;
 import org.poolen.backend.db.constants.House;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +49,41 @@ public class Group {
                 partyMembers
         );
     }
+
+    /**
+     * Generates a string formatted with Discord markdown to display group details.
+     * @return A Discord-ready markdown string.
+     */
+    public String toMarkdown() {
+        StringBuilder sb = new StringBuilder();
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG);
+
+        String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "_Unassigned_";
+        sb.append("**Dungeon Master:** ").append(dmName).append("\n");
+
+        String houseThemes = houses.stream()
+                .map(house -> {
+                    String name = house.name().toLowerCase().replace("_", " ");
+                    return name.substring(0, 1).toUpperCase() + name.substring(1);
+                })
+                .collect(Collectors.joining(", "));
+        if (houseThemes.isEmpty()) {
+            houseThemes = "_None_";
+        }
+        sb.append("**House Themes:** ").append(houseThemes).append("\n");
+
+        sb.append("**Party Members (" + party.size() + "):**\n");
+        if (party.isEmpty()) {
+            sb.append("> _No players in this group yet._\n");
+        } else {
+            party.values().stream()
+                    .sorted(Comparator.comparing(Player::getName))
+                    .forEach(player -> sb.append("> • ").append(player.getName()).append("\n"));
+        }
+
+        return sb.toString();
+    }
+
 
     public Player getDungeonMaster() {
         return dungeonMaster;
@@ -111,4 +149,3 @@ public class Group {
         group.setDungeonMaster(dm);
     }
 }
-
