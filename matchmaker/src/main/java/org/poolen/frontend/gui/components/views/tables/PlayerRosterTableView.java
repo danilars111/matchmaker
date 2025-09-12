@@ -65,7 +65,7 @@ public class PlayerRosterTableView extends VBox {
     private List<Group> allGroups = new ArrayList<>();
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
-    private PlayerAddRequestHandler onPlayerAddRequestHandler; // Our new messenger handler!
+    private PlayerAddRequestHandler onPlayerAddRequestHandler;
 
     public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
         super(10);
@@ -195,16 +195,14 @@ public class PlayerRosterTableView extends VBox {
             SimpleBooleanProperty property = new SimpleBooleanProperty(isSelected);
 
             property.addListener((obs, was, isNow) -> {
-                if (isNow) { // We are trying to add a player
+                if (isNow) {
                     if (onPlayerAddRequestHandler != null) {
-                        // We politely ask permission!
                         boolean success = onPlayerAddRequestHandler.onPlayerAddRequest(player);
                         if (!success) {
-                            // If we're told no, we un-check the box!
                             Platform.runLater(() -> property.set(false));
                         }
                     }
-                } else { // We are removing a player, which is always allowed.
+                } else {
                     if (currentGroup != null) {
                         currentGroup.removePartyMember(player);
                         playerTable.refresh();
@@ -293,6 +291,9 @@ public class PlayerRosterTableView extends VBox {
                     for (Group group : allGroups) {
                         if (currentGroup != null && currentGroup.equals(group)) continue;
                         assignedPlayerIds.addAll(group.getParty().keySet());
+                        if (group.getDungeonMaster() != null) {
+                            assignedPlayerIds.add(group.getDungeonMaster().getUuid());
+                        }
                     }
                     availableMatch = !assignedPlayerIds.contains(player.getUuid());
                 }
