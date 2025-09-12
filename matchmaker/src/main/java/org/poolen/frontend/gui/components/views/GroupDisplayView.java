@@ -4,6 +4,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
 import javafx.scene.control.Button;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TitledPane;
@@ -21,6 +22,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.views.tables.GroupTableView;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ public class GroupDisplayView extends BorderPane {
     private final Button autoPopulateButton;
     private final Button expandAllButton;
     private final Button collapseAllButton;
+    private final DatePicker datePicker;
     private final VBox suggestionDisplayBox;
     private final VBox suggestionContainer;
     private final HBox header;
@@ -53,6 +56,7 @@ public class GroupDisplayView extends BorderPane {
     private Consumer<List<House>> onSuggestedGroupsCreateHandler;
     private Runnable onAutoPopulateHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
+    private Consumer<LocalDate> onDateSelectedHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
     private Map<UUID, Player> attendingPlayers;
@@ -92,6 +96,14 @@ public class GroupDisplayView extends BorderPane {
         suggestionContainer.setPadding(new Insets(20));
 
         // --- Header ---
+        datePicker = new DatePicker();
+        datePicker.getEditor().setDisable(true);
+        datePicker.getEditor().setOpacity(1.0);
+        datePicker.valueProperty().addListener((obs, oldDate, newDate) -> {
+            if (onDateSelectedHandler != null && newDate != null) {
+                onDateSelectedHandler.accept(newDate);
+            }
+        });
         expandAllButton = new Button("Expand All");
         expandAllButton.setOnAction(e -> setAllCardsExpanded(true));
         collapseAllButton = new Button("Collapse All");
@@ -99,7 +111,7 @@ public class GroupDisplayView extends BorderPane {
 
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        header = new HBox(10, headerSpacer, expandAllButton, collapseAllButton);
+        header = new HBox(10, datePicker, headerSpacer, expandAllButton, collapseAllButton);
         header.setPadding(new Insets(10));
         header.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
 
@@ -131,10 +143,11 @@ public class GroupDisplayView extends BorderPane {
         });
     }
 
-    public void updateGroups(List<Group> groups, Map<UUID, Player> attendingPlayers, Set<Player> allAssignedDms) {
+    public void updateGroups(List<Group> groups, Map<UUID, Player> attendingPlayers, Set<Player> allAssignedDms, LocalDate eventDate) {
         this.currentGroups = groups;
         this.attendingPlayers = attendingPlayers;
         this.allAssignedDms = allAssignedDms;
+        this.datePicker.setValue(eventDate);
 
         if (groups.isEmpty()) {
             header.setVisible(false);
@@ -264,6 +277,10 @@ public class GroupDisplayView extends BorderPane {
 
     public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
         this.onDmUpdateRequestHandler = handler;
+    }
+
+    public void setOnDateSelected(Consumer<LocalDate> handler) {
+        this.onDateSelectedHandler = handler;
     }
 }
 

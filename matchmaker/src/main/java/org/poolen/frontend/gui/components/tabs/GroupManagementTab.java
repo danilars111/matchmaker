@@ -43,6 +43,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Map<UUID, Player> attendingPlayers;
     private List<Group> groups = new ArrayList<>();
     private final GroupDisplayView groupDisplayView;
+    private LocalDate eventDate = LocalDate.now();
 
     private final Map<Group, Player> dmsToReassignAsDm = new HashMap<>();
     private final Map<Group, Player> playersToPromoteToDm = new HashMap<>();
@@ -79,6 +80,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
         groupDisplayView.setOnPlayerMove(this::handlePlayerMove);
         groupDisplayView.setOnDmUpdateRequest(this::handleDmUpdateRequest);
+        groupDisplayView.setOnDateSelected(this::handleDateChange);
         groupDisplayView.setOnSuggestionRequest(() -> {
             GroupSuggester suggester = new GroupSuggester(attendingPlayers.values());
             List<House> suggestions = suggester.suggestGroupThemes();
@@ -94,6 +96,16 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         });
 
         this.setContent(root);
+    }
+
+    private void handleDateChange(LocalDate newDate) {
+        if (newDate != null) {
+            this.eventDate = newDate;
+            for (Group group : groups) {
+                group.setDate(this.eventDate);
+            }
+            refreshGroupDisplay();
+        }
     }
 
     private void updateDmList() {
@@ -208,7 +220,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private void handleCreateSuggestedGroups(List<House> themes) {
         for (House theme : themes) {
-            groups.add(groupFactory.create(null, List.of(theme), LocalDate.now(), new ArrayList<>()));
+            groups.add(groupFactory.create(null, List.of(theme), eventDate, new ArrayList<>()));
         }
         cleanUp();
     }
@@ -223,7 +235,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 Group source = findGroupForPlayer(player);
                 if (source != null) source.removePartyMember(player);
             });
-            groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), new ArrayList<>(newPartyMap.values())));
+            groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), eventDate, new ArrayList<>(newPartyMap.values())));
         } else {
             dmsToReassignAsDm.keySet().forEach(Group::removeDungeonMaster);
             playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
@@ -427,7 +439,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 allAssignedDms.add(group.getDungeonMaster());
             }
         }
-        groupDisplayView.updateGroups(groups, attendingPlayers, allAssignedDms);
+        groupDisplayView.updateGroups(groups, attendingPlayers, allAssignedDms, eventDate);
     }
 
     @Override
