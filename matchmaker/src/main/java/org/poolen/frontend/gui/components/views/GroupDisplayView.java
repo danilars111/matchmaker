@@ -6,10 +6,12 @@ import javafx.geometry.VPos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TitledPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
@@ -30,19 +32,22 @@ public class GroupDisplayView extends ScrollPane {
     private final StackPane contentPane;
     private final Button suggestButton;
     private final Button createSuggestedButton;
-    private final Button autoPopulateButton; // Our beautiful new button!
+    private final Button autoPopulateButton;
+    private final Button expandAllButton;
+    private final Button collapseAllButton;
     private final VBox suggestionDisplayBox;
     private final VBox suggestionContainer;
-    private final VBox gridContainer; // A new container for our grid and its buttons!
+    private final VBox gridContainer;
     private Consumer<Group> onGroupEditHandler;
     private Consumer<Group> onGroupDeleteHandler;
     private PlayerMoveHandler onPlayerMoveHandler;
     private Runnable onSuggestionRequestHandler;
     private Consumer<List<House>> onSuggestedGroupsCreateHandler;
-    private Runnable onAutoPopulateHandler; // Our new handler!
+    private Runnable onAutoPopulateHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
-    private static final double ESTIMATED_CARD_WIDTH = 300.0;
+    private final List<GroupTableView> groupCards = new ArrayList<>();
+    private static final double ESTIMATED_CARD_WIDTH = 200.0;
     private int lastColumnCount = -1;
 
     public GroupDisplayView() {
@@ -76,16 +81,25 @@ public class GroupDisplayView extends ScrollPane {
         suggestionContainer.setPadding(new Insets(20));
 
         // --- Grid UI ---
+        expandAllButton = new Button("Expand All");
+        expandAllButton.setOnAction(e -> setAllCardsExpanded(true));
+        collapseAllButton = new Button("Collapse All");
+        collapseAllButton.setOnAction(e -> setAllCardsExpanded(false));
+
+        Region topBarSpacer = new Region();
+        HBox.setHgrow(topBarSpacer, Priority.ALWAYS);
+        HBox topBar = new HBox(10, topBarSpacer, expandAllButton, collapseAllButton);
+        topBar.setPadding(new Insets(0, 10, 0, 10));
+
         autoPopulateButton = new Button("Auto-Populate Groups");
         autoPopulateButton.setStyle("-fx-font-size: 14px; -fx-background-color: #f44336; -fx-text-fill: white;");
         autoPopulateButton.setOnAction(e -> {
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
-        HBox buttonBar = new HBox(autoPopulateButton);
-        buttonBar.setAlignment(Pos.CENTER);
-        buttonBar.setPadding(new Insets(10, 0, 0, 0));
+        HBox bottomBar = new HBox(autoPopulateButton);
+        bottomBar.setPadding(new Insets(0, 10, 0, 10));
 
-        gridContainer = new VBox(10, buttonBar, groupGrid);
+        gridContainer = new VBox(10, topBar, groupGrid, bottomBar);
         gridContainer.setAlignment(Pos.TOP_CENTER);
 
         contentPane = new StackPane(gridContainer, suggestionContainer);
@@ -142,6 +156,7 @@ public class GroupDisplayView extends ScrollPane {
         if (newMaxCols == lastColumnCount) return;
         this.lastColumnCount = newMaxCols;
 
+        groupCards.clear();
         groupGrid.getChildren().clear();
         groupGrid.getColumnConstraints().clear();
 
@@ -160,6 +175,8 @@ public class GroupDisplayView extends ScrollPane {
             if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
             if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
             if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
+            groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
+            groupCards.add(groupCard);
             GridPane.setValignment(groupCard, VPos.TOP);
             groupGrid.add(groupCard, col, row);
 
@@ -169,6 +186,24 @@ public class GroupDisplayView extends ScrollPane {
                 row++;
             }
         }
+        updateExpandCollapseButtons();
+    }
+
+    private void setAllCardsExpanded(boolean expanded) {
+        groupCards.forEach(card -> card.setExpanded(expanded));
+    }
+
+    private void updateExpandCollapseButtons() {
+        if (groupCards.isEmpty()) {
+            expandAllButton.setDisable(true);
+            collapseAllButton.setDisable(true);
+            return;
+        }
+        boolean anyCollapsed = groupCards.stream().anyMatch(card -> !card.isExpanded());
+        expandAllButton.setDisable(!anyCollapsed);
+
+        boolean anyExpanded = groupCards.stream().anyMatch(TitledPane::isExpanded);
+        collapseAllButton.setDisable(!anyExpanded);
     }
 
     public void setOnGroupEdit(Consumer<Group> handler) {
@@ -195,4 +230,3 @@ public class GroupDisplayView extends ScrollPane {
         this.onAutoPopulateHandler = handler;
     }
 }
-
