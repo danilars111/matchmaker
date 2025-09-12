@@ -10,6 +10,9 @@ import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
+import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
+import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
+import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.time.LocalDate;
@@ -95,7 +98,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             dmsToReassign.keySet().forEach(Group::removeDungeonMaster);
             groups.add(groupFactory.create(groupForm.getSelectedDm(), groupForm.getSelectedHouses(), LocalDate.now(), new ArrayList<>(newPartyMap.values())));
         } else {
-            dmsToReassign.keySet().forEach(group -> group.moveDungeonMasterTo(groupForm.getSelectedDm(), groupToEdit));
+            dmsToReassign.forEach((sourceGroup, poachedDm) -> sourceGroup.moveDungeonMasterTo(poachedDm, groupToEdit));
             groupToEdit.setHouses(groupForm.getSelectedHouses());
         }
         cleanUp();
@@ -144,8 +147,29 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private boolean handlePlayerAddRequest(Player player) {
-        Group sourceGroup = findGroupForPlayer(player);
-        if (sourceGroup != null) {
+        // First, we check if they're a DM somewhere else.
+        Group dmSourceGroup = findGroupDmForPlayer(player);
+        if (dmSourceGroup != null) {
+            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                    player.getName() + " is a DM for another group. Reassign them as a player to this group?",
+                    ButtonType.YES, ButtonType.NO);
+            confirmation.initOwner(this.getTabPane().getScene().getWindow());
+            Optional<ButtonType> response = confirmation.showAndWait();
+            if (response.isPresent() && response.get() == ButtonType.YES) {
+                dmsToReassign.put(dmSourceGroup, player); // Prime them for reassignment!
+                // We still add them to the current party list so the UI looks right.
+                Group targetGroup = groupForm.getGroupBeingEdited();
+                if (targetGroup != null) targetGroup.addPartyMember(player);
+                else newPartyMap.put(player.getUuid(), player);
+                return true;
+            } else {
+                return false; // User cancelled.
+            }
+        }
+
+        // If they're not a DM, we check if they're a player somewhere else.
+        Group playerSourceGroup = findGroupForPlayer(player);
+        if (playerSourceGroup != null) {
             Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
                     player.getName() + " is already in another group. Reassign them?",
                     ButtonType.YES, ButtonType.NO);
@@ -155,7 +179,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 Group targetGroup = groupForm.getGroupBeingEdited();
                 if (targetGroup != null) {
-                    sourceGroup.movePlayerTo(player, targetGroup);
+                    playerSourceGroup.movePlayerTo(player, targetGroup);
                     rosterView.updateRoster();
                     groupDisplayView.updateGroups(groups);
                 } else {
@@ -165,12 +189,13 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             } else {
                 return false;
             }
-        } else {
-            Group targetGroup = groupForm.getGroupBeingEdited();
-            if (targetGroup != null) targetGroup.addPartyMember(player);
-            else newPartyMap.put(player.getUuid(), player);
-            return true;
         }
+
+        // If they are completely free, we just add them!
+        Group targetGroup = groupForm.getGroupBeingEdited();
+        if (targetGroup != null) targetGroup.addPartyMember(player);
+        else newPartyMap.put(player.getUuid(), player);
+        return true;
     }
 
     private boolean handleDmSelectionRequest(Player selectedDm) {
@@ -181,7 +206,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         if (sourceGroupOpt.isPresent()) {
             Group sourceGroup = sourceGroupOpt.get();
             Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
-                    selectedDm.getName() + " is already a DM for another group. Reassign them as a player to this group?",
+                    selectedDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?",
                     ButtonType.YES, ButtonType.NO);
             confirmation.initOwner(this.getTabPane().getScene().getWindow());
             Optional<ButtonType> response = confirmation.showAndWait();
@@ -201,6 +226,17 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         for (Group group : groups) {
             if (group.equals(groupBeingEdited)) continue;
             if (group.getParty().containsKey(player.getUuid())) {
+                return group;
+            }
+        }
+        return null;
+    }
+
+    private Group findGroupDmForPlayer(Player player) {
+        Group groupBeingEdited = groupForm.getGroupBeingEdited();
+        for (Group group : groups) {
+            if (group.equals(groupBeingEdited)) continue;
+            if (player.equals(group.getDungeonMaster())) {
                 return group;
             }
         }
