@@ -62,7 +62,10 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         cleanUp();
 
         root.getItems().addAll(groupForm, groupDisplayView);
-        root.setDividerPositions(0.4);
+        root.setDividerPositions(0.3);
+
+        groupForm.setMinWidth(50);
+        groupForm.setMaxWidth(310);
 
         // --- Event Wiring ---
         groupForm.getShowPlayersButton().setOnAction(e -> toggleRosterView());

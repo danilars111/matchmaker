@@ -42,7 +42,7 @@ public class GroupDisplayView extends ScrollPane {
     private Runnable onAutoPopulateHandler; // Our new handler!
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
-    private static final double ESTIMATED_CARD_WIDTH = 350.0;
+    private static final double ESTIMATED_CARD_WIDTH = 300.0;
     private int lastColumnCount = -1;
 
     public GroupDisplayView() {

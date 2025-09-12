@@ -31,7 +31,10 @@ public class PlayerManagementTab extends Tab {
                 attendingPlayers, onPlayerListChanged);
 
         root.getItems().addAll(formView, rosterView);
-        root.setDividerPositions(0.35);
+        root.setDividerPositions(0.3);
+
+        formView.setMinWidth(50);
+        formView.setMaxWidth(310);
 
         rosterView.setOnPlayerDoubleClick(player -> {
             if (isShowingBlacklist) {
