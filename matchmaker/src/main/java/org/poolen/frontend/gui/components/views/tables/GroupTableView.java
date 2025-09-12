@@ -14,6 +14,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 
@@ -32,15 +34,35 @@ public class GroupTableView extends TitledPane {
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy");
     private Group currentGroup;
 
+    // --- Labels for our beautiful new title bar! ---
+    private final Label dmNameLabel;
+    private final Label themesLabel;
+    private final Label partySizeLabel;
+
     public GroupTableView() {
         super();
+
+        // --- Our beautiful new title bar ---
+        dmNameLabel = new Label();
+        dmNameLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        themesLabel = new Label();
+        themesLabel.setStyle("-fx-text-fill: #555;");
+        partySizeLabel = new Label();
+        partySizeLabel.setStyle("-fx-font-style: italic;");
+
+        Region titleSpacer = new Region();
+        HBox.setHgrow(titleSpacer, Priority.ALWAYS);
+        HBox titleBox = new HBox(10, dmNameLabel, themesLabel, titleSpacer, partySizeLabel);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        this.setGraphic(titleBox);
+        this.setText(null); // We use the graphic, so we don't need text!
 
         // --- Information Header ---
         dateLabel = new Label();
         editButton = new Button("Edit");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox infoHeader = new HBox(5, dateLabel, spacer, editButton);
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox infoHeader = new HBox(5, dateLabel, headerSpacer, editButton);
         infoHeader.setAlignment(Pos.CENTER_LEFT);
         infoHeader.setPadding(new Insets(5, 10, 0, 10));
 
@@ -84,10 +106,20 @@ public class GroupTableView extends TitledPane {
      */
     public void setGroup(Group group) {
         this.currentGroup = group;
-        // --- Set the title ---
-        String themes = group.getHouses().stream().map(Enum::toString).collect(Collectors.joining(", "));
+        // --- Populate the beautiful new title bar ---
         String dmName = group.getDungeonMaster() != null ? group.getDungeonMaster().getName() : "N/A";
-        this.setText("%s %s (%s)".formatted(dmName, themes.isEmpty() ? "N/A" : themes, group.getParty().size()));
+        dmNameLabel.setText(dmName);
+
+        // We'll abbreviate the themes to two letters to save space!
+        String themes = group.getHouses().stream()
+                .map(house -> house.name().substring(0, 2))
+                .collect(Collectors.joining(", "));
+        if (themes.isEmpty()) themes = "No themes";
+        // And use the dot as a beautiful divider!
+        themesLabel.setText("• " + themes);
+
+        partySizeLabel.setText(group.getParty().size() + " players");
+
 
         String date = group.getDate() != null ? group.getDate().format(dateFormatter) : "N/A";
         dateLabel.setText(date);
