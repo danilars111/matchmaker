@@ -103,4 +103,3 @@ public class GroupDisplayView extends ScrollPane {
         this.onPlayerMoveHandler = handler;
     }
 }
-

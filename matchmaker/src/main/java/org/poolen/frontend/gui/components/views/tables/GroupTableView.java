@@ -192,4 +192,3 @@ public class GroupTableView extends TitledPane {
         this.onPlayerMoveHandler = handler;
     }
 }
-

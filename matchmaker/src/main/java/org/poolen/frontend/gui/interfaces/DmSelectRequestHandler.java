@@ -9,5 +9,5 @@ import org.poolen.backend.db.entities.Player;
  */
 @FunctionalInterface
 public interface DmSelectRequestHandler {
-    boolean onDmSelectRequest(Player selectedDm);
+    boolean onDmSelectionRequest(Player selectedDm);
 }

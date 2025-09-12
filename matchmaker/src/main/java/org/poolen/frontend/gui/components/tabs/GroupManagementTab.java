@@ -115,6 +115,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             dmsToReassignAsPlayer.keySet().forEach(Group::removeDungeonMaster);
             // Handle players being promoted to DM of our new group
             playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
+            // Handle DMs being reassigned as DM for our new group
+            dmsToReassignAsDm.keySet().forEach(Group::removeDungeonMaster);
             // Handle regular players being moved from other parties
             new ArrayList<>(newPartyMap.values()).forEach(player -> {
                 Group source = findGroupForPlayer(player);
@@ -225,7 +227,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private boolean handleDmSelectionRequest(Player selectedDm) {
         Group groupBeingEdited = groupForm.getGroupBeingEdited();
-        // Check if the selected person is already a DM in another group.
         Optional<Group> dmSourceGroupOpt = groups.stream()
                 .filter(g -> selectedDm.equals(g.getDungeonMaster()) && !g.equals(groupBeingEdited))
                 .findFirst();
@@ -246,7 +247,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             }
         }
 
-        // Check if the selected person is a player in any group (including the one being edited).
         Optional<Group> playerSourceGroupOpt = groups.stream()
                 .filter(g -> g.getParty().containsKey(selectedDm.getUuid()))
                 .findFirst();

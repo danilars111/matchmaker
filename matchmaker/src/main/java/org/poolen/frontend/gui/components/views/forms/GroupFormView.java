@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class GroupFormView extends GridPane {
 
     private final TextField uuidField;
-    private final ComboBox<Object> dmComboBox; // We use Object to hold Players, Separators, and our placeholder!
+    private final ComboBox<Object> dmComboBox;
     private final Map<House, CheckBox> houseCheckBoxes;
     private final Button actionButton;
     private final Button cancelButton;
@@ -47,8 +47,6 @@ public class GroupFormView extends GridPane {
     private Group groupBeingEdited;
     private Consumer<Player> onDmSelectionHandler;
     private DmSelectRequestHandler dmSelectRequestHandler;
-
-    // A beautiful, special placeholder for our "Unassigned" option!
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
 
     public GroupFormView(Map<UUID, Player> attendingPlayers) {
@@ -57,7 +55,6 @@ public class GroupFormView extends GridPane {
         setVgap(10);
         setPadding(new Insets(20));
 
-        // --- Layout Constraints ---
         ColumnConstraints col1 = new ColumnConstraints();
         col1.setHgrow(Priority.ALWAYS);
         this.getColumnConstraints().addAll(col1, new ColumnConstraints());
@@ -84,7 +81,7 @@ public class GroupFormView extends GridPane {
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
             if (dmSelectRequestHandler != null && newVal instanceof Player) {
-                boolean success = dmSelectRequestHandler.onDmSelectRequest(selectedPlayer);
+                boolean success = dmSelectRequestHandler.onDmSelectionRequest(selectedPlayer);
                 if (!success) {
                     Platform.runLater(() -> dmComboBox.setValue(oldVal));
                     return;
@@ -141,17 +138,17 @@ public class GroupFormView extends GridPane {
     }
 
     public void updateDmList(Map<UUID, Player> attendingPlayers, Set<Player> unavailablePlayers) {
-        Object selectedDm = dmComboBox.getValue();
+        Object selectedDm = getSelectedDm();
+        ObservableList<Object> items = FXCollections.observableArrayList();
+        items.add(UNASSIGNED_PLACEHOLDER);
+
         List<Player> allDms = attendingPlayers.values().stream()
                 .filter(Player::isDungeonMaster)
                 .sorted(Comparator.comparing(Player::getName))
                 .toList();
-
         List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm)).toList();
         List<Player> unavailableDms = allDms.stream().filter(unavailablePlayers::contains).toList();
 
-        ObservableList<Object> items = FXCollections.observableArrayList();
-        items.add(UNASSIGNED_PLACEHOLDER);
         items.addAll(availableDms);
         if (!unavailableDms.isEmpty()) {
             items.add(new Separator());
@@ -185,32 +182,14 @@ public class GroupFormView extends GridPane {
                 } else if (item.equals(UNASSIGNED_PLACEHOLDER)) {
                     setText(UNASSIGNED_PLACEHOLDER);
                     setFont(Font.font("System", FontPosture.ITALIC, 12));
-                    setGraphic(null);
-                    setDisable(false);
-                } else { // It must be a Player
-                    setText(((Player) item).getName());
-                    setFont(Font.getDefault());
-                    setGraphic(null);
-                    setDisable(false);
-                }
-            }
-        };
-        dmComboBox.setCellFactory(cellFactory);
-        dmComboBox.setButtonCell(new ListCell<>() {
-            @Override
-            protected void updateItem(Object item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null || item instanceof Separator) {
-                    setText(null);
-                } else if (item.equals(UNASSIGNED_PLACEHOLDER)) {
-                    setText(UNASSIGNED_PLACEHOLDER);
-                    setFont(Font.font("System", FontPosture.ITALIC, 12));
                 } else {
                     setText(((Player) item).getName());
                     setFont(Font.getDefault());
                 }
             }
-        });
+        };
+        dmComboBox.setCellFactory(cellFactory);
+        dmComboBox.setButtonCell(cellFactory.call(null));
     }
 
     public Player getSelectedDm() {
