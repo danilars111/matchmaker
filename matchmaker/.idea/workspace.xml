@@ -6,10 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/GroupManagementTab.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/GroupManagementTab.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/forms/GroupFormView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/forms/GroupFormView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/tables/GroupTableView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/tables/GroupTableView.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/tables/PlayerRosterTableView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/tables/PlayerRosterTableView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/main.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -103,7 +104,7 @@
       <workItem from="1757424861093" duration="4356000" />
       <workItem from="1757488458456" duration="18884000" />
       <workItem from="1757576373631" duration="44923000" />
-      <workItem from="1758292606315" duration="6794000" />
+      <workItem from="1758292606315" duration="7933000" />
     </task>
     <servers />
   </component>
@@ -117,6 +118,15 @@
           <url>file://$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/MainFrame.java</url>
           <line>123</line>
           <option name="timeStamp" value="46" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-method">
+          <url>file://$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/GroupManagementTab.java</url>
+          <line>198</line>
+          <properties class="org.poolen.frontend.gui.components.tabs.GroupManagementTab" method="toggleRosterView">
+            <option name="EMULATED" value="true" />
+            <option name="WATCH_EXIT" value="false" />
+          </properties>
+          <option name="timeStamp" value="52" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

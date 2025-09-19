@@ -37,28 +37,6 @@ public class main {
         Map<UUID, Player> attendingPlayers = new HashMap<>();
 
 
-        Player DM_1 = new Player("DM_1", true);
-        Player DM_2 = new Player("DM_2", true);
-        Player DM_3 = new Player("DM_3", true);
-        Player DM_4 = new Player("DM_4", true);
-        Player DM_5 = new Player("DM_5", true);
-        Player DM_6 = new Player("DM_6", true);/*
-        Player DM_7 = new Player("DM_7", true);
-        Player DM_8 = new Player("DM_8", true);
-        Player DM_9 = new Player("DM_9", true);
-        Player DM_10 = new Player("DM_10", true);*/
-
-        playerStore.addPlayer(DM_1);
-        playerStore.addPlayer(DM_2);
-        playerStore.addPlayer(DM_3);
-        playerStore.addPlayer(DM_4);
-        playerStore.addPlayer(DM_5);/*
-        playerStore.addPlayer(DM_6);
-        playerStore.addPlayer(DM_7);
-        playerStore.addPlayer(DM_8);
-        playerStore.addPlayer(DM_9);
-        playerStore.addPlayer(DM_10);*/
-
         for(Player player : playerStore.getAllPlayers()) {
             attendingPlayers.put(player.getUuid(), player);
         }
@@ -103,6 +81,18 @@ public class main {
 
         House[] houses = House.values();
 
+        Player DM_1 = new Player("DM_1", true);
+        Player DM_2 = new Player("DM_2", true);
+        Player DM_3 = new Player("DM_3", true);
+        Player DM_4 = new Player("DM_4", true);
+        Player DM_5 = new Player("DM_5", true);
+
+        playerStore.addPlayer(DM_1);
+        playerStore.addPlayer(DM_2);
+        playerStore.addPlayer(DM_3);
+        playerStore.addPlayer(DM_4);
+        playerStore.addPlayer(DM_5);
+
         for(int i = 0; i < 20; i++) {
             Random random = new Random();
             Character character1 = new Character("1", houses[random.nextInt(houses.length)]);
@@ -137,7 +127,6 @@ public class main {
         playerStore.addPlayer(player3);
 
         player.getBuddylist().put(player3.getUuid(), player3);
-        //player3.getBuddylist().put(player2.getUuid(), player2);
 
         player.getPlayerLog().put(player3.getUuid(), Date.from(LocalDate.of(2025, Month.AUGUST, 25).atStartOfDay(ZoneId.systemDefault()).toInstant()));
         player3.getPlayerLog().put(player.getUuid(), Date.from(LocalDate.of(2025, Month.AUGUST, 25).atStartOfDay(ZoneId.systemDefault()).toInstant()));

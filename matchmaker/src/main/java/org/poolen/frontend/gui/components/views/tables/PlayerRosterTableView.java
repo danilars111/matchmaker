@@ -323,41 +323,32 @@ public class PlayerRosterTableView extends VBox {
             boolean houseMatch = selectedHouse == null || player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
 
             if (mode == RosterMode.GROUP_ASSIGNMENT) {
-                // --- Consolidated "Is Unavailable" Logic ---
-                boolean isUnavailable = false;
-
-                // Unavailable if they are the DM for the group being edited/created
+                // --- Unavailability Rules (Applied to everyone) ---
+                // Rule 1: Unavailable if they are the DM for the group being edited/created
                 Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
                 if (dmToExclude != null && player.equals(dmToExclude)) {
-                    isUnavailable = true;
+                    return false;
+                }
+                // Rule 2: Unavailable if they are on the master DM list for the week
+                if (dmingPlayers != null && dmingPlayers.containsKey(player.getUuid())) {
+                    return false;
                 }
 
-                // If "Available Only" is checked, check all other reasons for unavailability
-                if (!isUnavailable && availableOnlyCheckbox.isSelected()) {
-                    // Unavailable if they are on the master DM list for the week
-                    if (dmingPlayers != null && dmingPlayers.containsKey(player.getUuid())) {
-                        isUnavailable = true;
-                    }
+                // --- Optional "Available Only" Filter ---
+                if (availableOnlyCheckbox.isSelected()) {
                     // Unavailable if they are in another group's party
-                    if (!isUnavailable) {
-                        for (Group group : allGroups) {
-                            if (currentGroup != null && currentGroup.equals(group)) continue;
-                            if (group.getParty().containsKey(player.getUuid())) {
-                                isUnavailable = true;
-                                break;
-                            }
+                    for (Group group : allGroups) {
+                        if (currentGroup != null && currentGroup.equals(group)) continue;
+                        if (group.getParty().containsKey(player.getUuid())) {
+                            return false; // Found in another party, so not available
                         }
                     }
                 }
 
-                if (isUnavailable) return false;
-                // --- End of Unavailability Logic ---
-
-
+                // --- Other Filters ---
                 boolean selectedOnly = modeSpecificFilterCheckbox.isSelected();
                 Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
                 boolean selectedMatch = !selectedOnly || (partyMap != null && partyMap.containsKey(player.getUuid()));
-
 
                 return textMatch && houseMatch && selectedMatch;
             }

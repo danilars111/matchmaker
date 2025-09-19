@@ -33,12 +33,14 @@ public class ManagementStage extends Stage {
     private static final List<Stage> detachedStages = new ArrayList<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
     private final Map<UUID, Player> dmingPlayers;
+    private final Map<UUID, Player> attendingPlayers;
 
-    public ManagementStage(Map<UUID, Player> attendingPlayers) {
+    public ManagementStage() {
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
         this.dmingPlayers = new HashMap<>();
+        this.attendingPlayers = new HashMap<>();
 
         TabPane tabPane = new TabPane();
 

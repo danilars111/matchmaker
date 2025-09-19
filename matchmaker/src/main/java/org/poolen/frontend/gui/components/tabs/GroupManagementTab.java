@@ -121,13 +121,13 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private boolean handleDmUpdateRequestFromCard(Group groupToUpdate, Player newDm) {
-        if (newDm == null || newDm.equals(groupToUpdate.getDungeonMaster())) {
+        if (newDm != null && newDm.equals(groupToUpdate.getDungeonMaster())) {
             return false;
         }
 
         // --- Check if the selected player is already a DM in another group ---
         Optional<Group> dmSourceGroupOpt = groups.stream()
-                .filter(g -> newDm.equals(g.getDungeonMaster()) && !g.equals(groupToUpdate))
+                .filter(g -> newDm != null && newDm.equals(g.getDungeonMaster()) && !g.equals(groupToUpdate))
                 .findFirst();
 
         if (dmSourceGroupOpt.isPresent()) {
@@ -149,30 +149,32 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
 
         // --- Check if the selected player is a party member in any group ---
-        Optional<Group> playerSourceGroupOpt = groups.stream()
-                .filter(g -> g.getParty().containsKey(newDm.getUuid()))
-                .findFirst();
+        if (newDm != null) {
+            Optional<Group> playerSourceGroupOpt = groups.stream()
+                    .filter(g -> g.getParty().containsKey(newDm.getUuid()))
+                    .findFirst();
 
-        if (playerSourceGroupOpt.isPresent()) {
-            Group playerSourceGroup = playerSourceGroupOpt.get();
-            String message;
-            if (playerSourceGroup.equals(groupToUpdate)) {
-                message = newDm.getName() + " is in this group's party. Promote them to DM? (This will remove them from the party)";
-            } else {
-                message = newDm.getName() + " is in another group's party. Reassign them as DM for this group?";
-            }
+            if (playerSourceGroupOpt.isPresent()) {
+                Group playerSourceGroup = playerSourceGroupOpt.get();
+                String message;
+                if (playerSourceGroup.equals(groupToUpdate)) {
+                    message = newDm.getName() + " is in this group's party. Promote them to DM? (This will remove them from the party)";
+                } else {
+                    message = newDm.getName() + " is in another group's party. Reassign them as DM for this group?";
+                }
 
-            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.YES, ButtonType.NO);
-            confirmation.initOwner(this.getTabPane().getScene().getWindow());
-            Optional<ButtonType> response = confirmation.showAndWait();
+                Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.YES, ButtonType.NO);
+                confirmation.initOwner(this.getTabPane().getScene().getWindow());
+                Optional<ButtonType> response = confirmation.showAndWait();
 
-            if (response.isPresent() && response.get() == ButtonType.YES) {
-                playerSourceGroup.removePartyMember(newDm);
-                groupToUpdate.setDungeonMaster(newDm);
-                cleanUp();
-                return true;
-            } else {
-                return false;
+                if (response.isPresent() && response.get() == ButtonType.YES) {
+                    playerSourceGroup.removePartyMember(newDm);
+                    groupToUpdate.setDungeonMaster(newDm);
+                    cleanUp();
+                    return true;
+                } else {
+                    return false;
+                }
             }
         }
 
@@ -357,6 +359,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private boolean handleDmSelectionRequest(Player selectedDm) {
+        if (selectedDm == null) return true; // It's okay to unassign a DM
+
         Group groupBeingEdited = groupForm.getGroupBeingEdited();
         Optional<Group> dmSourceGroupOpt = groups.stream()
                 .filter(g -> selectedDm.equals(g.getDungeonMaster()) && !g.equals(groupBeingEdited))
@@ -506,8 +510,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     @Override
     public void onPlayerUpdate() {
-        System.out.println("Heard a player update! Refreshing DM list...");
+        System.out.println("Heard a player update! Refreshing DM list and roster...");
         updateDmList();
+        rosterView.updateRoster();
     }
 }
 
