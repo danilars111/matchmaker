@@ -49,6 +49,7 @@ public class GroupFormView extends GridPane {
     private DmSelectRequestHandler dmSelectRequestHandler;
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
 
+
     public GroupFormView(Map<UUID, Player> attendingPlayers) {
         super();
         setHgap(10);
@@ -142,16 +143,22 @@ public class GroupFormView extends GridPane {
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
 
-        List<Player> allDms = dmingPlayers.values().stream()
+        List<Player> sortedDms = dmingPlayers.values().stream()
                 .sorted(Comparator.comparing(Player::getName))
                 .toList();
-        List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm)).toList();
-        List<Player> unavailableDms = allDms.stream().filter(unavailablePlayers::contains).toList();
+
+        List<Player> availableDms = sortedDms.stream()
+                .filter(dm -> !unavailablePlayers.contains(dm))
+                .toList();
+        List<Player> busyDms = sortedDms.stream()
+                .filter(unavailablePlayers::contains)
+                .toList();
+
 
         items.addAll(availableDms);
-        if (!unavailableDms.isEmpty()) {
+        if (!busyDms.isEmpty()) {
             items.add(new Separator());
-            items.addAll(unavailableDms);
+            items.addAll(busyDms);
         }
 
         dmComboBox.setItems(items);
@@ -178,12 +185,17 @@ public class GroupFormView extends GridPane {
                     setGraphic(separatorLine);
                     setPadding(new Insets(5, 0, 5, 0));
                     setDisable(true);
-                } else if (item.equals(UNASSIGNED_PLACEHOLDER)) {
-                    setText(UNASSIGNED_PLACEHOLDER);
-                    setFont(Font.font("System", FontPosture.ITALIC, 12));
                 } else {
-                    setText(((Player) item).getName());
-                    setFont(Font.getDefault());
+                    setDisable(false);
+                    setGraphic(null);
+                    if (item.equals(UNASSIGNED_PLACEHOLDER)) {
+                        setText(UNASSIGNED_PLACEHOLDER);
+                        setFont(Font.font("System", FontPosture.ITALIC, 12));
+                    } else { // It must be a Player
+                        setText(((Player) item).getName());
+                        setFont(Font.getDefault());
+                        setStyle(""); // Reset styles
+                    }
                 }
             }
         };
@@ -261,3 +273,4 @@ public class GroupFormView extends GridPane {
         return lowerCase.substring(0, 1).toUpperCase() + lowerCase.substring(1);
     }
 }
+

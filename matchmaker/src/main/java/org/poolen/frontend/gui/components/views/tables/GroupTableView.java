@@ -163,24 +163,29 @@ public class GroupTableView extends TitledPane {
         }
     }
 
-    public void setDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
+    public void setDmList(Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms) {
+        Player currentDmForThisGroup = currentGroup != null ? currentGroup.getDungeonMaster() : null;
+
         Object selectedDm = dmComboBox.getValue();
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
 
-        List<Player> allDms = dmingPlayers.values().stream()
+        List<Player> sortedDms = dmingPlayers.values().stream()
                 .sorted(Comparator.comparing(Player::getName))
                 .toList();
 
-        Player currentDmForThisGroup = currentGroup != null ? currentGroup.getDungeonMaster() : null;
+        List<Player> availableDms = sortedDms.stream()
+                .filter(dm -> !allAssignedDms.contains(dm) || dm.equals(currentDmForThisGroup))
+                .toList();
 
-        List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm) || dm.equals(currentDmForThisGroup)).toList();
-        List<Player> trulyUnavailableDms = allDms.stream().filter(dm -> unavailablePlayers.contains(dm) && !dm.equals(currentDmForThisGroup)).toList();
+        List<Player> busyDms = sortedDms.stream()
+                .filter(dm -> allAssignedDms.contains(dm) && !dm.equals(currentDmForThisGroup))
+                .toList();
 
         items.addAll(availableDms);
-        if (!trulyUnavailableDms.isEmpty()) {
+        if (!busyDms.isEmpty()) {
             items.add(new Separator());
-            items.addAll(trulyUnavailableDms);
+            items.addAll(busyDms);
         }
 
         dmComboBox.setItems(items);
@@ -209,12 +214,17 @@ public class GroupTableView extends TitledPane {
                     setGraphic(separatorLine);
                     setPadding(new Insets(5, 0, 5, 0));
                     setDisable(true);
-                } else if (item.equals(UNASSIGNED_PLACEHOLDER)) {
-                    setText(UNASSIGNED_PLACEHOLDER);
-                    setFont(Font.font("System", FontPosture.ITALIC, 12));
                 } else {
-                    setText(((Player) item).getName());
-                    setFont(Font.getDefault());
+                    setDisable(false);
+                    setGraphic(null);
+                    if (item.equals(UNASSIGNED_PLACEHOLDER)) {
+                        setText(UNASSIGNED_PLACEHOLDER);
+                        setFont(Font.font("System", FontPosture.ITALIC, 12));
+                    } else { // It must be a Player
+                        setText(((Player) item).getName());
+                        setFont(Font.getDefault());
+                        setStyle(""); // Reset styles
+                    }
                 }
             }
         };
