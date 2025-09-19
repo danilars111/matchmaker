@@ -28,6 +28,7 @@ import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -68,7 +69,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.root = new SplitPane();
         this.attendingPlayers = attendingPlayers;
         this.dmingPlayers = dmingPlayers;
-        this.groupForm = new GroupFormView(attendingPlayers);
+        this.groupForm = new GroupFormView();
         this.groupDisplayView = new GroupDisplayView();
         this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, dmingPlayers, onPlayerListChanged);
         this.newPartyMap = new HashMap<>();
@@ -419,6 +420,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
 
         StringBuilder markdownBuilder = new StringBuilder();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d MMMM, yyyy");
+        markdownBuilder.append("# ").append(eventDate.format(formatter)).append("\n");
+
         groups.stream()
                 .sorted(Comparator.comparing(g -> g.getDungeonMaster() != null ? g.getDungeonMaster().getName() : ""))
                 .forEach(group -> {

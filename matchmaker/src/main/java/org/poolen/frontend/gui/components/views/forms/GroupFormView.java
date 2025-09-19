@@ -51,7 +51,7 @@ public class GroupFormView extends GridPane {
     private boolean isUpdatingComboBox = false;
 
 
-    public GroupFormView(Map<UUID, Player> attendingPlayers) {
+    public GroupFormView() {
         super();
         setHgap(10);
         setVgap(10);
