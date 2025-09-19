@@ -6,6 +6,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TextArea;
@@ -434,14 +435,23 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         markdownArea.setWrapText(true);
 
         Button copyButton = new Button("Copy to Clipboard");
+        Label copyStatusLabel = new Label(); // Our new feedback label!
+
         copyButton.setOnAction(e -> {
-            Clipboard clipboard = Clipboard.getSystemClipboard();
-            ClipboardContent content = new ClipboardContent();
-            content.putString(markdownArea.getText());
-            clipboard.setContent(content);
+            try {
+                final Clipboard clipboard = Clipboard.getSystemClipboard();
+                final ClipboardContent content = new ClipboardContent();
+                content.putString(markdownArea.getText());
+                clipboard.setContent(content);
+                copyStatusLabel.setText("Copied!");
+                copyStatusLabel.setStyle("-fx-text-fill: green;");
+            } catch (Exception ex) {
+                copyStatusLabel.setText("Failed to copy.");
+                copyStatusLabel.setStyle("-fx-text-fill: red;");
+            }
         });
 
-        HBox buttonBar = new HBox(copyButton);
+        HBox buttonBar = new HBox(10, copyButton, copyStatusLabel);
         buttonBar.setAlignment(Pos.CENTER);
         buttonBar.setPadding(new Insets(10));
 

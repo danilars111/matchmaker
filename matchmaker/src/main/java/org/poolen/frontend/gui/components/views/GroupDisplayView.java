@@ -124,7 +124,7 @@ public class GroupDisplayView extends BorderPane {
         autoPopulateButton.setOnAction(e -> {
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
-        exportButton = new Button("Export Markdown");
+        exportButton = new Button("Export");
         exportButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         exportButton.setOnAction(e -> {
             if (onExportRequestHandler != null) onExportRequestHandler.run();
