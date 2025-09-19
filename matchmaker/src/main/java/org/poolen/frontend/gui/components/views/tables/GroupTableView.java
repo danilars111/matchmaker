@@ -61,6 +61,7 @@ public class GroupTableView extends TitledPane {
     private final Label themesLabel;
     private final Label partySizeLabel;
     private final ComboBox<Object> dmComboBox;
+    private boolean isUpdatingComboBox = false;
 
     public GroupTableView() {
         super();
@@ -90,15 +91,18 @@ public class GroupTableView extends TitledPane {
         setupDmComboBoxCellFactory();
 
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal == null || oldVal == newVal) return;
+            if (isUpdatingComboBox || newVal == null || oldVal == newVal) return;
             if (newVal instanceof Player && oldVal instanceof Player && ((Player) newVal).getUuid().equals(((Player) oldVal).getUuid())) return;
-            if (newVal.equals(UNASSIGNED_PLACEHOLDER) && oldVal == null) return;
 
             Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
             if (onDmUpdateRequestHandler != null) {
                 boolean success = onDmUpdateRequestHandler.apply(this.currentGroup, selectedPlayer);
                 if (!success) {
-                    Platform.runLater(() -> dmComboBox.setValue(oldVal));
+                    isUpdatingComboBox = true;
+                    Platform.runLater(() -> {
+                        dmComboBox.setValue(oldVal);
+                        isUpdatingComboBox = false;
+                    });
                 }
             }
         });

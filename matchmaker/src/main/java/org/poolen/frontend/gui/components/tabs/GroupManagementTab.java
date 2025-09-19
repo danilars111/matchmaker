@@ -69,7 +69,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.dmingPlayers = dmingPlayers;
         this.groupForm = new GroupFormView(attendingPlayers);
         this.groupDisplayView = new GroupDisplayView();
-        this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, null, onPlayerListChanged);
+        this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, dmingPlayers, onPlayerListChanged);
         this.newPartyMap = new HashMap<>();
         this.eventDate = LocalDate.now();
 

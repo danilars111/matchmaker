@@ -48,6 +48,7 @@ public class GroupFormView extends GridPane {
     private Consumer<Player> onDmSelectionHandler;
     private DmSelectRequestHandler dmSelectRequestHandler;
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
+    private boolean isUpdatingComboBox = false;
 
 
     public GroupFormView(Map<UUID, Player> attendingPlayers) {
@@ -80,11 +81,17 @@ public class GroupFormView extends GridPane {
         setupDmComboBoxCellFactory();
 
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (isUpdatingComboBox) return;
+
             Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
             if (dmSelectRequestHandler != null && newVal instanceof Player) {
                 boolean success = dmSelectRequestHandler.onDmSelectionRequest(selectedPlayer);
                 if (!success) {
-                    Platform.runLater(() -> dmComboBox.setValue(oldVal));
+                    isUpdatingComboBox = true;
+                    Platform.runLater(() -> {
+                        dmComboBox.setValue(oldVal);
+                        isUpdatingComboBox = false;
+                    });
                     return;
                 }
             }
