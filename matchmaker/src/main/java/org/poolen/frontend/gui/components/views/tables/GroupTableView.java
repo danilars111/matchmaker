@@ -163,13 +163,12 @@ public class GroupTableView extends TitledPane {
         }
     }
 
-    public void setDmList(Map<UUID, Player> attendingPlayers, Set<Player> unavailablePlayers) {
+    public void setDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
         Object selectedDm = dmComboBox.getValue();
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
 
-        List<Player> allDms = attendingPlayers.values().stream()
-                .filter(Player::isDungeonMaster)
+        List<Player> allDms = dmingPlayers.values().stream()
                 .sorted(Comparator.comparing(Player::getName))
                 .toList();
 
@@ -284,3 +283,4 @@ public class GroupTableView extends TitledPane {
         this.onDmUpdateRequestHandler = handler;
     }
 }
+

@@ -51,6 +51,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private final Map<UUID, Player> newPartyMap;
     private final Map<UUID, Player> attendingPlayers;
+    private final Map<UUID, Player> dmingPlayers;
     private List<Group> groups = new ArrayList<>();
     private final GroupDisplayView groupDisplayView;
     private LocalDate eventDate;
@@ -60,14 +61,15 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Map<Group, Player> dmsToReassignAsPlayer = new HashMap<>();
 
 
-    public GroupManagementTab(Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
+    public GroupManagementTab(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
         super("Group Management");
 
         this.root = new SplitPane();
         this.attendingPlayers = attendingPlayers;
+        this.dmingPlayers = dmingPlayers;
         this.groupForm = new GroupFormView(attendingPlayers);
         this.groupDisplayView = new GroupDisplayView();
-        this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, onPlayerListChanged);
+        this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, null, onPlayerListChanged);
         this.newPartyMap = new HashMap<>();
         this.eventDate = LocalDate.now();
 
@@ -93,7 +95,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupDisplayView.setOnDmUpdateRequest(this::handleDmUpdateRequestFromCard);
         groupDisplayView.setOnDateSelected(this::handleDateChange);
         groupDisplayView.setOnSuggestionRequest(() -> {
-            GroupSuggester suggester = new GroupSuggester(attendingPlayers.values());
+            GroupSuggester suggester = new GroupSuggester(attendingPlayers.values(), dmingPlayers.values());
             List<House> suggestions = suggester.suggestGroupThemes();
             groupDisplayView.displaySuggestions(suggestions);
         });
@@ -189,7 +191,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 unavailablePlayers.add(group.getDungeonMaster());
             }
         }
-        groupForm.updateDmList(attendingPlayers, unavailablePlayers);
+        groupForm.updateDmList(dmingPlayers, unavailablePlayers);
     }
 
     private void toggleRosterView() {
@@ -271,7 +273,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         if (playerToMove != null) {
             sourceGroup.removePartyMember(playerToMove);
             targetGroup.addPartyMember(playerToMove);
-            groupDisplayView.updateGroups(groups, attendingPlayers, getAllAssignedDms(), eventDate);
+            groupDisplayView.updateGroups(groups, dmingPlayers, getAllAssignedDms(), eventDate);
             rosterView.setAllGroups(groups);
         }
     }
@@ -338,7 +340,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 if (targetGroup != null) {
                     playerSourceGroup.movePlayerTo(player, targetGroup);
                     rosterView.updateRoster();
-                    groupDisplayView.updateGroups(groups, attendingPlayers, getAllAssignedDms(), eventDate);
+                    groupDisplayView.updateGroups(groups, dmingPlayers, getAllAssignedDms(), eventDate);
                 } else {
                     newPartyMap.put(player.getUuid(), player);
                 }
@@ -498,7 +500,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
         rosterView.setAllGroups(groups);
-        groupDisplayView.updateGroups(groups, attendingPlayers, getAllAssignedDms(), eventDate);
+        groupDisplayView.updateGroups(groups, dmingPlayers, getAllAssignedDms(), eventDate);
         updateDmList();
     }
 

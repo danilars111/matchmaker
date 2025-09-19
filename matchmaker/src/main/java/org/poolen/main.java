@@ -63,12 +63,12 @@ public class main {
             attendingPlayers.put(player.getUuid(), player);
         }
 
-        GroupSuggester groupSuggester = new GroupSuggester(playerStore.getAllPlayers());
+       // GroupSuggester groupSuggester = new GroupSuggester(playerStore.getAllPlayers());
 
-        List<House> groups = groupSuggester.suggestGroupThemes();
+     //   List<House> groups = groupSuggester.suggestGroupThemes();
 
-        System.out.println("\nSuggested Groups based on player turnout: ");
-        System.out.println(groups);
+/*        System.out.println("\nSuggested Groups based on player turnout: ");
+        System.out.println(groups);*/
 
 
        // Matchmaker matchmaker = new Matchmaker(createGroups(groups), attendingPlayers);

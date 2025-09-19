@@ -20,6 +20,7 @@ import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,22 +31,20 @@ import java.util.UUID;
 public class ManagementStage extends Stage {
 
     private static final List<Stage> detachedStages = new ArrayList<>();
-    // A list of all the lovely components that are listening for player updates!
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
+    private final Map<UUID, Player> dmingPlayers;
 
     public ManagementStage(Map<UUID, Player> attendingPlayers) {
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
+        this.dmingPlayers = new HashMap<>();
+
         TabPane tabPane = new TabPane();
 
-        // --- The new, event-driven magic! ---
-        // We create the tabs...
-        PlayerManagementTab playerTab = new PlayerManagementTab(attendingPlayers, this::notifyPlayerUpdateListeners);
-        GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, this::notifyPlayerUpdateListeners);
-        // ...and we register the group tab as a listener!
+        PlayerManagementTab playerTab = new PlayerManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
+        GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
         addPlayerUpdateListener(groupTab);
-        // ------------------------------------
 
         Tab characterTab = new Tab("Character Management");
         characterTab.setContent(new Label("Character management will go here!"));
@@ -138,4 +137,3 @@ public class ManagementStage extends Stage {
         });
     }
 }
-

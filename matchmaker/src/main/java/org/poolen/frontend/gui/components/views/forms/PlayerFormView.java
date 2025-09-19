@@ -189,4 +189,3 @@ public class PlayerFormView extends GridPane {
         Platform.runLater(nameField::requestFocus);
     }
 }
-

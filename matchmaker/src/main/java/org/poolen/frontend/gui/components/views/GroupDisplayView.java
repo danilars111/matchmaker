@@ -61,7 +61,7 @@ public class GroupDisplayView extends BorderPane {
     private Consumer<LocalDate> onDateSelectedHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
-    private Map<UUID, Player> attendingPlayers;
+    private Map<UUID, Player> dmingPlayers;
     private Set<Player> allAssignedDms;
     private final List<GroupTableView> groupCards = new ArrayList<>();
     private static final double ESTIMATED_CARD_WIDTH = 200.0;
@@ -153,9 +153,9 @@ public class GroupDisplayView extends BorderPane {
         });
     }
 
-    public void updateGroups(List<Group> groups, Map<UUID, Player> attendingPlayers, Set<Player> allAssignedDms, LocalDate eventDate) {
+    public void updateGroups(List<Group> groups, Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms, LocalDate eventDate) {
         this.currentGroups = groups;
-        this.attendingPlayers = attendingPlayers;
+        this.dmingPlayers = dmingPlayers;
         this.allAssignedDms = allAssignedDms;
         this.datePicker.setValue(eventDate);
 
@@ -228,7 +228,7 @@ public class GroupDisplayView extends BorderPane {
             if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
             if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
             if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
-            if (attendingPlayers != null && allAssignedDms != null) groupCard.setDmList(attendingPlayers, allAssignedDms);
+            if (dmingPlayers != null && allAssignedDms != null) groupCard.setDmList(dmingPlayers, allAssignedDms);
 
             groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
             groupCards.add(groupCard);

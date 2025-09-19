@@ -56,6 +56,7 @@ public class PlayerRosterTableView extends VBox {
 
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
+    private final Map<UUID, Player> dmingPlayers;
     private Group currentGroup;
     private Map<UUID, Player> partyForNewGroup;
     private Player dmForNewGroup;
@@ -66,12 +67,14 @@ public class PlayerRosterTableView extends VBox {
     private final ComboBox<House> houseFilterBox;
     private final CheckBox dmFilterCheckBox;
     private PlayerAddRequestHandler onPlayerAddRequestHandler;
+    private final CheckBox allowTrialDmsCheckBox;
 
-    public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Runnable onPlayerListChanged) {
+    public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
         super(10);
         this.setPadding(new Insets(10));
         this.mode = mode;
         this.attendingPlayers = attendingPlayers;
+        this.dmingPlayers = dmingPlayers;
 
         this.playerTable = new TableView<>();
         this.searchField = new TextField();
@@ -79,6 +82,7 @@ public class PlayerRosterTableView extends VBox {
         this.sourcePlayers = FXCollections.observableArrayList();
         this.houseFilterBox = new ComboBox<>();
         this.dmFilterCheckBox = new CheckBox("DMs");
+        this.allowTrialDmsCheckBox = new CheckBox("Allow Trial DMs");
 
         VBox.setVgrow(this.pagination, Priority.ALWAYS);
         this.playerTable.setMaxWidth(Double.MAX_VALUE);
@@ -129,7 +133,8 @@ public class PlayerRosterTableView extends VBox {
 
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             setupForPlayerManagement(onPlayerListChanged, filterPanel);
-            playerTable.getColumns().addAll(rowNumCol, nameCol, dmCol, charCol, interactiveColumn);
+            TableColumn<Player, Boolean> dmingCol = createDmingColumn(onPlayerListChanged);
+            playerTable.getColumns().addAll(rowNumCol, nameCol, dmCol, charCol, interactiveColumn, dmingCol);
         } else {
             setupForGroupAssignment(filterPanel);
             playerTable.getColumns().addAll(rowNumCol, nameCol, charCol, interactiveColumn);
@@ -142,6 +147,8 @@ public class PlayerRosterTableView extends VBox {
             modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
         if (availableOnlyCheckbox != null)
             availableOnlyCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        allowTrialDmsCheckBox.selectedProperty().addListener((obs, old, val) -> playerTable.refresh());
+
 
         filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends Player> c) -> {
             updatePageCount(filteredData.size());
@@ -158,6 +165,7 @@ public class PlayerRosterTableView extends VBox {
         modeSpecificFilterCheckbox = new CheckBox("Attending");
         filterPanel.getChildren().add(1, dmFilterCheckBox);
         filterPanel.getChildren().add(2, modeSpecificFilterCheckbox);
+        filterPanel.getChildren().add(3, allowTrialDmsCheckBox);
         interactiveColumn = createAttendingColumn(onPlayerListChanged);
     }
 
@@ -176,8 +184,16 @@ public class PlayerRosterTableView extends VBox {
             Player player = cellData.getValue();
             SimpleBooleanProperty property = new SimpleBooleanProperty(attendingPlayers.containsKey(player.getUuid()));
             property.addListener((obs, was, isNow) -> {
-                if (isNow) attendingPlayers.put(player.getUuid(), player);
-                else attendingPlayers.remove(player.getUuid());
+                if (isNow) {
+                    attendingPlayers.put(player.getUuid(), player);
+                } else {
+                    attendingPlayers.remove(player.getUuid());
+                    // Also remove them from dming if they are no longer attending
+                    if (dmingPlayers.containsKey(player.getUuid())) {
+                        dmingPlayers.remove(player.getUuid());
+                        playerTable.refresh();
+                    }
+                }
                 onPlayerListChanged.run();
             });
             return property;
@@ -185,6 +201,54 @@ public class PlayerRosterTableView extends VBox {
         setCheckboxCellStyle(col);
         return col;
     }
+
+    private TableColumn<Player, Boolean> createDmingColumn(Runnable onPlayerListChanged) {
+        TableColumn<Player, Boolean> col = new TableColumn<>("DMing");
+        col.setCellValueFactory(cellData -> {
+            Player player = cellData.getValue();
+            SimpleBooleanProperty property = new SimpleBooleanProperty(dmingPlayers.containsKey(player.getUuid()));
+            property.addListener((obs, was, isNow) -> {
+                if (isNow) {
+                    dmingPlayers.put(player.getUuid(), player);
+                    // Also make sure they are marked as attending
+                    if (!attendingPlayers.containsKey(player.getUuid())) {
+                        attendingPlayers.put(player.getUuid(), player);
+                        playerTable.refresh();
+                    }
+                } else {
+                    dmingPlayers.remove(player.getUuid());
+                }
+                onPlayerListChanged.run();
+            });
+            return property;
+        });
+
+        col.setCellFactory(param -> new CheckBoxTableCell<Player, Boolean>() {
+            @Override
+            public void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setGraphic(null);
+                    return;
+                }
+                Player player = (Player) getTableRow().getItem();
+                boolean isTrialDmAllowed = allowTrialDmsCheckBox.isSelected();
+
+                if (player.isDungeonMaster() || isTrialDmAllowed) {
+                    // This is a valid (potential) DM, so show the checkbox.
+                    // The superclass method handles creating and showing the graphic.
+                    // We just need to ensure it's not hidden.
+                    setGraphic(this.getGraphic());
+                } else {
+                    // This player is not a DM and trials are not allowed, so hide it.
+                    setGraphic(null);
+                }
+            }
+        });
+
+        return col;
+    }
+
 
     private TableColumn<Player, Boolean> createSelectedColumn() {
         TableColumn<Player, Boolean> col = new TableColumn<>("Selected");

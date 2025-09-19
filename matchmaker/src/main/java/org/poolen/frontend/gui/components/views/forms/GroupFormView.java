@@ -137,13 +137,12 @@ public class GroupFormView extends GridPane {
         Platform.runLater(dmComboBox::requestFocus);
     }
 
-    public void updateDmList(Map<UUID, Player> attendingPlayers, Set<Player> unavailablePlayers) {
+    public void updateDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
         Object selectedDm = getSelectedDm();
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
 
-        List<Player> allDms = attendingPlayers.values().stream()
-                .filter(Player::isDungeonMaster)
+        List<Player> allDms = dmingPlayers.values().stream()
                 .sorted(Comparator.comparing(Player::getName))
                 .toList();
         List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm)).toList();
@@ -262,4 +261,3 @@ public class GroupFormView extends GridPane {
         return lowerCase.substring(0, 1).toUpperCase() + lowerCase.substring(1);
     }
 }
-

@@ -7,7 +7,9 @@ import org.poolen.backend.db.entities.Player;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -18,12 +20,14 @@ public class GroupSuggester {
     private static final double MAX_SCORE = 10.0;
     private static final double DEFAULT_SCORE = 1.0;
 
-    public GroupSuggester(Collection<Player> attendees) {
-        this.dungeonMasters = attendees.stream()
-                .filter(Player::isDungeonMaster)
-                .collect(Collectors.toList());
+    public GroupSuggester(Collection<Player> attendees, Collection<Player> dungeonMasters) {
+        this.dungeonMasters = dungeonMasters.stream().toList();
+
+        Set<Player> dmSet = new HashSet<>(this.dungeonMasters);
+
         this.playersToMatch = attendees.stream()
-                .filter(p -> !p.isDungeonMaster())
+                // This filter now checks if an attendee is in our DM set.
+                .filter(attendee -> !dmSet.contains(attendee))
                 .collect(Collectors.toList());
     }
 
