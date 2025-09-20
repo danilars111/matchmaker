@@ -4,13 +4,8 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -22,75 +17,48 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
 
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * A reusable JavaFX component for creating or updating a group.
+ * A reusable JavaFX component for creating or updating a group, inheriting from BaseFormView.
  */
-public class GroupFormView extends GridPane {
+public class GroupFormView extends BaseFormView<Group> {
 
-    private final TextField uuidField;
-    private final ComboBox<Object> dmComboBox;
-    private final Map<House, CheckBox> houseCheckBoxes;
-    private final Button actionButton;
-    private final Button cancelButton;
-    private final Button deleteButton;
-    private final Button showPlayersButton;
-    private Group groupBeingEdited;
+    private ComboBox<Object> dmComboBox;
+    private Map<House, CheckBox> houseCheckBoxes;
+    private Button deleteButton;
+    private Button showPlayersButton;
+
     private Consumer<Player> onDmSelectionHandler;
     private DmSelectRequestHandler dmSelectRequestHandler;
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
-    private boolean isUpdatingComboBox = false;
-
+    private boolean isRevertingDmSelection = false;
 
     public GroupFormView() {
         super();
-        setHgap(10);
-        setVgap(10);
-        setPadding(new Insets(20));
+        setupFormControls();
+        clearForm(); // Set initial state
+    }
 
-        ColumnConstraints col1 = new ColumnConstraints();
-        col1.setHgrow(Priority.ALWAYS);
-        this.getColumnConstraints().addAll(col1, new ColumnConstraints());
-
-        uuidField = new TextField();
-        uuidField.setEditable(false);
-        uuidField.setStyle("-fx-control-inner-background: #f0f0f0; -fx-text-fill: #555;");
-
-        Button copyButton = new Button("📋");
-        copyButton.setOnAction(e -> {
-            Clipboard clipboard = Clipboard.getSystemClipboard();
-            ClipboardContent content = new ClipboardContent();
-            content.putString(uuidField.getText());
-            clipboard.setContent(content);
-        });
-
-        HBox uuidBox = new HBox(5, uuidField, copyButton);
-        HBox.setHgrow(uuidField, Priority.ALWAYS);
-
+    @Override
+    protected void setupFormControls() {
         dmComboBox = new ComboBox<>();
         dmComboBox.setMaxWidth(Double.MAX_VALUE);
         setupDmComboBoxCellFactory();
 
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (isUpdatingComboBox) return;
+            if (isRevertingDmSelection) return;
 
             Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
             if (dmSelectRequestHandler != null && newVal instanceof Player) {
                 boolean success = dmSelectRequestHandler.onDmSelectionRequest(selectedPlayer);
                 if (!success) {
-                    isUpdatingComboBox = true;
+                    isRevertingDmSelection = true;
                     Platform.runLater(() -> {
                         dmComboBox.setValue(oldVal);
-                        isUpdatingComboBox = false;
+                        isRevertingDmSelection = false;
                     });
                     return;
                 }
@@ -118,98 +86,54 @@ public class GroupFormView extends GridPane {
         showPlayersButton.setMaxWidth(Double.MAX_VALUE);
         showPlayersButton.setStyle("-fx-background-color: #6A5ACD; -fx-text-fill: white;");
 
-        actionButton = new Button("Create");
-        cancelButton = new Button("Cancel");
         deleteButton = new Button("Delete");
         deleteButton.setStyle("-fx-background-color: #DC143C; -fx-text-fill: white;");
-        deleteButton.setVisible(false);
-        actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
 
-        HBox mainActionsBox = new HBox(10, cancelButton, actionButton);
-        mainActionsBox.setAlignment(Pos.CENTER_RIGHT);
+        add(new Label("Dungeon Master:"), 0, 2);
+        add(dmComboBox, 0, 3);
+        add(new Label("House Themes:"), 0, 4);
+        add(houseGrid, 0, 5);
+        add(showPlayersButton, 0, 6);
+        add(deleteButton, 0, 7);
 
+        // Add the common controls from the parent at the end
         VBox spacer = new VBox();
         GridPane.setVgrow(spacer, Priority.ALWAYS);
+        add(spacer, 0, 8);
+        add(mainActionsBox, 0, 9);
+    }
 
-        add(new Label("UUID"), 0, 0, 2, 1);
-        add(uuidBox, 0, 1, 2, 1);
-        add(new Label("Dungeon Master:"), 0, 2, 2, 1);
-        add(dmComboBox, 0, 3, 2, 1);
-        add(new Label("House Themes:"), 0, 4, 2, 1);
-        add(houseGrid, 0, 5, 2, 1);
-        add(showPlayersButton, 0, 6, 2, 1);
-        add(deleteButton, 0, 7, 2, 1);
-        add(spacer, 0, 8, 2, 1);
-        add(mainActionsBox, 0, 9, 2, 1);
+    @Override
+    protected UUID getUuidFromItem(Group item) {
+        return item.getUuid();
+    }
 
+    @Override
+    public void populateForm(Group group) {
+        super.populateForm(group);
+        if (group.getDungeonMaster() == null) {
+            dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
+        } else {
+            dmComboBox.setValue(group.getDungeonMaster());
+        }
+        houseCheckBoxes.forEach((house, checkBox) -> checkBox.setSelected(group.getHouses().contains(house)));
+        actionButton.setText("Update");
+        actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
+        deleteButton.setVisible(true);
+    }
+
+    @Override
+    public void clearForm() {
+        super.clearForm();
+        dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
+        houseCheckBoxes.values().forEach(cb -> cb.setSelected(false));
+        actionButton.setText("Create");
+        actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
+        deleteButton.setVisible(false);
         Platform.runLater(dmComboBox::requestFocus);
     }
 
-    public void updateDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
-        Object selectedDm = getSelectedDm();
-        ObservableList<Object> items = FXCollections.observableArrayList();
-        items.add(UNASSIGNED_PLACEHOLDER);
-
-        List<Player> sortedDms = dmingPlayers.values().stream()
-                .sorted(Comparator.comparing(Player::getName))
-                .toList();
-
-        List<Player> availableDms = sortedDms.stream()
-                .filter(dm -> !unavailablePlayers.contains(dm))
-                .toList();
-        List<Player> busyDms = sortedDms.stream()
-                .filter(unavailablePlayers::contains)
-                .toList();
-
-
-        items.addAll(availableDms);
-        if (!busyDms.isEmpty()) {
-            items.add(new Separator());
-            items.addAll(busyDms);
-        }
-
-        dmComboBox.setItems(items);
-        if (selectedDm != null && items.contains(selectedDm)) {
-            dmComboBox.setValue(selectedDm);
-        } else {
-            dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
-        }
-    }
-
-    private void setupDmComboBoxCellFactory() {
-        Callback<ListView<Object>, ListCell<Object>> cellFactory = lv -> new ListCell<>() {
-            @Override
-            protected void updateItem(Object item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setGraphic(null);
-                } else if (item instanceof Separator) {
-                    setText(null);
-                    Region separatorLine = new Region();
-                    separatorLine.setStyle("-fx-border-style: solid; -fx-border-width: 1 0 0 0; -fx-border-color: #c0c0c0;");
-                    separatorLine.setMaxHeight(1);
-                    setGraphic(separatorLine);
-                    setPadding(new Insets(5, 0, 5, 0));
-                    setDisable(true);
-                } else {
-                    setDisable(false);
-                    setGraphic(null);
-                    if (item.equals(UNASSIGNED_PLACEHOLDER)) {
-                        setText(UNASSIGNED_PLACEHOLDER);
-                        setFont(Font.font("System", FontPosture.ITALIC, 12));
-                    } else { // It must be a Player
-                        setText(((Player) item).getName());
-                        setFont(Font.getDefault());
-                        setStyle(""); // Reset styles
-                    }
-                }
-            }
-        };
-        dmComboBox.setCellFactory(cellFactory);
-        dmComboBox.setButtonCell(cellFactory.call(null));
-    }
-
+    // --- Specific Getters and Methods ---
     public Player getSelectedDm() {
         Object selected = dmComboBox.getValue();
         return (selected instanceof Player) ? (Player) selected : null;
@@ -222,14 +146,6 @@ public class GroupFormView extends GridPane {
                 .collect(Collectors.toList());
     }
 
-    public Button getActionButton() {
-        return actionButton;
-    }
-
-    public Button getCancelButton() {
-        return cancelButton;
-    }
-
     public Button getDeleteButton() {
         return deleteButton;
     }
@@ -239,7 +155,7 @@ public class GroupFormView extends GridPane {
     }
 
     public Group getGroupBeingEdited() {
-        return groupBeingEdited;
+        return super.getItemBeingEdited();
     }
 
     public void setOnDmSelection(Consumer<Player> handler) {
@@ -250,29 +166,64 @@ public class GroupFormView extends GridPane {
         this.dmSelectRequestHandler = handler;
     }
 
-    public void populateForm(Group group) {
-        this.groupBeingEdited = group;
-        uuidField.setText(group.getUuid().toString());
-        if (group.getDungeonMaster() == null) {
-            dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
-        } else {
-            dmComboBox.setValue(group.getDungeonMaster());
+    public void updateDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
+        Object selectedDm = dmComboBox.getValue();
+        ObservableList<Object> items = FXCollections.observableArrayList();
+        items.add(UNASSIGNED_PLACEHOLDER);
+
+        List<Player> allDms = dmingPlayers.values().stream()
+                .sorted(Comparator.comparing(Player::getName))
+                .toList();
+
+        Player currentDmForThisGroup = itemBeingEdited != null ? itemBeingEdited.getDungeonMaster() : null;
+
+        List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm) || dm.equals(currentDmForThisGroup)).toList();
+        List<Player> trulyUnavailableDms = allDms.stream().filter(dm -> unavailablePlayers.contains(dm) && !dm.equals(currentDmForThisGroup)).toList();
+
+        items.addAll(availableDms);
+        if (!trulyUnavailableDms.isEmpty()) {
+            items.add(new Separator());
+            items.addAll(trulyUnavailableDms);
         }
-        houseCheckBoxes.forEach((house, checkBox) -> checkBox.setSelected(group.getHouses().contains(house)));
-        actionButton.setText("Update");
-        actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
-        deleteButton.setVisible(true);
+
+        dmComboBox.setItems(items);
+        if (selectedDm != null && items.contains(selectedDm)) {
+            dmComboBox.setValue(selectedDm);
+        } else if (currentDmForThisGroup != null) {
+            dmComboBox.setValue(currentDmForThisGroup);
+        } else {
+            dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
+        }
     }
 
-    public void clearForm() {
-        this.groupBeingEdited = null;
-        uuidField.clear();
-        dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
-        houseCheckBoxes.values().forEach(cb -> cb.setSelected(false));
-        actionButton.setText("Create");
-        actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
-        deleteButton.setVisible(false);
-        Platform.runLater(dmComboBox::requestFocus);
+    private void setupDmComboBoxCellFactory() {
+        Callback<ListView<Object>, ListCell<Object>> cellFactory = lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(Object item, boolean empty) {
+                super.updateItem(item, empty);
+                setDisable(false); // Reset disable state
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else if (item instanceof Separator) {
+                    setText(null);
+                    Region separatorLine = new Region();
+                    separatorLine.setStyle("-fx-border-style: solid; -fx-border-width: 1 0 0 0; -fx-border-color: #c0c0c0;");
+                    separatorLine.setMaxHeight(1);
+                    setGraphic(separatorLine);
+                    setPadding(new Insets(5, 0, 5, 0));
+                    setDisable(true);
+                } else if (item.equals(UNASSIGNED_PLACEHOLDER)) {
+                    setText(UNASSIGNED_PLACEHOLDER);
+                    setFont(Font.font("System", FontPosture.ITALIC, 12));
+                } else {
+                    setText(((Player) item).getName());
+                    setFont(Font.getDefault());
+                }
+            }
+        };
+        dmComboBox.setCellFactory(cellFactory);
+        dmComboBox.setButtonCell(cellFactory.call(null));
     }
 
     private String formatHouseName(House house) {
