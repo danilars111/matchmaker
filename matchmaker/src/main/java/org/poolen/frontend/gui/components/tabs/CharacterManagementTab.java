@@ -11,11 +11,11 @@ import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
 import org.poolen.frontend.gui.components.views.tables.CharacterRosterTableView;
 
 import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  * A dedicated tab for creating, viewing, and managing characters.
@@ -45,11 +45,15 @@ public class CharacterManagementTab extends Tab {
 
         // --- Event Wiring ---
         rosterView.setOnItemDoubleClick(characterForm::populateForm);
-        characterForm.getCancelButton().setOnAction(e -> characterForm.clearForm());
+        characterForm.getCancelButton().setOnAction(e -> {
+            characterForm.clearForm();
+            rosterView.filterByPlayer(null); // Clear the player filter on cancel!
+        });
         characterForm.getActionButton().setOnAction(e -> handleCharacterAction());
         characterForm.getRetireButton().setOnAction(e -> handleRetire());
         characterForm.getDeleteButton().setOnAction(e -> handleDelete());
         characterForm.getUnretireButton().setOnAction(e -> handleUnretire());
+        characterForm.setOnCreateSecondCharacterRequestHandler(this::handleCreateSecondCharacter);
 
         this.setContent(root);
     }
@@ -58,20 +62,34 @@ public class CharacterManagementTab extends Tab {
         return this.characterForm;
     }
 
-    /**
-     * Filters the character roster to show only characters belonging to a specific player.
-     * @param player The player whose characters to show.
-     */
     public void showCharactersForPlayer(Player player) {
         rosterView.filterByPlayer(player);
     }
 
-    /**
-     * Sets the character form to create a new character, pre-populating the given player.
-     * @param player The player to create a new character for.
-     */
     public void createCharacterForPlayer(Player player) {
         characterForm.createNewCharacterForPlayer(player);
+    }
+
+    private void handleCreateSecondCharacter(Player player) {
+        if (characterForm.hasUnsavedChanges()) {
+            UnsavedChangesDialog dialog = new UnsavedChangesDialog(
+                    "You have unsaved changes to the current character. How would you like to proceed?",
+                    this.getTabPane()
+            );
+            Optional<ButtonType> response = dialog.showAndWait();
+            if (response.isPresent()) {
+                if (response.get() == UnsavedChangesDialog.UPDATE_AND_CONTINUE) {
+                    handleCharacterAction(); // This will save, then clear the form.
+                    createCharacterForPlayer(player); // This sets up the cleared form for the new character.
+                } else if (response.get() == UnsavedChangesDialog.DISCARD_AND_CONTINUE) {
+                    createCharacterForPlayer(player); // This clears the form and sets it up.
+                }
+                // If CANCEL, do nothing.
+            }
+        } else {
+            // No unsaved changes, just proceed to create the new character.
+            createCharacterForPlayer(player);
+        }
     }
 
 
@@ -101,6 +119,7 @@ public class CharacterManagementTab extends Tab {
             onListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
+            rosterView.filterByPlayer(null); // Also clear filter after a successful action
         } catch (IllegalArgumentException e) {
             new ErrorDialog(e.getMessage(), this.getTabPane()).showAndWait();
         }
@@ -114,6 +133,7 @@ public class CharacterManagementTab extends Tab {
             onListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
+            rosterView.filterByPlayer(null);
         }
     }
 
@@ -125,6 +145,7 @@ public class CharacterManagementTab extends Tab {
             onListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
+            rosterView.filterByPlayer(null);
         }
     }
 
@@ -147,6 +168,7 @@ public class CharacterManagementTab extends Tab {
                 onListChanged.run();
                 rosterView.updateRoster();
                 characterForm.clearForm();
+                rosterView.filterByPlayer(null);
             }
         }
     }

@@ -14,6 +14,7 @@ import org.poolen.backend.db.store.PlayerStore;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -31,7 +32,9 @@ public class CharacterFormView extends BaseFormView<Character> {
     private Button unretireButton;
     private Button deleteButton;
     private Button openPlayerButton;
+    private Button createSecondCharacterButton;
     private Consumer<Player> onOpenPlayerRequestHandler;
+    private Consumer<Player> onCreateSecondCharacterRequestHandler;
 
     public CharacterFormView() {
         super();
@@ -46,7 +49,6 @@ public class CharacterFormView extends BaseFormView<Character> {
         playerComboBox = new ComboBox<>();
         isMainCheckBox = new CheckBox("Main Character");
 
-        // Let the combo boxes take up the full width, just like the buttons!
         houseComboBox.setMaxWidth(Double.MAX_VALUE);
         playerComboBox.setMaxWidth(Double.MAX_VALUE);
 
@@ -61,16 +63,20 @@ public class CharacterFormView extends BaseFormView<Character> {
         unretireButton = new Button("Un-Retire");
         deleteButton = new Button("Delete Permanently");
         openPlayerButton = new Button("Open Player");
+        createSecondCharacterButton = new Button("Create Second Character");
 
 
         retireButton.setStyle("-fx-background-color: #f0ad4e; -fx-text-fill: white;");
         unretireButton.setStyle("-fx-background-color: #5bc0de; -fx-text-fill: white;");
         deleteButton.setStyle("-fx-background-color: #d9534f; -fx-text-fill: white;");
         openPlayerButton.setStyle("-fx-background-color: #6A5ACD; -fx-text-fill: white;");
+        createSecondCharacterButton.setStyle("-fx-background-color: #20B2AA; -fx-text-fill: white;"); // LightSeaGreen
+
         retireButton.setMaxWidth(Double.MAX_VALUE);
         unretireButton.setMaxWidth(Double.MAX_VALUE);
         deleteButton.setMaxWidth(Double.MAX_VALUE);
         openPlayerButton.setMaxWidth(Double.MAX_VALUE);
+        createSecondCharacterButton.setMaxWidth(Double.MAX_VALUE);
 
         // Start adding controls at row 2
         add(new Label("Character Name:"), 0, 2);
@@ -79,7 +85,6 @@ public class CharacterFormView extends BaseFormView<Character> {
         add(houseComboBox, 0, 5);
         add(new Label("Player:"), 0, 6);
 
-        // Create a StackPane to hold the interchangeable player controls
         StackPane playerControlContainer = new StackPane(playerComboBox, openPlayerButton);
         add(playerControlContainer, 0, 7);
 
@@ -87,16 +92,23 @@ public class CharacterFormView extends BaseFormView<Character> {
         add(retireButton, 0, 9);
         add(unretireButton, 0, 10);
         add(deleteButton, 0, 11);
+        add(createSecondCharacterButton, 0, 12);
 
         // Add the common controls from the parent at the end
         VBox spacer = new VBox();
         GridPane.setVgrow(spacer, Priority.ALWAYS);
-        add(spacer, 0, 12);
-        add(mainActionsBox, 0, 13);
+        add(spacer, 0, 13);
+        add(mainActionsBox, 0, 14);
 
         openPlayerButton.setOnAction(e -> {
             if (onOpenPlayerRequestHandler != null && itemBeingEdited != null && itemBeingEdited.getPlayer() != null) {
                 onOpenPlayerRequestHandler.accept(itemBeingEdited.getPlayer());
+            }
+        });
+
+        createSecondCharacterButton.setOnAction(e -> {
+            if (onCreateSecondCharacterRequestHandler != null && itemBeingEdited != null && itemBeingEdited.getPlayer() != null) {
+                onCreateSecondCharacterRequestHandler.accept(itemBeingEdited.getPlayer());
             }
         });
     }
@@ -130,21 +142,25 @@ public class CharacterFormView extends BaseFormView<Character> {
         houseComboBox.setValue(null);
         playerComboBox.setValue(null);
         isMainCheckBox.setSelected(false);
-
         openPlayerButton.setText("Open Player");
-
         actionButton.setText("Create");
         updateButtonVisibility();
         Platform.runLater(nameField::requestFocus);
     }
 
-    /**
-     * Clears the form and pre-populates the player for a new character.
-     * @param player The player to create a character for.
-     */
     public void createNewCharacterForPlayer(Player player) {
         clearForm();
         playerComboBox.setValue(player);
+    }
+
+    public boolean hasUnsavedChanges() {
+        if (itemBeingEdited == null) {
+            return false;
+        }
+        boolean nameChanged = !Objects.equals(nameField.getText(), itemBeingEdited.getName());
+        boolean houseChanged = houseComboBox.getValue() != itemBeingEdited.getHouse();
+        boolean mainChanged = isMainCheckBox.isSelected() != itemBeingEdited.isMain();
+        return nameChanged || houseChanged || mainChanged;
     }
 
     // --- Specific Getters and Methods ---
@@ -159,11 +175,20 @@ public class CharacterFormView extends BaseFormView<Character> {
     public void setOnOpenPlayerRequestHandler(Consumer<Player> handler) {
         this.onOpenPlayerRequestHandler = handler;
     }
+    public void setOnCreateSecondCharacterRequestHandler(Consumer<Player> handler) {
+        this.onCreateSecondCharacterRequestHandler = handler;
+    }
 
     private void updateButtonVisibility() {
         boolean isEditing = itemBeingEdited != null;
         openPlayerButton.setVisible(isEditing);
         playerComboBox.setVisible(!isEditing);
+
+        boolean canCreateSecond = false;
+        if (isEditing && itemBeingEdited.getPlayer() != null) {
+            canCreateSecond = itemBeingEdited.getPlayer().hasEmptyCharacterSlot();
+        }
+        createSecondCharacterButton.setVisible(canCreateSecond);
 
         if (!isEditing) {
             retireButton.setVisible(false);

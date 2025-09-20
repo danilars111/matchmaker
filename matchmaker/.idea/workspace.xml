@@ -6,12 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="3ce98bd9-438c-4997-8d94-aa5d2c8e8d50" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Player.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/backend/db/entities/Player.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/stages/ManagementStage.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/CharacterManagementTab.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/CharacterManagementTab.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/PlayerManagementTab.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/tabs/PlayerManagementTab.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/forms/CharacterFormView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/forms/CharacterFormView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/forms/PlayerFormView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/forms/PlayerFormView.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/tables/CharacterRosterTableView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/poolen/frontend/gui/components/views/tables/CharacterRosterTableView.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -23,8 +19,8 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Interface" />
-        <option value="Class" />
         <option value="CSS File" />
+        <option value="Class" />
       </list>
     </option>
   </component>

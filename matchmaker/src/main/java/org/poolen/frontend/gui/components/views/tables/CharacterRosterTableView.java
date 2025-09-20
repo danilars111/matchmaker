@@ -16,7 +16,6 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     private final CharacterStore characterStore = CharacterStore.getInstance();
     private CheckBox retiredFilterCheckBox;
     private CheckBox mainsFilterCheckBox;
-    private Button clearPlayerFilterButton;
     private Player selectedPlayer; // Can be null to show all characters
 
     public CharacterRosterTableView() {
@@ -48,14 +47,11 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     protected void setupFilters() {
         retiredFilterCheckBox = new CheckBox("Show Retired");
         mainsFilterCheckBox = new CheckBox("Mains Only");
-        clearPlayerFilterButton = new Button("Clear Player Filter");
 
         retiredFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
         mainsFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-        clearPlayerFilterButton.setOnAction(e -> filterByPlayer(null));
-        clearPlayerFilterButton.setVisible(false); // Initially hidden
 
-        topFilterBar.getChildren().addAll(mainsFilterCheckBox, retiredFilterCheckBox, clearPlayerFilterButton);
+        topFilterBar.getChildren().addAll(mainsFilterCheckBox, retiredFilterCheckBox);
     }
 
     @Override
@@ -97,7 +93,7 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     public void filterByPlayer(Player player) {
         this.selectedPlayer = player;
         this.houseFilterBox.setDisable(player != null); // Disable house filter when player is selected
-        this.clearPlayerFilterButton.setVisible(player != null);
         applyFilter();
     }
 }
+
