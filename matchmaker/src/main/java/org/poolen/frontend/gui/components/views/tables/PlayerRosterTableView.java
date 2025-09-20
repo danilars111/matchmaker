@@ -3,27 +3,28 @@ package org.poolen.frontend.gui.components.views.tables;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.geometry.Pos;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.TableColumn;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.geometry.Pos;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
+import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
  * A highly reusable JavaFX component that displays a filterable and paginated table of players.
  */
-public class PlayerRosterTableView extends BaseRosterTableView<Player> {
+public class PlayerRosterTableView extends BaseRosterTableView<Player> implements PlayerUpdateListener {
 
     public enum RosterMode {
         PLAYER_MANAGEMENT,
@@ -106,10 +107,48 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
     }
 
     @Override
+    public void setOnItemDoubleClick(Consumer<Player> onItemDoubleClick) {
+        table.setRowFactory(tv -> {
+            TableRow<Player> row = new TableRow<>() {
+                @Override
+                protected void updateItem(Player player, boolean empty) {
+                    super.updateItem(player, empty);
+
+                    // Always clear the style first to handle recycling
+                    setStyle("");
+
+                    if (player != null && !empty) {
+                        // Priority 1: Player has no characters at all (needs attention)
+                        if (player.getCharacters().isEmpty()) {
+                            setStyle("-fx-background-color: #FFEBEE;"); // Light Red
+                            // Priority 2: Player has characters, but no main (needs attention)
+                        } else if (player.getMainCharacter() == null) {
+                            setStyle("-fx-background-color: #FFF8E1;"); // Light Amber
+                            // Priority 3: Player has exactly one character (just for info)
+                        } else if (player.getCharacters().size() == 1) {
+                            setStyle("-fx-background-color: #E3F2FD;"); // Light Blue
+                        }
+                    }
+                }
+            };
+
+            // Re-apply the double-click functionality
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && (!row.isEmpty()) && row.getItem() != null) {
+                    onItemDoubleClick.accept(row.getItem());
+                }
+            });
+
+            return row;
+        });
+    }
+
+    @Override
     public void applyFilter() {
         String searchText = searchField.getText() == null ? "" : searchField.getText().toLowerCase();
         boolean dmsOnly = dmFilterCheckBox.isSelected();
         House selectedHouse = houseFilterBox.getValue();
+
 
         filteredData.setPredicate(player -> {
             boolean textMatch = searchText.isEmpty() ||
@@ -118,10 +157,10 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
 
-            boolean houseMatch = selectedHouse == null ||
-                    player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
-
-            if (!houseMatch) return false;
+            if (selectedHouse != null) {
+                boolean houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
+                if (!houseMatch) return false;
+            }
 
             if (mode == RosterMode.PLAYER_MANAGEMENT) {
                 boolean attendingOnly = modeSpecificFilterCheckbox.isSelected();
@@ -158,6 +197,17 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
             sourceItems.setAll(attendingPlayers.values());
         }
         applyFilter();
+    }
+
+    /**
+     * This is our new listener method! When another part of the app says something changed,
+     * this will be called, and we can just refresh our table's visuals.
+     */
+    @Override
+    public void onPlayerUpdate() {
+        // A player's character list might have changed, which affects our row coloring.
+        // We just need to refresh the visual state of the table, not reload all the data.
+        table.refresh();
     }
 
     // --- Blacklisting Methods ---
@@ -321,3 +371,4 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
         this.onPlayerAddRequestHandler = handler;
     }
 }
+

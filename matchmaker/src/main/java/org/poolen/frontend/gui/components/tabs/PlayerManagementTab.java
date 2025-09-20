@@ -14,6 +14,7 @@ import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * A dedicated tab for creating, viewing, and managing players.
@@ -59,17 +60,27 @@ public class PlayerManagementTab extends Tab {
         this.setContent(root);
     }
 
-    public PlayerFormView getPlayerForm() {
-        return this.playerForm;
-    }
-
     public void editPlayer(Player player) {
         if (player != null) {
-            // Tell our form to populate itself with this player's data
             playerForm.populateForm(player);
-            // Optional: Also select them in the table for a nice touch
             rosterView.selectItem(player);
         }
+    }
+
+    public void setOnShowCharactersRequestHandler(Consumer<Player> handler) {
+        playerForm.setOnShowCharactersRequestHandler(handler);
+    }
+
+    public void setOnCreateCharacterRequestHandler(Consumer<Player> handler) {
+        playerForm.setOnCreateCharacterRequestHandler(handler);
+    }
+
+    /**
+     * This is our new helper method so the ManagementStage can find our roster view.
+     * @return The PlayerRosterTableView instance used by this tab.
+     */
+    public PlayerRosterTableView getRosterView() {
+        return rosterView;
     }
 
     private void handlePlayerAction() {

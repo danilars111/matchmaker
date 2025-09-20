@@ -3,9 +3,7 @@ package org.poolen.frontend.gui.components.stages;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -49,6 +47,8 @@ public class ManagementStage extends Stage {
         PlayerManagementTab playerTab = new PlayerManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
         GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
         addPlayerUpdateListener(groupTab);
+        // This is our new connection! We're telling the main stage to notify the player roster view of any updates.
+        addPlayerUpdateListener(playerTab.getRosterView());
 
         CharacterManagementTab characterTab = new CharacterManagementTab(this::notifyPlayerUpdateListeners);
         Tab settingsTab = new SettingsTab();
@@ -63,10 +63,10 @@ public class ManagementStage extends Stage {
 
         tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab, persistenceTab);
 
-        // --- Cross-Tab Communication Wiring ---
+        // --- Player <-> Character Navigation Wiring ---
         characterTab.getCharacterForm().setOnOpenPlayerRequestHandler(player -> {
             Stage detachedStage = detachedTabMap.get(playerTab);
-            if (detachedStage != null) {
+            if (detachedStage != null && detachedStage.isShowing()) {
                 detachedStage.requestFocus();
             } else {
                 tabPane.getSelectionModel().select(playerTab);
@@ -74,34 +74,28 @@ public class ManagementStage extends Stage {
             playerTab.editPlayer(player);
         });
 
-        playerTab.getPlayerForm().setOnShowCharactersRequestHandler(player -> {
+        playerTab.setOnShowCharactersRequestHandler(player -> {
             Stage detachedStage = detachedTabMap.get(characterTab);
-            if (detachedStage != null) {
+            if (detachedStage != null && detachedStage.isShowing()) {
                 detachedStage.requestFocus();
             } else {
                 tabPane.getSelectionModel().select(characterTab);
             }
-            // Filter the roster to show the player's characters
             characterTab.showCharactersForPlayer(player);
 
-            // Now, find the character we should automatically edit
-            Character characterToEdit = player.getMainCharacter();
-            if (characterToEdit == null && player.hasCharacters()) {
-                // If they have no main, just grab the first one in their list
-                characterToEdit = player.getCharacters().get(0);
+            // Auto-select their main or first character
+            Character charToEdit = player.getMainCharacter();
+            if (charToEdit == null && player.hasCharacters()) {
+                charToEdit = player.getCharacters().get(0);
             }
-
-            // If we found a character, tell the form to show them
-            if (characterToEdit != null) {
-                characterTab.getCharacterForm().populateForm(characterToEdit);
-            } else {
-                characterTab.getCharacterForm().clearForm(); // Fallback
+            if (charToEdit != null) {
+                characterTab.getCharacterForm().populateForm(charToEdit);
             }
         });
 
-        playerTab.getPlayerForm().setOnCreateCharacterRequestHandler(player -> {
+        playerTab.setOnCreateCharacterRequestHandler(player -> {
             Stage detachedStage = detachedTabMap.get(characterTab);
-            if (detachedStage != null) {
+            if (detachedStage != null && detachedStage.isShowing()) {
                 detachedStage.requestFocus();
             } else {
                 tabPane.getSelectionModel().select(characterTab);
@@ -111,17 +105,7 @@ public class ManagementStage extends Stage {
 
 
         this.setOnCloseRequest(event -> {
-            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
-                    "Are you sure you want to close the management window? This will close all detached tabs as well.",
-                    ButtonType.YES, ButtonType.CANCEL);
-            confirmation.initOwner(this);
-            confirmation.showAndWait().ifPresent(response -> {
-                if (response == ButtonType.YES) {
-                    new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
-                } else {
-                    event.consume();
-                }
-            });
+            new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
         });
 
         Scene scene = new Scene(tabPane, 800, 500);
@@ -174,9 +158,7 @@ public class ManagementStage extends Stage {
                 double parentY = ManagementStage.this.getY();
                 detachedStage.setX(parentX + 30);
                 detachedStage.setY(parentY + 60);
-
                 detachedTabMap.put(tab, detachedStage);
-
                 detachedStage.setOnCloseRequest(closeEvent -> {
                     detachedTabMap.remove(tab);
                     if (!parent.getTabs().contains(tab)) {
