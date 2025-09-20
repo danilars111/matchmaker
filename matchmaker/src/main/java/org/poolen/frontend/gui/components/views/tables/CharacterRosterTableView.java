@@ -4,9 +4,12 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
+
+import java.util.function.Consumer;
 
 /**
  * A reusable table view for displaying and filtering Characters, inheriting from BaseRosterTableView.
@@ -31,6 +34,26 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
         TableColumn<Character, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
 
+        TableColumn<Character, House> houseCol = new TableColumn<>("House");
+        houseCol.setCellValueFactory(new PropertyValueFactory<>("house"));
+        houseCol.setCellFactory(column -> {
+            return new TableCell<Character, House>() {
+                @Override
+                protected void updateItem(House house, boolean empty) {
+                    super.updateItem(house, empty);
+
+                    if (house == null || empty) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(house.toString());
+                        String color = getHouseColor(house);
+                        setStyle("-fx-font-weight: bold; -fx-text-fill: " + color + ";");
+                    }
+                }
+            };
+        });
+
         TableColumn<Character, String> playerCol = new TableColumn<>("Player");
         playerCol.setCellValueFactory(cellData -> {
             Player player = cellData.getValue().getPlayer();
@@ -40,7 +63,7 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
         TableColumn<Character, Boolean> mainCol = new TableColumn<>("Main");
         mainCol.setCellValueFactory(cellData -> new SimpleBooleanProperty(cellData.getValue().isMain()));
 
-        table.getColumns().addAll(nameCol, playerCol, mainCol);
+        table.getColumns().addAll(nameCol, houseCol, playerCol, mainCol);
     }
 
     @Override
@@ -54,11 +77,32 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
         topFilterBar.getChildren().addAll(mainsFilterCheckBox, retiredFilterCheckBox);
     }
 
+    private String getHouseColor(House house) {
+        if (house == null) {
+            return "black"; // Default color for characters with no house
+        }
+        // Finalized palette with more distinct red and brown tones.
+        switch (house) {
+            case GARNET:
+                return "#C0392B"; // A clearer, classic red.
+            case AMBER:
+                return "#8D6E63"; // A definite, warm brown.
+            case AVENTURINE:
+                return "#1E8449"; // A solid, forest green.
+            case OPAL:
+                return "#21618C"; // A deep, readable blue.
+            default:
+                return "black"; // Fallback color
+        }
+    }
+
+
     @Override
     public void applyFilter() {
         String searchText = searchField.getText() == null ? "" : searchField.getText().toLowerCase();
         boolean showRetired = retiredFilterCheckBox.isSelected();
         boolean mainsOnly = mainsFilterCheckBox.isSelected();
+        House selectedHouse = houseFilterBox.getValue();
 
         filteredData.setPredicate(character -> {
             if (character.isRetired() != showRetired) {
@@ -70,6 +114,10 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
             }
 
             if (mainsOnly && !character.isMain()) {
+                return false;
+            }
+
+            if (selectedHouse != null && character.getHouse() != selectedHouse) {
                 return false;
             }
 

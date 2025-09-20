@@ -3,10 +3,12 @@ package org.poolen.frontend.gui.components.views.tables;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.scene.control.*;
+import javafx.geometry.Pos;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.TableColumn;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.geometry.Pos;
+import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
@@ -107,6 +109,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
     public void applyFilter() {
         String searchText = searchField.getText() == null ? "" : searchField.getText().toLowerCase();
         boolean dmsOnly = dmFilterCheckBox.isSelected();
+        House selectedHouse = houseFilterBox.getValue();
 
         filteredData.setPredicate(player -> {
             boolean textMatch = searchText.isEmpty() ||
@@ -114,6 +117,11 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
                     player.getUuid().toString().toLowerCase().contains(searchText);
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
+
+            boolean houseMatch = selectedHouse == null ||
+                    player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
+
+            if (!houseMatch) return false;
 
             if (mode == RosterMode.PLAYER_MANAGEMENT) {
                 boolean attendingOnly = modeSpecificFilterCheckbox.isSelected();
@@ -313,4 +321,3 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
         this.onPlayerAddRequestHandler = handler;
     }
 }
-
