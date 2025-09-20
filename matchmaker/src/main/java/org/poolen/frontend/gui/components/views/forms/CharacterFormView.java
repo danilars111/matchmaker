@@ -143,6 +143,7 @@ public class CharacterFormView extends BaseFormView<Character> {
         playerComboBox.setValue(null);
         isMainCheckBox.setSelected(false);
         openPlayerButton.setText("Open Player");
+        playerComboBox.setDisable(false);
         actionButton.setText("Create");
         updateButtonVisibility();
         Platform.runLater(nameField::requestFocus);
@@ -151,6 +152,7 @@ public class CharacterFormView extends BaseFormView<Character> {
     public void createNewCharacterForPlayer(Player player) {
         clearForm();
         playerComboBox.setValue(player);
+        playerComboBox.setDisable(true);
     }
 
     public boolean hasUnsavedChanges() {

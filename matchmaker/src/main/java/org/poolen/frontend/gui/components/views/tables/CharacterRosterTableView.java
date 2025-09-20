@@ -92,8 +92,11 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
      */
     public void filterByPlayer(Player player) {
         this.selectedPlayer = player;
-        this.houseFilterBox.setDisable(player != null); // Disable house filter when player is selected
         applyFilter();
+    }
+
+    public Player getFilteredPlayer() {
+        return selectedPlayer;
     }
 }
 

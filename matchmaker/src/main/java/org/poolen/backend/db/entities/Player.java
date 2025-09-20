@@ -149,7 +149,7 @@ public class Player {
         return !characters.isEmpty();
     }
     public boolean hasEmptyCharacterSlot() {
-        return characters.size() < 2;
+        return characters.stream().filter(c -> !c.isRetired()).count() < 2;
     }
     public Character getMainCharacter() {
         return characters.stream()

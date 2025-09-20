@@ -46,8 +46,15 @@ public class CharacterManagementTab extends Tab {
         // --- Event Wiring ---
         rosterView.setOnItemDoubleClick(characterForm::populateForm);
         characterForm.getCancelButton().setOnAction(e -> {
-            characterForm.clearForm();
-            rosterView.filterByPlayer(null); // Clear the player filter on cancel!
+            Player filteredPlayer = rosterView.getFilteredPlayer();
+            if (filteredPlayer != null) {
+                // A filter is active, so "cancel" means "start new for this player"
+                characterForm.createNewCharacterForPlayer(filteredPlayer);
+            } else {
+                // No filter is active, so "cancel" means clear everything
+                characterForm.clearForm();
+                rosterView.filterByPlayer(null);
+            }
         });
         characterForm.getActionButton().setOnAction(e -> handleCharacterAction());
         characterForm.getRetireButton().setOnAction(e -> handleRetire());
@@ -111,6 +118,23 @@ public class CharacterManagementTab extends Tab {
                 );
             } else {
                 // Updating an existing character
+                boolean isBecomingMain = characterForm.isMainCharacter();
+                Player owner = characterToEdit.getPlayer();
+                Character currentMain = owner.getMainCharacter();
+
+                if (isBecomingMain && currentMain != null && !currentMain.equals(characterToEdit)) {
+                    ConfirmationDialog confirmation = new ConfirmationDialog(
+                            owner.getName() + " already has a main character: " + currentMain.getName() + ".\n\n" +
+                                    "Do you want to make " + characterForm.getCharacterName() + " their new main character?",
+                            this.getTabPane()
+                    );
+                    Optional<ButtonType> response = confirmation.showAndWait();
+                    if (response.isEmpty() || response.get() != ButtonType.YES) {
+                        characterForm.populateForm(characterToEdit); // Revert the checkbox change visually
+                        return; // Stop the action
+                    }
+                }
+
                 characterToEdit.setName(characterForm.getCharacterName());
                 characterToEdit.setHouse(characterForm.getSelectedHouse());
                 characterToEdit.setMain(characterForm.isMainCharacter());
