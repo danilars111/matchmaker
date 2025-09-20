@@ -10,8 +10,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.util.Callback;
 import org.poolen.backend.db.constants.House;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -50,13 +52,22 @@ public abstract class BaseRosterTableView<T> extends VBox {
 
         // Add listeners now that components are ready
         searchField.textProperty().addListener((obs, old, val) -> applyFilter());
-        pagination.setPageFactory(this::createPageFactory);
         pagination.heightProperty().addListener((obs, oldH, newH) -> handleResize());
+
+        // This is the crucial listener!
+        filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends T> c) -> {
+            updatePageCount(filteredData.size());
+            pagination.setPageFactory(createPageFactory(filteredData));
+        });
+
+        // Set the initial page factory
+        pagination.setPageFactory(createPageFactory(filteredData));
     }
 
     private void setupCommonUI() {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         searchField.setPromptText("Search...");
+        VBox.setVgrow(pagination, Priority.ALWAYS);
 
         VBox filterContainer = new VBox(10);
         HBox mainFilterRow = new HBox(10);
@@ -110,22 +121,30 @@ public abstract class BaseRosterTableView<T> extends VBox {
         return table.getSelectionModel().getSelectedItem();
     }
 
-    private Node createPageFactory(int pageIndex) {
-        int fromIndex = pageIndex * rowsPerPage;
-        int toIndex = Math.min(fromIndex + rowsPerPage, filteredData.size());
-        table.setItems(FXCollections.observableArrayList(filteredData.subList(fromIndex, toIndex)));
-        return table;
+    // This now returns a Callback, just like in the old version.
+    private Callback<Integer, Node> createPageFactory(List<T> data) {
+        return pageIndex -> {
+            int fromIndex = pageIndex * rowsPerPage;
+            int toIndex = Math.min(fromIndex + rowsPerPage, data.size());
+            table.setItems(FXCollections.observableArrayList(data.subList(fromIndex, toIndex)));
+            return table;
+        };
     }
 
+    // This now ONLY updates the page count, just like the old version.
     private void updatePageCount(int totalItems) {
         int pageCount = (totalItems + rowsPerPage - 1) / rowsPerPage;
         if (pageCount == 0) pageCount = 1;
+        int currentPage = pagination.getCurrentPageIndex();
         pagination.setPageCount(pageCount);
-        pagination.setPageFactory(this::createPageFactory);
+        if (currentPage >= pageCount) {
+            pagination.setCurrentPageIndex(pageCount - 1);
+        }
     }
 
     protected void refreshTable() {
         updatePageCount(filteredData.size());
+        pagination.setPageFactory(createPageFactory(filteredData));
     }
 
 
@@ -140,7 +159,8 @@ public abstract class BaseRosterTableView<T> extends VBox {
 
             if (newRows > 0 && newRows != this.rowsPerPage) {
                 this.rowsPerPage = newRows;
-                refreshTable();
+                updatePageCount(filteredData.size());
+                pagination.setPageFactory(createPageFactory(filteredData));
             }
         }
     }
