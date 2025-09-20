@@ -40,8 +40,6 @@ public class CharacterManagementTab extends Tab {
         // --- Layout ---
         root.getItems().addAll(characterForm, rosterView);
         root.setDividerPositions(0.3);
-        characterForm.setMinWidth(50);
-        characterForm.setMaxWidth(310);
         SplitPane.setResizableWithParent(characterForm, false);
 
         // --- Event Wiring ---
@@ -130,5 +128,8 @@ public class CharacterManagementTab extends Tab {
             }
         }
     }
-}
 
+    public CharacterFormView getCharacterForm() {
+        return this.characterForm;
+    }
+}

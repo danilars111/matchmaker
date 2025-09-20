@@ -31,7 +31,7 @@ import java.util.UUID;
  */
 public class ManagementStage extends Stage {
 
-    private static final List<Stage> detachedStages = new ArrayList<>();
+    private static final Map<Tab, Stage> detachedTabs = new HashMap<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
@@ -62,6 +62,21 @@ public class ManagementStage extends Stage {
 
         tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab, persistenceTab);
 
+        // --- Our new wiring logic! ---
+        characterTab.getCharacterForm().setOnOpenPlayerRequestHandler(player -> {
+            if (detachedTabs.containsKey(playerTab)) {
+                // The tab has been detached, so focus its window
+                Stage detachedPlayerStage = detachedTabs.get(playerTab);
+                detachedPlayerStage.toFront();
+                detachedPlayerStage.requestFocus();
+            } else {
+                // The tab is still in the main pane, so select it
+                tabPane.getSelectionModel().select(playerTab);
+            }
+            // In either case, tell the player tab to edit the player
+            playerTab.editPlayer(player);
+        });
+
         this.setOnCloseRequest(event -> {
             Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
                     "Are you sure you want to close the management window? This will close all detached tabs as well.",
@@ -69,7 +84,7 @@ public class ManagementStage extends Stage {
             confirmation.initOwner(this);
             confirmation.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.YES) {
-                    new ArrayList<>(detachedStages).forEach(Stage::close);
+                    new ArrayList<>(detachedTabs.values()).forEach(Stage::close);
                 } else {
                     event.consume();
                 }
@@ -126,9 +141,9 @@ public class ManagementStage extends Stage {
                 double parentY = ManagementStage.this.getY();
                 detachedStage.setX(parentX + 30);
                 detachedStage.setY(parentY + 60);
-                detachedStages.add(detachedStage);
+                detachedTabs.put(tab, detachedStage);
                 detachedStage.setOnCloseRequest(closeEvent -> {
-                    detachedStages.remove(detachedStage);
+                    detachedTabs.remove(tab);
                     if (!parent.getTabs().contains(tab)) {
                         int insertionIndex = Math.min(originalIndex, parent.getTabs().size());
                         parent.getTabs().add(insertionIndex, tab);

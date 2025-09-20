@@ -127,6 +127,12 @@ public abstract class BaseRosterTableView<T> extends VBox {
         return table.getSelectionModel().getSelectedItem();
     }
 
+    public void selectItem(T item) {
+        if (item != null) {
+            table.getSelectionModel().select(item);
+        }
+    }
+
     private Callback<Integer, Node> createPageFactory(List<T> data) {
         return pageIndex -> {
             int fromIndex = pageIndex * rowsPerPage;
@@ -164,5 +170,4 @@ public abstract class BaseRosterTableView<T> extends VBox {
         }
     }
 }
-
 

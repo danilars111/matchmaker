@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
@@ -14,6 +15,7 @@ import org.poolen.backend.db.store.PlayerStore;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -28,6 +30,9 @@ public class CharacterFormView extends BaseFormView<Character> {
     private Button retireButton;
     private Button unretireButton;
     private Button deleteButton;
+    private Button openPlayerButton;
+    private Consumer<Player> onOpenPlayerRequestHandler;
+
 
     public CharacterFormView() {
         super();
@@ -52,6 +57,7 @@ public class CharacterFormView extends BaseFormView<Character> {
         retireButton = new Button("Retire");
         unretireButton = new Button("Un-Retire");
         deleteButton = new Button("Delete Permanently");
+        openPlayerButton = new Button("Open Player");
 
         retireButton.setStyle("-fx-background-color: #f0ad4e; -fx-text-fill: white;");
         unretireButton.setStyle("-fx-background-color: #5bc0de; -fx-text-fill: white;");
@@ -66,7 +72,11 @@ public class CharacterFormView extends BaseFormView<Character> {
         add(new Label("House:"), 0, 4);
         add(houseComboBox, 0, 5);
         add(new Label("Player:"), 0, 6);
-        add(playerComboBox, 0, 7);
+
+        HBox playerBox = new HBox(10, playerComboBox, openPlayerButton);
+        HBox.setHgrow(playerComboBox, Priority.ALWAYS); // Let the combo box grow
+        add(playerBox, 0, 7);
+
         add(isMainCheckBox, 0, 8);
         add(retireButton, 0, 9);
         add(unretireButton, 0, 10);
@@ -77,6 +87,12 @@ public class CharacterFormView extends BaseFormView<Character> {
         GridPane.setVgrow(spacer, Priority.ALWAYS);
         add(spacer, 0, 12);
         add(mainActionsBox, 0, 13);
+
+        openPlayerButton.setOnAction(e -> {
+            if (onOpenPlayerRequestHandler != null && itemBeingEdited != null && itemBeingEdited.getPlayer() != null) {
+                onOpenPlayerRequestHandler.accept(itemBeingEdited.getPlayer());
+            }
+        });
     }
 
     @Override
@@ -122,8 +138,14 @@ public class CharacterFormView extends BaseFormView<Character> {
     public Button getDeleteButton() { return deleteButton; }
     public Character getCharacterBeingEdited() { return super.getItemBeingEdited(); }
 
+    public void setOnOpenPlayerRequestHandler(Consumer<Player> handler) {
+        this.onOpenPlayerRequestHandler = handler;
+    }
+
     private void updateButtonVisibility() {
         boolean isEditing = itemBeingEdited != null;
+        openPlayerButton.setVisible(isEditing);
+
         if (!isEditing) {
             retireButton.setVisible(false);
             unretireButton.setVisible(false);
@@ -151,4 +173,3 @@ public class CharacterFormView extends BaseFormView<Character> {
         };
     }
 }
-

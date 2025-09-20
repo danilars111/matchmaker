@@ -76,9 +76,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         root.getItems().addAll(groupForm, groupDisplayView);
         root.setDividerPositions(0.3);
-
-        groupForm.setMinWidth(50);
-        groupForm.setMaxWidth(310);
         SplitPane.setResizableWithParent(groupForm, false);
 
         // --- Event Wiring ---

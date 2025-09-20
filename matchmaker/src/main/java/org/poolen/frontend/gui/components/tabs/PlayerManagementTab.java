@@ -39,8 +39,6 @@ public class PlayerManagementTab extends Tab {
         // --- Layout ---
         root.getItems().addAll(playerForm, rosterView);
         root.setDividerPositions(0.3);
-        playerForm.setMinWidth(50);
-        playerForm.setMaxWidth(310);
         SplitPane.setResizableWithParent(playerForm, false);
 
 
@@ -134,6 +132,16 @@ public class PlayerManagementTab extends Tab {
             rosterView.showBlacklistedPlayers(editingPlayer);
         } else {
             rosterView.updateRoster();
+        }
+    }
+
+    public void editPlayer(Player player) {
+        if (player != null) {
+            // Tell our form to populate itself with this player's data
+            playerForm.populateForm(player);
+            // Also select them in the table for a nice touch
+            rosterView.updateRoster();
+            rosterView.selectItem(player);
         }
     }
 }
