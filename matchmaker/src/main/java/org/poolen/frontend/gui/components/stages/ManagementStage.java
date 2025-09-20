@@ -14,6 +14,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
@@ -48,8 +49,7 @@ public class ManagementStage extends Stage {
         GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
         addPlayerUpdateListener(groupTab);
 
-        Tab characterTab = new Tab("Character Management");
-        characterTab.setContent(new Label("Character management will go here!"));
+        CharacterManagementTab characterTab = new CharacterManagementTab(this::notifyPlayerUpdateListeners);
         Tab settingsTab = new SettingsTab();
         Tab persistenceTab = new Tab("Persistence");
         persistenceTab.setContent(new Label("Persistence will go here!"));
@@ -139,3 +139,5 @@ public class ManagementStage extends Stage {
         });
     }
 }
+
+

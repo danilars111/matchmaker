@@ -7,6 +7,7 @@ import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.engine.GroupSuggester;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 public class main {
     static PlayerStore playerStore = PlayerStore.getInstance();
+    static CharacterStore characterStore = CharacterStore.getInstance();
     static SettingsStore settingsStore = SettingsStore.getInstance();
 
     public static void main(String[] args) {
@@ -100,7 +102,14 @@ public class main {
             Player player = new Player(character1.getHouse().toString() +"/" + character2.getHouse(), false);
             player.addCharacter(character1);
             player.addCharacter(character2);
+            character1.setPlayer(player);
+            character1.setMain(true);
+            character2.setPlayer(player);
+            character2.setMain(true);
+            characterStore.addCharacter(character1);
+            characterStore.addCharacter(character2);
             playerStore.addPlayer(player);
+
         }
 
         Character character1 = new Character("1", House.AVENTURINE);
@@ -108,6 +117,12 @@ public class main {
         Player player = new Player("BLACKLISTER", false);
         player.addCharacter(character1);
         player.addCharacter(character2);
+        character1.setPlayer(player);
+        character1.setMain(true);
+        character2.setPlayer(player);
+        character2.setMain(true);
+        characterStore.addCharacter(character1);
+        characterStore.addCharacter(character2);
         playerStore.addPlayer(player);
 
         Character character3 = new Character("1", House.AVENTURINE);
@@ -115,6 +130,12 @@ public class main {
         Player player2 = new Player("BLACKLISTEE", false);
         player2.addCharacter(character3);
         player2.addCharacter(character4);
+        character4.setPlayer(player2);
+        character4.setMain(true);
+        character3.setPlayer(player2);
+        character3.setMain(true);
+        characterStore.addCharacter(character4);
+        characterStore.addCharacter(character3);
         playerStore.addPlayer(player2);
 
         player.blacklist(player2);
@@ -124,6 +145,12 @@ public class main {
         Player player3 = new Player("BUDDY", false);
         player3.addCharacter(character5);
         player3.addCharacter(character6);
+        character5.setPlayer(player3);
+        character5.setMain(true);
+        character6.setPlayer(player3);
+        character6.setMain(true);
+        characterStore.addCharacter(character5);
+        characterStore.addCharacter(character6);
         playerStore.addPlayer(player3);
 
         player.getBuddylist().put(player3.getUuid(), player3);
