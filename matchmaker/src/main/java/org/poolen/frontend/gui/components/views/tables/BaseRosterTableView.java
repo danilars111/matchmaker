@@ -62,6 +62,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
     }
 
     private void setupCommonUI() {
+        table.setEditable(true); // The magic word!
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         searchField.setPromptText("Search...");
         VBox.setVgrow(pagination, Priority.ALWAYS);
@@ -163,4 +164,5 @@ public abstract class BaseRosterTableView<T> extends VBox {
         }
     }
 }
+
 

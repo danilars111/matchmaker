@@ -174,7 +174,6 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
         applyFilter();
     }
 
-
     // --- Mode-Specific Setup ---
 
     private void setupPlayerManagementColumns() {
@@ -205,7 +204,6 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
                         table.refresh();
                     }
                 }
-                // Assuming onPlayerListChanged is handled by the parent Tab
             });
             return property;
         });
@@ -272,13 +270,21 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
                 } else if (isDmingColumn) {
                     Player player = getTableRow().getItem();
                     boolean allowTrials = allowTrialDmsCheckbox != null && allowTrialDmsCheckbox.isSelected();
-                    this.setGraphic(player.isDungeonMaster() || allowTrials ? this.getGraphic() : null);
+                    boolean shouldBeVisible = player.isDungeonMaster() || allowTrials;
+
+                    if (getGraphic() != null) {
+                        getGraphic().setVisible(shouldBeVisible);
+                    }
                 }
             }
         });
     }
 
     // --- Getters and Setters for Parent Tab ---
+
+    public Player getSelectedPlayer() {
+        return getSelectedItem();
+    }
 
     public void displayForGroup(Group group) {
         this.currentGroup = group;
