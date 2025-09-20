@@ -13,6 +13,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
@@ -31,7 +32,7 @@ import java.util.UUID;
  */
 public class ManagementStage extends Stage {
 
-    private static final Map<Tab, Stage> detachedTabs = new HashMap<>();
+    private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
@@ -62,20 +63,52 @@ public class ManagementStage extends Stage {
 
         tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab, persistenceTab);
 
-        // --- Our new wiring logic! ---
+        // --- Cross-Tab Communication Wiring ---
         characterTab.getCharacterForm().setOnOpenPlayerRequestHandler(player -> {
-            if (detachedTabs.containsKey(playerTab)) {
-                // The tab has been detached, so focus its window
-                Stage detachedPlayerStage = detachedTabs.get(playerTab);
-                detachedPlayerStage.toFront();
-                detachedPlayerStage.requestFocus();
+            Stage detachedStage = detachedTabMap.get(playerTab);
+            if (detachedStage != null) {
+                detachedStage.requestFocus();
             } else {
-                // The tab is still in the main pane, so select it
                 tabPane.getSelectionModel().select(playerTab);
             }
-            // In either case, tell the player tab to edit the player
             playerTab.editPlayer(player);
         });
+
+        playerTab.getPlayerForm().setOnShowCharactersRequestHandler(player -> {
+            Stage detachedStage = detachedTabMap.get(characterTab);
+            if (detachedStage != null) {
+                detachedStage.requestFocus();
+            } else {
+                tabPane.getSelectionModel().select(characterTab);
+            }
+            // Filter the roster to show the player's characters
+            characterTab.showCharactersForPlayer(player);
+
+            // Now, find the character we should automatically edit
+            Character characterToEdit = player.getMainCharacter();
+            if (characterToEdit == null && player.hasCharacters()) {
+                // If they have no main, just grab the first one in their list
+                characterToEdit = player.getCharacters().get(0);
+            }
+
+            // If we found a character, tell the form to show them
+            if (characterToEdit != null) {
+                characterTab.getCharacterForm().populateForm(characterToEdit);
+            } else {
+                characterTab.getCharacterForm().clearForm(); // Fallback
+            }
+        });
+
+        playerTab.getPlayerForm().setOnCreateCharacterRequestHandler(player -> {
+            Stage detachedStage = detachedTabMap.get(characterTab);
+            if (detachedStage != null) {
+                detachedStage.requestFocus();
+            } else {
+                tabPane.getSelectionModel().select(characterTab);
+            }
+            characterTab.createCharacterForPlayer(player);
+        });
+
 
         this.setOnCloseRequest(event -> {
             Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
@@ -84,7 +117,7 @@ public class ManagementStage extends Stage {
             confirmation.initOwner(this);
             confirmation.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.YES) {
-                    new ArrayList<>(detachedTabs.values()).forEach(Stage::close);
+                    new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
                 } else {
                     event.consume();
                 }
@@ -141,9 +174,11 @@ public class ManagementStage extends Stage {
                 double parentY = ManagementStage.this.getY();
                 detachedStage.setX(parentX + 30);
                 detachedStage.setY(parentY + 60);
-                detachedTabs.put(tab, detachedStage);
+
+                detachedTabMap.put(tab, detachedStage);
+
                 detachedStage.setOnCloseRequest(closeEvent -> {
-                    detachedTabs.remove(tab);
+                    detachedTabMap.remove(tab);
                     if (!parent.getTabs().contains(tab)) {
                         int insertionIndex = Math.min(originalIndex, parent.getTabs().size());
                         parent.getTabs().add(insertionIndex, tab);

@@ -143,6 +143,18 @@ public class Player {
 
     public void setLastSeen(Date lastSeen) {
         this.lastSeen = lastSeen;
+    }
 
+    public boolean hasCharacters() {
+        return !characters.isEmpty();
+    }
+    public boolean hasEmptyCharacterSlot() {
+        return characters.size() < 2;
+    }
+    public Character getMainCharacter() {
+        return characters.stream()
+                .filter(Character::isMain)
+                .findFirst()
+                .orElse(null);
     }
 }

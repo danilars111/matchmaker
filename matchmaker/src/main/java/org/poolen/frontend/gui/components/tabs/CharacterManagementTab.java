@@ -15,6 +15,7 @@ import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
 import org.poolen.frontend.gui.components.views.tables.CharacterRosterTableView;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * A dedicated tab for creating, viewing, and managing characters.
@@ -52,6 +53,27 @@ public class CharacterManagementTab extends Tab {
 
         this.setContent(root);
     }
+
+    public CharacterFormView getCharacterForm() {
+        return this.characterForm;
+    }
+
+    /**
+     * Filters the character roster to show only characters belonging to a specific player.
+     * @param player The player whose characters to show.
+     */
+    public void showCharactersForPlayer(Player player) {
+        rosterView.filterByPlayer(player);
+    }
+
+    /**
+     * Sets the character form to create a new character, pre-populating the given player.
+     * @param player The player to create a new character for.
+     */
+    public void createCharacterForPlayer(Player player) {
+        characterForm.createNewCharacterForPlayer(player);
+    }
+
 
     private void handleCharacterAction() {
         Character characterToEdit = (Character) characterForm.getItemBeingEdited();
@@ -128,8 +150,5 @@ public class CharacterManagementTab extends Tab {
             }
         }
     }
-
-    public CharacterFormView getCharacterForm() {
-        return this.characterForm;
-    }
 }
+

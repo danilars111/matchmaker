@@ -138,6 +138,15 @@ public class CharacterFormView extends BaseFormView<Character> {
         Platform.runLater(nameField::requestFocus);
     }
 
+    /**
+     * Clears the form and pre-populates the player for a new character.
+     * @param player The player to create a character for.
+     */
+    public void createNewCharacterForPlayer(Player player) {
+        clearForm();
+        playerComboBox.setValue(player);
+    }
+
     // --- Specific Getters and Methods ---
     public String getCharacterName() { return nameField.getText(); }
     public House getSelectedHouse() { return houseComboBox.getValue(); }

@@ -59,6 +59,19 @@ public class PlayerManagementTab extends Tab {
         this.setContent(root);
     }
 
+    public PlayerFormView getPlayerForm() {
+        return this.playerForm;
+    }
+
+    public void editPlayer(Player player) {
+        if (player != null) {
+            // Tell our form to populate itself with this player's data
+            playerForm.populateForm(player);
+            // Optional: Also select them in the table for a nice touch
+            rosterView.selectItem(player);
+        }
+    }
+
     private void handlePlayerAction() {
         Player playerToEdit = (Player) playerForm.getItemBeingEdited();
         if (playerToEdit == null) {
@@ -132,16 +145,6 @@ public class PlayerManagementTab extends Tab {
             rosterView.showBlacklistedPlayers(editingPlayer);
         } else {
             rosterView.updateRoster();
-        }
-    }
-
-    public void editPlayer(Player player) {
-        if (player != null) {
-            // Tell our form to populate itself with this player's data
-            playerForm.populateForm(player);
-            // Also select them in the table for a nice touch
-            rosterView.updateRoster();
-            rosterView.selectItem(player);
         }
     }
 }
