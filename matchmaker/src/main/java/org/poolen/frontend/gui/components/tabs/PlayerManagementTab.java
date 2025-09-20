@@ -42,7 +42,7 @@ public class PlayerManagementTab extends Tab {
         playerForm.setMaxWidth(310);
 
         // --- Event Wiring ---
-        rosterView.setOnPlayerDoubleClick(playerForm::populateForm);
+        rosterView.setOnItemDoubleClick(playerForm::populateForm);
         playerForm.getCancelButton().setOnAction(e -> {
             playerForm.clearForm();
             if (isShowingBlacklist) {
@@ -108,7 +108,7 @@ public class PlayerManagementTab extends Tab {
 
     private void handleBlacklistAction() {
         Player editingPlayer = playerForm.getPlayerBeingEdited();
-        Player selectedPlayer = rosterView.getSelectedPlayer();
+        Player selectedPlayer = rosterView.getSelectedItem();
 
         if (editingPlayer == null || selectedPlayer == null) {
             Alert info = new Alert(Alert.AlertType.INFORMATION, "Please select a player from the roster to blacklist.");

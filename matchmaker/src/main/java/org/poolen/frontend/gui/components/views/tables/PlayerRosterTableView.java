@@ -3,13 +3,10 @@ package org.poolen.frontend.gui.components.views.tables;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.geometry.Pos;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
-import org.poolen.backend.db.constants.House;
+import javafx.geometry.Pos;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
@@ -22,7 +19,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * A concrete implementation of BaseRosterTableView for displaying Players.
+ * A highly reusable JavaFX component that displays a filterable and paginated table of players.
  */
 public class PlayerRosterTableView extends BaseRosterTableView<Player> {
 
@@ -31,26 +28,24 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
         GROUP_ASSIGNMENT
     }
 
+    private final PlayerStore playerStore = PlayerStore.getInstance();
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
     private final Map<UUID, Player> dmingPlayers;
-    private final Runnable onPlayerListChanged;
-
     private Group currentGroup;
     private Map<UUID, Player> partyForNewGroup;
     private Player dmForNewGroup;
     private List<Group> allGroups = new ArrayList<>();
-
     private PlayerAddRequestHandler onPlayerAddRequestHandler;
 
-    // Filter controls
+    // --- Filter Controls ---
     private CheckBox dmFilterCheckBox;
-    private CheckBox modeSpecificFilterCheckbox;
-    private CheckBox availableOnlyCheckbox;
-    private CheckBox allowTrialDmsCheckbox;
+    private CheckBox modeSpecificFilterCheckbox; // "Attending" or "Selected"
+    private CheckBox availableOnlyCheckbox;      // Only in GROUP_ASSIGNMENT mode
+    private CheckBox allowTrialDmsCheckbox;      // Only in PLAYER_MANAGEMENT mode
 
-    // Columns that change based on mode
-    private TableColumn<Player, Boolean> interactiveColumn;
+    // --- Columns for special handling ---
+    private TableColumn<Player, Boolean> attendingColumn;
     private TableColumn<Player, Boolean> dmingColumn;
 
 
@@ -59,34 +54,18 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
         this.mode = mode;
         this.attendingPlayers = attendingPlayers;
         this.dmingPlayers = dmingPlayers;
-        this.onPlayerListChanged = onPlayerListChanged;
+        this.searchField.setPromptText("Search by name or UUID...");
 
-        // Call setup methods now that fields are initialized
         setupTableColumns();
         setupFilters();
-
-        // Now that everything is set up, we can populate the table
         updateRoster();
     }
 
     @Override
     protected void setupTableColumns() {
-        TableColumn<Player, Void> rowNumCol = new TableColumn<>("#");
-        rowNumCol.setSortable(false);
-        rowNumCol.setPrefWidth(40);
-        rowNumCol.setMaxWidth(40);
-        rowNumCol.setMinWidth(40);
-        rowNumCol.setStyle("-fx-alignment: CENTER;");
-        rowNumCol.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(Void item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty ? null : String.valueOf((pagination.getCurrentPageIndex() * getRowsPerPage()) + getIndex() + 1));
-            }
-        });
-
         TableColumn<Player, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+
         TableColumn<Player, String> charCol = new TableColumn<>("Characters");
         charCol.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getCharacters().stream()
@@ -94,98 +73,122 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
                         .collect(Collectors.joining(", "))
         ));
 
-        table.getColumns().addAll(rowNumCol, nameCol, charCol);
+        table.getColumns().addAll(nameCol, charCol);
 
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
-            interactiveColumn = createAttendingColumn();
-            dmingColumn = createDmingColumn();
-            table.getColumns().addAll(interactiveColumn, dmingColumn);
+            setupPlayerManagementColumns();
         } else {
-            interactiveColumn = createSelectedColumn();
-            table.getColumns().add(interactiveColumn);
+            setupGroupAssignmentColumns();
         }
-        table.setEditable(true);
     }
 
     @Override
     protected void setupFilters() {
+        dmFilterCheckBox = new CheckBox("DMs");
+        dmFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        topFilterBar.getChildren().add(dmFilterCheckBox);
+
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
-            dmFilterCheckBox = new CheckBox("DMs");
             modeSpecificFilterCheckbox = new CheckBox("Attending");
             allowTrialDmsCheckbox = new CheckBox("Allow Trial DMs");
-
-            dmFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-            modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
             allowTrialDmsCheckbox.selectedProperty().addListener((obs, old, val) -> table.refresh());
-
-            topFilterBar.getChildren().addAll(dmFilterCheckBox, modeSpecificFilterCheckbox, allowTrialDmsCheckbox);
-
-        } else { // GROUP_ASSIGNMENT mode
+            topFilterBar.getChildren().addAll(modeSpecificFilterCheckbox, allowTrialDmsCheckbox);
+        } else { // GROUP_ASSIGNMENT
+            modeSpecificFilterCheckbox = new CheckBox("Selected");
             availableOnlyCheckbox = new CheckBox("Available");
             availableOnlyCheckbox.setSelected(true);
-            modeSpecificFilterCheckbox = new CheckBox("Selected");
-
             availableOnlyCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-            modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-
             topFilterBar.getChildren().addAll(availableOnlyCheckbox, modeSpecificFilterCheckbox);
         }
+        modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
     }
 
     @Override
     public void applyFilter() {
-        String searchText = searchField.getText();
-        House selectedHouse = houseFilterBox.getValue();
+        String searchText = searchField.getText() == null ? "" : searchField.getText().toLowerCase();
+        boolean dmsOnly = dmFilterCheckBox.isSelected();
 
         filteredData.setPredicate(player -> {
-            boolean textMatch = searchText == null || searchText.isEmpty() ||
-                    player.getName().toLowerCase().contains(searchText.toLowerCase()) ||
-                    player.getUuid().toString().toLowerCase().contains(searchText.toLowerCase());
+            boolean textMatch = searchText.isEmpty() ||
+                    player.getName().toLowerCase().contains(searchText) ||
+                    player.getUuid().toString().toLowerCase().contains(searchText);
 
-            boolean houseMatch = selectedHouse == null || player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
+            boolean dmMatch = !dmsOnly || player.isDungeonMaster();
 
             if (mode == RosterMode.PLAYER_MANAGEMENT) {
-                boolean dmsOnly = dmFilterCheckBox.isSelected();
                 boolean attendingOnly = modeSpecificFilterCheckbox.isSelected();
-                boolean dmMatch = !dmsOnly || player.isDungeonMaster();
                 boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
-                return textMatch && houseMatch && dmMatch && attendingMatch;
-
-            } else { // GROUP_ASSIGNMENT mode
+                return textMatch && dmMatch && attendingMatch;
+            } else { // GROUP_ASSIGNMENT
+                if (dmingPlayers != null && dmingPlayers.containsKey(player.getUuid())) {
+                    return false;
+                }
                 Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
-                if (dmToExclude != null && player.equals(dmToExclude)) return false;
-                if (dmingPlayers != null && dmingPlayers.containsKey(player.getUuid())) return false;
-
+                if (dmToExclude != null && player.equals(dmToExclude)) {
+                    return false;
+                }
                 if (availableOnlyCheckbox.isSelected()) {
                     for (Group group : allGroups) {
-                        if (currentGroup != null && currentGroup.equals(group)) continue;
+                        if (currentGroup != null && group.equals(currentGroup)) continue;
                         if (group.getParty().containsKey(player.getUuid())) return false;
                     }
                 }
-
                 boolean selectedOnly = modeSpecificFilterCheckbox.isSelected();
                 Map<UUID, Player> partyMap = (currentGroup != null) ? currentGroup.getParty() : partyForNewGroup;
                 boolean selectedMatch = !selectedOnly || (partyMap != null && partyMap.containsKey(player.getUuid()));
 
-                return textMatch && houseMatch && selectedMatch;
+                return textMatch && dmMatch && selectedMatch;
             }
         });
-
-        refreshTable();
     }
 
     @Override
     public void updateRoster() {
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
-            sourceItems.setAll(PlayerStore.getInstance().getAllPlayers());
+            sourceItems.setAll(playerStore.getAllPlayers());
         } else {
             sourceItems.setAll(attendingPlayers.values());
         }
         applyFilter();
     }
 
+    // --- Blacklisting Methods ---
 
-    // --- Column Creation Logic ---
+    public void showBlacklistedPlayers(Player editingPlayer) {
+        topFilterBar.getChildren().forEach(node -> node.setDisable(true));
+        houseFilterBox.setDisable(true);
+        refreshButton.setDisable(true);
+        searchField.setDisable(true);
+        attendingColumn.setEditable(false);
+        dmingColumn.setEditable(false);
+        filteredData.setPredicate(player -> editingPlayer.getBlacklist().containsKey(player.getUuid()));
+    }
+
+    public void showAllPlayers() {
+        topFilterBar.getChildren().forEach(node -> node.setDisable(false));
+        houseFilterBox.setDisable(false);
+        refreshButton.setDisable(false);
+        searchField.setDisable(false);
+        attendingColumn.setEditable(true);
+        dmingColumn.setEditable(true);
+        applyFilter();
+    }
+
+
+    // --- Mode-Specific Setup ---
+
+    private void setupPlayerManagementColumns() {
+        this.attendingColumn = createAttendingColumn();
+        this.dmingColumn = createDmingColumn();
+        table.getColumns().addAll(attendingColumn, dmingColumn);
+    }
+
+    private void setupGroupAssignmentColumns() {
+        TableColumn<Player, Boolean> selectedCol = createSelectedColumn();
+        table.getColumns().add(selectedCol);
+    }
+
+    // --- Column Creation ---
 
     private TableColumn<Player, Boolean> createAttendingColumn() {
         TableColumn<Player, Boolean> col = new TableColumn<>("Attending");
@@ -202,7 +205,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
                         table.refresh();
                     }
                 }
-                onPlayerListChanged.run();
+                // Assuming onPlayerListChanged is handled by the parent Tab
             });
             return property;
         });
@@ -225,7 +228,6 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
                 } else {
                     dmingPlayers.remove(player.getUuid());
                 }
-                onPlayerListChanged.run();
             });
             return property;
         });
@@ -242,8 +244,9 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
             SimpleBooleanProperty property = new SimpleBooleanProperty(isSelected);
             property.addListener((obs, was, isNow) -> {
                 if (isNow) {
-                    if (onPlayerAddRequestHandler != null && !onPlayerAddRequestHandler.onPlayerAddRequest(player)) {
-                        Platform.runLater(() -> property.set(false));
+                    if (onPlayerAddRequestHandler != null) {
+                        boolean success = onPlayerAddRequestHandler.onPlayerAddRequest(player);
+                        if (!success) Platform.runLater(() -> property.set(false));
                     }
                 } else {
                     if (currentGroup != null) currentGroup.removePartyMember(player);
@@ -256,7 +259,26 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
         return col;
     }
 
-    // --- Public Setters & Getters for Group Assignment Mode ---
+    // --- Style and Helper Methods ---
+
+    private void setCheckboxCellStyle(TableColumn<Player, Boolean> column, boolean isDmingColumn) {
+        column.setCellFactory(param -> new CheckBoxTableCell<Player, Boolean>() {
+            @Override
+            public void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                this.setAlignment(Pos.CENTER);
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    this.setGraphic(null);
+                } else if (isDmingColumn) {
+                    Player player = getTableRow().getItem();
+                    boolean allowTrials = allowTrialDmsCheckbox != null && allowTrialDmsCheckbox.isSelected();
+                    this.setGraphic(player.isDungeonMaster() || allowTrials ? this.getGraphic() : null);
+                }
+            }
+        });
+    }
+
+    // --- Getters and Setters for Parent Tab ---
 
     public void displayForGroup(Group group) {
         this.currentGroup = group;
@@ -283,52 +305,6 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
 
     public void setOnPlayerAddRequest(PlayerAddRequestHandler handler) {
         this.onPlayerAddRequestHandler = handler;
-    }
-
-    // --- Other Methods ---
-
-    public void showBlacklistedPlayers(Player editingPlayer) {
-        topFilterBar.getParent().setDisable(true); // Disable the whole HBox
-        interactiveColumn.setEditable(false);
-        if (dmingColumn != null) dmingColumn.setEditable(false);
-        filteredData.setPredicate(player -> editingPlayer.getBlacklist().containsKey(player.getUuid()));
-        refreshTable();
-    }
-
-    public void showAllPlayers() {
-        topFilterBar.getParent().setDisable(false);
-        interactiveColumn.setEditable(true);
-        if (dmingColumn != null) dmingColumn.setEditable(true);
-        applyFilter();
-    }
-
-    private void setCheckboxCellStyle(TableColumn<Player, Boolean> column, boolean isDmingColumn) {
-        column.setCellFactory(param -> new CheckBoxTableCell<Player, Boolean>() {
-            @Override
-            public void updateItem(Boolean item, boolean empty) {
-                super.updateItem(item, empty);
-                this.setStyle("-fx-font-size: 1.5em;");
-                this.setAlignment(Pos.CENTER);
-                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
-                    this.setGraphic(null);
-                } else if (isDmingColumn) {
-                    Player player = getTableRow().getItem();
-                    boolean allowTrials = allowTrialDmsCheckbox != null && allowTrialDmsCheckbox.isSelected();
-                    this.setGraphic(player.isDungeonMaster() || allowTrials ? this.getGraphic() : null);
-                }
-            }
-        });
-    }
-
-    private int getRowsPerPage() { return 15; } // Simplified for row num column
-
-    // Alias for clarity
-    public void setOnPlayerDoubleClick(java.util.function.Consumer<Player> handler) {
-        setOnItemDoubleClick(handler);
-    }
-
-    public Player getSelectedPlayer() {
-        return getSelectedItem();
     }
 }
 

@@ -43,7 +43,7 @@ public class CharacterManagementTab extends Tab {
         characterForm.setMaxWidth(310);
 
         // --- Event Wiring ---
-        rosterView.setOnCharacterDoubleClick(characterForm::populateForm);
+        rosterView.setOnItemDoubleClick(characterForm::populateForm);
         characterForm.getCancelButton().setOnAction(e -> characterForm.clearForm());
         characterForm.getActionButton().setOnAction(e -> handleCharacterAction());
         characterForm.getRetireButton().setOnAction(e -> handleRetire());

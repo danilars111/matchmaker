@@ -1,30 +1,29 @@
 package org.poolen.frontend.gui.components.views.tables;
 
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
+import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
 
 /**
- * A concrete implementation of BaseRosterTableView for displaying Characters.
+ * A reusable table view for displaying and filtering Characters, inheriting from BaseRosterTableView.
  */
 public class CharacterRosterTableView extends BaseRosterTableView<Character> {
 
-    private CheckBox showRetiredCheckBox;
-    private CheckBox showMainsOnlyCheckBox;
+    private final CharacterStore characterStore = CharacterStore.getInstance();
+    private CheckBox retiredFilterCheckBox;
+    private CheckBox mainsFilterCheckBox;
+    private Player selectedPlayer; // Can be null to show all characters
 
     public CharacterRosterTableView() {
         super();
-
-        // Call setup methods now that fields are initialized
+        this.searchField.setPromptText("Search by character or player name...");
         setupTableColumns();
         setupFilters();
-
-        // Now that everything is set up, we can populate the table
-        updateRoster();
+        updateRoster(); // Initial data load
     }
 
     @Override
@@ -32,85 +31,69 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
         TableColumn<Character, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
 
-        TableColumn<Character, House> houseCol = new TableColumn<>("House");
-        houseCol.setCellValueFactory(new PropertyValueFactory<>("house"));
-
         TableColumn<Character, String> playerCol = new TableColumn<>("Player");
         playerCol.setCellValueFactory(cellData -> {
-            if (cellData.getValue().getPlayer() != null) {
-                return new javafx.beans.property.SimpleStringProperty(cellData.getValue().getPlayer().getName());
-            }
-            return new javafx.beans.property.SimpleStringProperty("N/A");
+            Player player = cellData.getValue().getPlayer();
+            return new SimpleStringProperty(player != null ? player.getName() : "N/A");
         });
 
         TableColumn<Character, Boolean> mainCol = new TableColumn<>("Main");
-        mainCol.setCellValueFactory(new PropertyValueFactory<>("main"));
-        mainCol.setCellFactory(col -> createBooleanCell());
+        mainCol.setCellValueFactory(cellData -> new SimpleBooleanProperty(cellData.getValue().isMain()));
 
-        table.getColumns().addAll(nameCol, houseCol, playerCol, mainCol);
+        table.getColumns().addAll(nameCol, playerCol, mainCol);
     }
 
     @Override
     protected void setupFilters() {
-        showRetiredCheckBox = new CheckBox("Show Retired");
-        showMainsOnlyCheckBox = new CheckBox("Mains Only");
+        retiredFilterCheckBox = new CheckBox("Show Retired");
+        mainsFilterCheckBox = new CheckBox("Mains Only");
 
-        showRetiredCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
-        showMainsOnlyCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        retiredFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
+        mainsFilterCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
 
-        topFilterBar.getChildren().addAll(showRetiredCheckBox, showMainsOnlyCheckBox);
+        topFilterBar.getChildren().addAll(mainsFilterCheckBox, retiredFilterCheckBox);
     }
 
     @Override
     public void applyFilter() {
-        String searchText = searchField.getText();
-        boolean showRetired = showRetiredCheckBox.isSelected();
-        boolean mainsOnly = showMainsOnlyCheckBox.isSelected();
-        House selectedHouse = houseFilterBox.getValue();
+        String searchText = searchField.getText() == null ? "" : searchField.getText().toLowerCase();
+        boolean showRetired = retiredFilterCheckBox.isSelected();
+        boolean mainsOnly = mainsFilterCheckBox.isSelected();
 
         filteredData.setPredicate(character -> {
-            boolean retiredMatch = character.isRetired() == showRetired;
-            boolean mainMatch = !mainsOnly || character.isMain();
-            boolean houseMatch = selectedHouse == null || character.getHouse() == selectedHouse;
-            boolean textMatch = searchText == null || searchText.isEmpty() ||
-                    character.getName().toLowerCase().contains(searchText.toLowerCase()) ||
-                    (character.getPlayer() != null && character.getPlayer().getName().toLowerCase().contains(searchText.toLowerCase()));
+            if (character.isRetired() != showRetired) {
+                return false;
+            }
 
-            return retiredMatch && textMatch && mainMatch && houseMatch;
+            if (selectedPlayer != null && !character.getPlayer().equals(selectedPlayer)) {
+                return false;
+            }
+
+            if (mainsOnly && !character.isMain()) {
+                return false;
+            }
+
+            boolean nameMatch = character.getName().toLowerCase().contains(searchText);
+            boolean playerMatch = character.getPlayer() != null && character.getPlayer().getName().toLowerCase().contains(searchText);
+
+            return nameMatch || playerMatch;
         });
-
-        refreshTable();
     }
 
     @Override
     public void updateRoster() {
-        sourceItems.setAll(CharacterStore.getInstance().getAllCharacters());
+        sourceItems.setAll(characterStore.getAllCharacters());
         applyFilter();
     }
 
-    private TableCell<Character, Boolean> createBooleanCell() {
-        return new TableCell<>() {
-            @Override
-            protected void updateItem(Boolean item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                } else {
-                    setText(item.toString());
-                    setStyle(item ? "-fx-text-fill: green;" : "-fx-text-fill: red;");
-                }
-            }
-        };
-    }
-
-    // Alias for clarity
-    public void setOnCharacterDoubleClick(java.util.function.Consumer<Character> handler) {
-        setOnItemDoubleClick(handler);
-    }
-
-    public Character getSelectedCharacter() {
-        return getSelectedItem();
+    /**
+     * Filters the roster to show characters only for a specific player.
+     * @param player The player to filter by, or null to clear the filter.
+     */
+    public void filterByPlayer(Player player) {
+        this.selectedPlayer = player;
+        this.houseFilterBox.setDisable(player != null); // Disable house filter when player is selected
+        applyFilter();
     }
 }
 

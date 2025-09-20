@@ -25,7 +25,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
     protected final TableView<T> table;
     protected final TextField searchField;
     protected final Pagination pagination;
-    protected final HBox topFilterBar; // For subclass-specific filters
+    protected final HBox topFilterBar;
     protected final ComboBox<House> houseFilterBox;
     protected final Button refreshButton;
 
@@ -50,17 +50,14 @@ public abstract class BaseRosterTableView<T> extends VBox {
 
         setupCommonUI();
 
-        // Add listeners now that components are ready
         searchField.textProperty().addListener((obs, old, val) -> applyFilter());
         pagination.heightProperty().addListener((obs, oldH, newH) -> handleResize());
 
-        // This is the crucial listener!
         filteredData.addListener((javafx.collections.ListChangeListener.Change<? extends T> c) -> {
             updatePageCount(filteredData.size());
             pagination.setPageFactory(createPageFactory(filteredData));
         });
 
-        // Set the initial page factory
         pagination.setPageFactory(createPageFactory(filteredData));
     }
 
@@ -69,10 +66,27 @@ public abstract class BaseRosterTableView<T> extends VBox {
         searchField.setPromptText("Search...");
         VBox.setVgrow(pagination, Priority.ALWAYS);
 
+        // --- Universal Row Number Column ---
+        TableColumn<T, Void> rowNumCol = new TableColumn<>("#");
+        rowNumCol.setSortable(false);
+        rowNumCol.setPrefWidth(40);
+        rowNumCol.setMaxWidth(40);
+        rowNumCol.setMinWidth(40);
+        rowNumCol.setStyle("-fx-alignment: CENTER;");
+        rowNumCol.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : String.valueOf((pagination.getCurrentPageIndex() * rowsPerPage) + getIndex() + 1));
+            }
+        });
+        table.getColumns().add(rowNumCol);
+
+
         VBox filterContainer = new VBox(10);
         HBox mainFilterRow = new HBox(10);
 
-        houseFilterBox.getItems().add(null); // Allow "All Houses"
+        houseFilterBox.getItems().add(null);
         houseFilterBox.getItems().addAll(House.values());
         houseFilterBox.setPromptText("Filter by House");
         houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
@@ -88,23 +102,14 @@ public abstract class BaseRosterTableView<T> extends VBox {
         getChildren().addAll(filterContainer, pagination);
     }
 
-    // --- Abstract Methods for Subclasses to Implement ---
-
-    /** Sets up the specific columns for the table. */
+    // --- Abstract Methods for Subclasses ---
     protected abstract void setupTableColumns();
-
-    /** Sets up any additional filter controls and adds them to the topFilterBar. */
     protected abstract void setupFilters();
-
-    /** Applies the specific filtering logic for the table. */
     public abstract void applyFilter();
-
-    /** Updates the source list of items for the table. */
     public abstract void updateRoster();
 
 
     // --- Common Functionality ---
-
     public void setOnItemDoubleClick(Consumer<T> onItemDoubleClick) {
         table.setRowFactory(tv -> {
             TableRow<T> row = new TableRow<>();
@@ -121,17 +126,16 @@ public abstract class BaseRosterTableView<T> extends VBox {
         return table.getSelectionModel().getSelectedItem();
     }
 
-    // This now returns a Callback, just like in the old version.
     private Callback<Integer, Node> createPageFactory(List<T> data) {
         return pageIndex -> {
             int fromIndex = pageIndex * rowsPerPage;
             int toIndex = Math.min(fromIndex + rowsPerPage, data.size());
             table.setItems(FXCollections.observableArrayList(data.subList(fromIndex, toIndex)));
+            table.refresh(); // This helps ensure visual updates
             return table;
         };
     }
 
-    // This now ONLY updates the page count, just like the old version.
     private void updatePageCount(int totalItems) {
         int pageCount = (totalItems + rowsPerPage - 1) / rowsPerPage;
         if (pageCount == 0) pageCount = 1;
@@ -141,12 +145,6 @@ public abstract class BaseRosterTableView<T> extends VBox {
             pagination.setCurrentPageIndex(pageCount - 1);
         }
     }
-
-    protected void refreshTable() {
-        updatePageCount(filteredData.size());
-        pagination.setPageFactory(createPageFactory(filteredData));
-    }
-
 
     private void handleResize() {
         double newHeight = pagination.getHeight();
