@@ -3,12 +3,7 @@ package org.poolen.frontend.gui.components.tabs;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.Label;
-import javafx.scene.control.SplitPane;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TextArea;
+import javafx.scene.control.*;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.BorderPane;
@@ -84,6 +79,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         groupForm.setMinWidth(50);
         groupForm.setMaxWidth(310);
+        SplitPane.setResizableWithParent(groupForm, false);
 
         // --- Event Wiring ---
         groupForm.getShowPlayersButton().setOnAction(e -> toggleRosterView());
@@ -129,14 +125,17 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             return false;
         }
 
+        // --- Check if the selected player is already a DM in another group ---
         Optional<Group> dmSourceGroupOpt = groups.stream()
                 .filter(g -> newDm != null && newDm.equals(g.getDungeonMaster()) && !g.equals(groupToUpdate))
                 .findFirst();
 
         if (dmSourceGroupOpt.isPresent()) {
             Group sourceGroup = dmSourceGroupOpt.get();
-            String message = newDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?";
-            Optional<ButtonType> response = ConfirmationDialog.show(message, getContent());
+            ConfirmationDialog confirmation = new ConfirmationDialog(
+                    newDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?",
+                    this.getTabPane());
+            Optional<ButtonType> response = confirmation.showAndWait();
 
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 sourceGroup.removeDungeonMaster();
@@ -148,6 +147,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             }
         }
 
+        // --- Check if the selected player is a party member in any group ---
         if (newDm != null) {
             Optional<Group> playerSourceGroupOpt = groups.stream()
                     .filter(g -> g.getParty().containsKey(newDm.getUuid()))
@@ -161,7 +161,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 } else {
                     message = newDm.getName() + " is in another group's party. Reassign them as DM for this group?";
                 }
-                Optional<ButtonType> response = ConfirmationDialog.show(message, getContent());
+
+                ConfirmationDialog confirmation = new ConfirmationDialog(message, this.getTabPane());
+                Optional<ButtonType> response = confirmation.showAndWait();
 
                 if (response.isPresent() && response.get() == ButtonType.YES) {
                     playerSourceGroup.removePartyMember(newDm);
@@ -181,7 +183,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
 
     private void updateDmList() {
-        Group groupBeingEdited = groupForm.getGroupBeingEdited();
+        Group groupBeingEdited = (Group) groupForm.getItemBeingEdited();
         Set<Player> unavailablePlayers = new HashSet<>();
         for (Group group : groups) {
             if (group.equals(groupBeingEdited)) continue;
@@ -207,18 +209,20 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private void handleAutoPopulate() {
         boolean anyGroupWithoutDm = groups.stream().anyMatch(g -> g.getDungeonMaster() == null);
         if (anyGroupWithoutDm) {
-            ErrorDialog.show("Please assign a Dungeon Master to every group before auto-populating.", getContent());
+            new ErrorDialog("Please assign a Dungeon Master to every group before auto-populating.", this.getTabPane()).showAndWait();
             return;
         }
 
-        String message = "This will clear all current party members and generate new ones. Are you sure?";
-        ConfirmationDialog.show(message, getContent()).ifPresent(response -> {
+        ConfirmationDialog confirmation = new ConfirmationDialog(
+                "This will clear all current party members and generate new ones. Are you sure?", this.getTabPane());
+        confirmation.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
+                // Clear all existing party members for a clean slate.
                 for (Group group : groups) {
                     new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
                 }
                 Matchmaker matchmaker = new Matchmaker(this.groups, this.attendingPlayers);
-                this.groups = matchmaker.match();
+                this.groups = matchmaker.match(); // The matchmaker returns the populated list.
                 cleanUp();
             }
         });
@@ -232,7 +236,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private void handleGroupAction() {
-        Group groupToEdit = groupForm.getGroupBeingEdited();
+        Group groupToEdit = (Group) groupForm.getItemBeingEdited();
         Player selectedDm = groupForm.getSelectedDm();
         if (groupToEdit == null) {
             dmsToReassignAsPlayer.keySet().forEach(Group::removeDungeonMaster);
@@ -271,8 +275,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private void handleDeleteFromCard(Group groupToDelete) {
-        String message = "Are you sure you want to delete this group? This cannot be undone.";
-        ConfirmationDialog.show(message, getContent()).ifPresent(response -> {
+        ConfirmationDialog confirmation = new ConfirmationDialog(
+                "Are you sure you want to delete this group? This cannot be undone.", this.getTabPane());
+        confirmation.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
                 groups.remove(groupToDelete);
                 cleanUp();
@@ -281,10 +286,11 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private void handleDeleteFromForm() {
-        Group groupToDelete = groupForm.getGroupBeingEdited();
+        Group groupToDelete = (Group) groupForm.getItemBeingEdited();
         if (groupToDelete != null) {
-            String message = "Are you sure you want to delete this group? This cannot be undone.";
-            ConfirmationDialog.show(message, getContent()).ifPresent(response -> {
+            ConfirmationDialog confirmation = new ConfirmationDialog(
+                    "Are you sure you want to delete this group? This cannot be undone.", this.getTabPane());
+            confirmation.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.YES) {
                     groups.remove(groupToDelete);
                     cleanUp();
@@ -296,12 +302,14 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private boolean handlePlayerAddRequest(Player player) {
         Group dmSourceGroup = findGroupDmForPlayer(player);
         if (dmSourceGroup != null) {
-            String message = player.getName() + " is a DM for another group. Reassign them as a player to this group?";
-            Optional<ButtonType> response = ConfirmationDialog.show(message, getContent());
+            ConfirmationDialog confirmation = new ConfirmationDialog(
+                    player.getName() + " is a DM for another group. Reassign them as a player to this group?",
+                    this.getTabPane());
+            Optional<ButtonType> response = confirmation.showAndWait();
 
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 dmsToReassignAsPlayer.put(dmSourceGroup, player);
-                Group targetGroup = groupForm.getGroupBeingEdited();
+                Group targetGroup = (Group) groupForm.getItemBeingEdited();
                 if (targetGroup != null) targetGroup.addPartyMember(player);
                 else newPartyMap.put(player.getUuid(), player);
                 return true;
@@ -312,11 +320,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         Group playerSourceGroup = findGroupForPlayer(player);
         if (playerSourceGroup != null) {
-            String message = player.getName() + " is already in another group. Reassign them?";
-            Optional<ButtonType> response = ConfirmationDialog.show(message, getContent());
+            ConfirmationDialog confirmation = new ConfirmationDialog(
+                    player.getName() + " is already in another group. Reassign them?", this.getTabPane());
+            Optional<ButtonType> response = confirmation.showAndWait();
 
             if (response.isPresent() && response.get() == ButtonType.YES) {
-                Group targetGroup = groupForm.getGroupBeingEdited();
+                Group targetGroup = (Group) groupForm.getItemBeingEdited();
                 if (targetGroup != null) {
                     playerSourceGroup.movePlayerTo(player, targetGroup);
                     rosterView.updateRoster();
@@ -330,24 +339,26 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             }
         }
 
-        Group targetGroup = groupForm.getGroupBeingEdited();
+        Group targetGroup = (Group) groupForm.getItemBeingEdited();
         if (targetGroup != null) targetGroup.addPartyMember(player);
         else newPartyMap.put(player.getUuid(), player);
         return true;
     }
 
     private boolean handleDmSelectionRequest(Player selectedDm) {
-        if (selectedDm == null) return true;
+        if (selectedDm == null) return true; // It's okay to unassign a DM
 
-        Group groupBeingEdited = groupForm.getGroupBeingEdited();
+        Group groupBeingEdited = (Group) groupForm.getItemBeingEdited();
         Optional<Group> dmSourceGroupOpt = groups.stream()
                 .filter(g -> selectedDm.equals(g.getDungeonMaster()) && !g.equals(groupBeingEdited))
                 .findFirst();
 
         if (dmSourceGroupOpt.isPresent()) {
             Group sourceGroup = dmSourceGroupOpt.get();
-            String message = selectedDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?";
-            Optional<ButtonType> response = ConfirmationDialog.show(message, getContent());
+            ConfirmationDialog confirmation = new ConfirmationDialog(
+                    selectedDm.getName() + " is already a DM for another group. Reassign them as the DM for this group?",
+                    this.getTabPane());
+            Optional<ButtonType> response = confirmation.showAndWait();
 
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 dmsToReassignAsDm.put(sourceGroup, selectedDm);
@@ -369,7 +380,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             } else {
                 message = selectedDm.getName() + " is in another group's party. Reassign them as DM for this group?";
             }
-            Optional<ButtonType> response = ConfirmationDialog.show(message, getContent());
+
+            ConfirmationDialog confirmation = new ConfirmationDialog(message, this.getTabPane());
+            Optional<ButtonType> response = confirmation.showAndWait();
 
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 playersToPromoteToDm.put(playerSourceGroup, selectedDm);
@@ -383,17 +396,22 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private void handleExportRequest() {
         if (groups.isEmpty()) {
-            InfoDialog.show("There are no groups to export.", getContent());
+            new InfoDialog("There are no groups to export.", this.getTabPane()).showAndWait();
             return;
         }
 
         StringBuilder markdownBuilder = new StringBuilder();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d MMMM, yyyy");
-        markdownBuilder.append("# ").append(eventDate.format(formatter)).append("\n");
+        markdownBuilder.append("# ").append(eventDate.format(formatter)).append("\n\n");
 
-        groups.stream()
-                .sorted(Comparator.comparing(g -> g.getDungeonMaster() != null ? g.getDungeonMaster().getName() : ""))
-                .forEach(group -> markdownBuilder.append(group.toMarkdown()).append("\n---\n\n"));
+        List<Group> sortedGroups = groups.stream()
+                .sorted(Comparator.comparing(g -> g.getDungeonMaster() != null ? g.getDungeonMaster().getName() : "", String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        for (Group group : sortedGroups) {
+            markdownBuilder.append(group.toMarkdown()).append("\n---\n\n");
+        }
+
 
         Stage exportStage = new Stage();
         exportStage.initModality(Modality.APPLICATION_MODAL);
@@ -405,7 +423,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         markdownArea.setWrapText(true);
 
         Button copyButton = new Button("Copy to Clipboard");
-        Label copyStatusLabel = new Label();
+        Label copyStatusLabel = new Label(); // Our new feedback label!
 
         copyButton.setOnAction(e -> {
             try {
@@ -436,7 +454,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
 
     private Group findGroupForPlayer(Player player) {
-        Group groupBeingEdited = groupForm.getGroupBeingEdited();
+        Group groupBeingEdited = (Group) groupForm.getItemBeingEdited();
         for (Group group : groups) {
             if (group.equals(groupBeingEdited)) continue;
             if (group.getParty().containsKey(player.getUuid())) {
@@ -447,7 +465,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private Group findGroupDmForPlayer(Player player) {
-        Group groupBeingEdited = groupForm.getGroupBeingEdited();
+        Group groupBeingEdited = (Group) groupForm.getItemBeingEdited();
         for (Group group : groups) {
             if (group.equals(groupBeingEdited)) continue;
             if (player.equals(group.getDungeonMaster())) {

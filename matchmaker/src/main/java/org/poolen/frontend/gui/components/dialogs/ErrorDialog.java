@@ -1,23 +1,14 @@
 package org.poolen.frontend.gui.components.dialogs;
 
-import javafx.scene.Node;
+import javafx.scene.control.TabPane;
 
 /**
- * A consistent error dialog.
+ * A consistent, styled dialog for displaying error messages.
  */
 public class ErrorDialog extends BaseDialog {
 
-    private ErrorDialog(String contentText, Node ownerNode) {
-        super(AlertType.ERROR, contentText, getOwnerWindow(ownerNode));
-    }
-
-    /**
-     * Shows an error dialog and waits for it to be closed.
-     * @param message The message to display.
-     * @param ownerNode A node within the scene that should own this dialog.
-     */
-    public static void show(String message, Node ownerNode) {
-        ErrorDialog dialog = new ErrorDialog(message, ownerNode);
-        dialog.showAndWait();
+    public ErrorDialog(String contentText, TabPane owner) {
+        super(AlertType.ERROR, contentText, getOwnerWindow(owner));
     }
 }
+

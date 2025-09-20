@@ -26,7 +26,7 @@ public class CharacterFormView extends BaseFormView<Character> {
     private ComboBox<Player> playerComboBox;
     private CheckBox isMainCheckBox;
     private Button retireButton;
-    private Button unRetireButton;
+    private Button unretireButton;
     private Button deleteButton;
 
     public CharacterFormView() {
@@ -50,14 +50,14 @@ public class CharacterFormView extends BaseFormView<Character> {
         playerComboBox.setButtonCell(createPlayerCell());
 
         retireButton = new Button("Retire");
-        unRetireButton = new Button("Un-Retire");
+        unretireButton = new Button("Un-Retire");
         deleteButton = new Button("Delete Permanently");
 
         retireButton.setStyle("-fx-background-color: #f0ad4e; -fx-text-fill: white;");
-        unRetireButton.setStyle("-fx-background-color: #5bc0de; -fx-text-fill: white;");
+        unretireButton.setStyle("-fx-background-color: #5bc0de; -fx-text-fill: white;");
         deleteButton.setStyle("-fx-background-color: #d9534f; -fx-text-fill: white;");
         retireButton.setMaxWidth(Double.MAX_VALUE);
-        unRetireButton.setMaxWidth(Double.MAX_VALUE);
+        unretireButton.setMaxWidth(Double.MAX_VALUE);
         deleteButton.setMaxWidth(Double.MAX_VALUE);
 
         // Start adding controls at row 2
@@ -69,7 +69,7 @@ public class CharacterFormView extends BaseFormView<Character> {
         add(playerComboBox, 0, 7);
         add(isMainCheckBox, 0, 8);
         add(retireButton, 0, 9);
-        add(unRetireButton, 0, 10);
+        add(unretireButton, 0, 10);
         add(deleteButton, 0, 11);
 
         // Add the common controls from the parent at the end
@@ -118,7 +118,7 @@ public class CharacterFormView extends BaseFormView<Character> {
     public Player getSelectedPlayer() { return playerComboBox.getValue(); }
     public boolean isMainCharacter() { return isMainCheckBox.isSelected(); }
     public Button getRetireButton() { return retireButton; }
-    public Button getUnRetireButton() { return unRetireButton; }
+    public Button getUnretireButton() { return unretireButton; }
     public Button getDeleteButton() { return deleteButton; }
     public Character getCharacterBeingEdited() { return super.getItemBeingEdited(); }
 
@@ -126,16 +126,16 @@ public class CharacterFormView extends BaseFormView<Character> {
         boolean isEditing = itemBeingEdited != null;
         if (!isEditing) {
             retireButton.setVisible(false);
-            unRetireButton.setVisible(false);
+            unretireButton.setVisible(false);
             deleteButton.setVisible(false);
         } else {
             if (itemBeingEdited.isRetired()) {
                 retireButton.setVisible(false);
-                unRetireButton.setVisible(true);
+                unretireButton.setVisible(true);
                 deleteButton.setVisible(true);
             } else {
                 retireButton.setVisible(true);
-                unRetireButton.setVisible(false);
+                unretireButton.setVisible(false);
                 deleteButton.setVisible(false);
             }
         }

@@ -1,12 +1,13 @@
 package org.poolen.frontend.gui.components.tabs;
 
-import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.PlayerFactory;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
+import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 
@@ -40,6 +41,8 @@ public class PlayerManagementTab extends Tab {
         root.setDividerPositions(0.3);
         playerForm.setMinWidth(50);
         playerForm.setMaxWidth(310);
+        SplitPane.setResizableWithParent(playerForm, false);
+
 
         // --- Event Wiring ---
         rosterView.setOnItemDoubleClick(playerForm::populateForm);
@@ -59,11 +62,10 @@ public class PlayerManagementTab extends Tab {
     }
 
     private void handlePlayerAction() {
-        Player playerToEdit = playerForm.getPlayerBeingEdited();
+        Player playerToEdit = (Player) playerForm.getItemBeingEdited();
         if (playerToEdit == null) {
-            // Creating a new player
-            Player newPlayer = playerFactory.create(playerForm.getPlayerName(), playerForm.isDungeonMaster());
-            playerStore.addPlayer(newPlayer);
+            // Creating a new player using the factory
+            playerFactory.create(playerForm.getPlayerName(), playerForm.isDungeonMaster());
         } else {
             // Updating an existing player
             playerToEdit.setName(playerForm.getPlayerName());
@@ -76,12 +78,12 @@ public class PlayerManagementTab extends Tab {
     }
 
     private void handleDelete() {
-        Player playerToDelete = playerForm.getPlayerBeingEdited();
+        Player playerToDelete = (Player) playerForm.getItemBeingEdited();
         if (playerToDelete != null) {
-            Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+            ConfirmationDialog confirmation = new ConfirmationDialog(
                     "Are you sure you want to delete " + playerToDelete.getName() + "? This cannot be undone.",
-                    ButtonType.YES, ButtonType.NO);
-            confirmation.initOwner(this.getTabPane().getScene().getWindow());
+                    this.getTabPane()
+            );
             Optional<ButtonType> response = confirmation.showAndWait();
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 playerStore.removePlayer(playerToDelete);
@@ -93,7 +95,7 @@ public class PlayerManagementTab extends Tab {
     }
 
     private void handleShowBlacklist() {
-        Player editingPlayer = playerForm.getPlayerBeingEdited();
+        Player editingPlayer = (Player) playerForm.getItemBeingEdited();
         if (editingPlayer == null) return;
 
         isShowingBlacklist = !isShowingBlacklist;
@@ -107,20 +109,16 @@ public class PlayerManagementTab extends Tab {
     }
 
     private void handleBlacklistAction() {
-        Player editingPlayer = playerForm.getPlayerBeingEdited();
+        Player editingPlayer = (Player) playerForm.getItemBeingEdited();
         Player selectedPlayer = rosterView.getSelectedItem();
 
         if (editingPlayer == null || selectedPlayer == null) {
-            Alert info = new Alert(Alert.AlertType.INFORMATION, "Please select a player from the roster to blacklist.");
-            info.initOwner(this.getTabPane().getScene().getWindow());
-            info.showAndWait();
+            new InfoDialog("Please select a player from the roster to blacklist.", this.getTabPane()).showAndWait();
             return;
         }
 
         if (editingPlayer.equals(selectedPlayer)) {
-            Alert info = new Alert(Alert.AlertType.INFORMATION, "You cannot blacklist yourself, you silly goose!");
-            info.initOwner(this.getTabPane().getScene().getWindow());
-            info.showAndWait();
+            new InfoDialog("You cannot blacklist yourself, you silly goose!", this.getTabPane()).showAndWait();
             return;
         }
 
