@@ -4,8 +4,8 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
@@ -33,7 +33,6 @@ public class CharacterFormView extends BaseFormView<Character> {
     private Button openPlayerButton;
     private Consumer<Player> onOpenPlayerRequestHandler;
 
-
     public CharacterFormView() {
         super();
         setupFormControls();
@@ -45,7 +44,11 @@ public class CharacterFormView extends BaseFormView<Character> {
         nameField = new TextField();
         houseComboBox = new ComboBox<>(FXCollections.observableArrayList(House.values()));
         playerComboBox = new ComboBox<>();
-        isMainCheckBox = new CheckBox("Is this their main character?");
+        isMainCheckBox = new CheckBox("Main Character");
+
+        // Let the combo boxes take up the full width, just like the buttons!
+        houseComboBox.setMaxWidth(Double.MAX_VALUE);
+        playerComboBox.setMaxWidth(Double.MAX_VALUE);
 
         List<Player> sortedPlayers = PlayerStore.getInstance().getAllPlayers().stream()
                 .sorted(Comparator.comparing(Player::getName))
@@ -59,12 +62,15 @@ public class CharacterFormView extends BaseFormView<Character> {
         deleteButton = new Button("Delete Permanently");
         openPlayerButton = new Button("Open Player");
 
+
         retireButton.setStyle("-fx-background-color: #f0ad4e; -fx-text-fill: white;");
         unretireButton.setStyle("-fx-background-color: #5bc0de; -fx-text-fill: white;");
         deleteButton.setStyle("-fx-background-color: #d9534f; -fx-text-fill: white;");
+        openPlayerButton.setStyle("-fx-background-color: #6A5ACD; -fx-text-fill: white;");
         retireButton.setMaxWidth(Double.MAX_VALUE);
         unretireButton.setMaxWidth(Double.MAX_VALUE);
         deleteButton.setMaxWidth(Double.MAX_VALUE);
+        openPlayerButton.setMaxWidth(Double.MAX_VALUE);
 
         // Start adding controls at row 2
         add(new Label("Character Name:"), 0, 2);
@@ -73,9 +79,9 @@ public class CharacterFormView extends BaseFormView<Character> {
         add(houseComboBox, 0, 5);
         add(new Label("Player:"), 0, 6);
 
-        HBox playerBox = new HBox(10, playerComboBox, openPlayerButton);
-        HBox.setHgrow(playerComboBox, Priority.ALWAYS); // Let the combo box grow
-        add(playerBox, 0, 7);
+        // Create a StackPane to hold the interchangeable player controls
+        StackPane playerControlContainer = new StackPane(playerComboBox, openPlayerButton);
+        add(playerControlContainer, 0, 7);
 
         add(isMainCheckBox, 0, 8);
         add(retireButton, 0, 9);
@@ -108,7 +114,10 @@ public class CharacterFormView extends BaseFormView<Character> {
         playerComboBox.setValue(character.getPlayer());
         isMainCheckBox.setSelected(character.isMain());
 
-        playerComboBox.setDisable(true);
+        if (character.getPlayer() != null) {
+            openPlayerButton.setText(character.getPlayer().getName());
+        }
+
         actionButton.setText("Update");
         updateButtonVisibility();
         Platform.runLater(nameField::requestFocus);
@@ -122,7 +131,8 @@ public class CharacterFormView extends BaseFormView<Character> {
         playerComboBox.setValue(null);
         isMainCheckBox.setSelected(false);
 
-        playerComboBox.setDisable(false);
+        openPlayerButton.setText("Open Player");
+
         actionButton.setText("Create");
         updateButtonVisibility();
         Platform.runLater(nameField::requestFocus);
@@ -137,7 +147,6 @@ public class CharacterFormView extends BaseFormView<Character> {
     public Button getUnretireButton() { return unretireButton; }
     public Button getDeleteButton() { return deleteButton; }
     public Character getCharacterBeingEdited() { return super.getItemBeingEdited(); }
-
     public void setOnOpenPlayerRequestHandler(Consumer<Player> handler) {
         this.onOpenPlayerRequestHandler = handler;
     }
@@ -145,6 +154,7 @@ public class CharacterFormView extends BaseFormView<Character> {
     private void updateButtonVisibility() {
         boolean isEditing = itemBeingEdited != null;
         openPlayerButton.setVisible(isEditing);
+        playerComboBox.setVisible(!isEditing);
 
         if (!isEditing) {
             retireButton.setVisible(false);
@@ -173,3 +183,4 @@ public class CharacterFormView extends BaseFormView<Character> {
         };
     }
 }
+
