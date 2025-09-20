@@ -1,15 +1,19 @@
 package org.poolen.frontend.gui.components.views.forms;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 
 import java.util.UUID;
 
@@ -30,6 +34,13 @@ public abstract class BaseFormView<T> extends GridPane {
         setHgap(10);
         setVgap(10);
         setPadding(new Insets(20));
+        setMinWidth(50);
+        setMaxWidth(310);
+
+        // This is our new magic! It tells the grid pane's column to always grow.
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setHgrow(Priority.ALWAYS);
+        this.getColumnConstraints().add(col1);
 
         // --- Common UUID Field ---
         uuidField = new TextField();
@@ -74,9 +85,18 @@ public abstract class BaseFormView<T> extends GridPane {
         uuidField.clear();
     }
 
+
     // --- Public Getters ---
     public Button getActionButton() { return actionButton; }
     public Button getCancelButton() { return cancelButton; }
     public T getItemBeingEdited() { return itemBeingEdited; }
+
+    /**
+     * A helper to run focus requests after the UI has been updated.
+     * @param control The control to focus on.
+     */
+    protected void requestFocusOn(Control control) {
+        Platform.runLater(control::requestFocus);
+    }
 }
 
