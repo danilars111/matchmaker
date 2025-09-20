@@ -4,16 +4,11 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
@@ -49,7 +44,6 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
     private PlayerAddRequestHandler onPlayerAddRequestHandler;
 
     // Filter controls
-    private ComboBox<House> houseFilterBox;
     private CheckBox dmFilterCheckBox;
     private CheckBox modeSpecificFilterCheckbox;
     private CheckBox availableOnlyCheckbox;
@@ -115,22 +109,6 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
 
     @Override
     protected void setupFilters() {
-        houseFilterBox = new ComboBox<>();
-        houseFilterBox.getItems().add(null);
-        houseFilterBox.getItems().addAll(House.values());
-        houseFilterBox.setPromptText("Filter by House");
-        houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
-
-        Button refreshButton = new Button("🔄");
-        refreshButton.setOnAction(e -> updateRoster());
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        // Remove search field to re-add it at the start
-        filterBar.getChildren().remove(searchField);
-        filterBar.getChildren().addAll(searchField, houseFilterBox);
-
         if (mode == RosterMode.PLAYER_MANAGEMENT) {
             dmFilterCheckBox = new CheckBox("DMs");
             modeSpecificFilterCheckbox = new CheckBox("Attending");
@@ -140,7 +118,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
             modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
             allowTrialDmsCheckbox.selectedProperty().addListener((obs, old, val) -> table.refresh());
 
-            filterBar.getChildren().addAll(dmFilterCheckBox, modeSpecificFilterCheckbox, allowTrialDmsCheckbox);
+            topFilterBar.getChildren().addAll(dmFilterCheckBox, modeSpecificFilterCheckbox, allowTrialDmsCheckbox);
 
         } else { // GROUP_ASSIGNMENT mode
             availableOnlyCheckbox = new CheckBox("Available");
@@ -150,22 +128,21 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
             availableOnlyCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
             modeSpecificFilterCheckbox.selectedProperty().addListener((obs, old, val) -> applyFilter());
 
-            filterBar.getChildren().addAll(availableOnlyCheckbox, modeSpecificFilterCheckbox);
+            topFilterBar.getChildren().addAll(availableOnlyCheckbox, modeSpecificFilterCheckbox);
         }
-
-        filterBar.getChildren().addAll(spacer, refreshButton);
     }
 
     @Override
     public void applyFilter() {
         String searchText = searchField.getText();
+        House selectedHouse = houseFilterBox.getValue();
 
         filteredData.setPredicate(player -> {
             boolean textMatch = searchText == null || searchText.isEmpty() ||
                     player.getName().toLowerCase().contains(searchText.toLowerCase()) ||
                     player.getUuid().toString().toLowerCase().contains(searchText.toLowerCase());
 
-            boolean houseMatch = houseFilterBox.getValue() == null || player.getCharacters().stream().anyMatch(c -> c.getHouse() == houseFilterBox.getValue());
+            boolean houseMatch = selectedHouse == null || player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
 
             if (mode == RosterMode.PLAYER_MANAGEMENT) {
                 boolean dmsOnly = dmFilterCheckBox.isSelected();
@@ -311,7 +288,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
     // --- Other Methods ---
 
     public void showBlacklistedPlayers(Player editingPlayer) {
-        filterBar.getChildren().forEach(node -> node.setDisable(true));
+        topFilterBar.getParent().setDisable(true); // Disable the whole HBox
         interactiveColumn.setEditable(false);
         if (dmingColumn != null) dmingColumn.setEditable(false);
         filteredData.setPredicate(player -> editingPlayer.getBlacklist().containsKey(player.getUuid()));
@@ -319,7 +296,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> {
     }
 
     public void showAllPlayers() {
-        filterBar.getChildren().forEach(node -> node.setDisable(false));
+        topFilterBar.getParent().setDisable(false);
         interactiveColumn.setEditable(true);
         if (dmingColumn != null) dmingColumn.setEditable(true);
         applyFilter();

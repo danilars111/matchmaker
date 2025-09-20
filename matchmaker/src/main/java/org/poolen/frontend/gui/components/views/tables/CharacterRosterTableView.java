@@ -58,7 +58,7 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
         showRetiredCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
         showMainsOnlyCheckBox.selectedProperty().addListener((obs, old, val) -> applyFilter());
 
-        filterBar.getChildren().addAll(showRetiredCheckBox, showMainsOnlyCheckBox);
+        topFilterBar.getChildren().addAll(showRetiredCheckBox, showMainsOnlyCheckBox);
     }
 
     @Override
@@ -66,15 +66,17 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
         String searchText = searchField.getText();
         boolean showRetired = showRetiredCheckBox.isSelected();
         boolean mainsOnly = showMainsOnlyCheckBox.isSelected();
+        House selectedHouse = houseFilterBox.getValue();
 
         filteredData.setPredicate(character -> {
             boolean retiredMatch = character.isRetired() == showRetired;
             boolean mainMatch = !mainsOnly || character.isMain();
+            boolean houseMatch = selectedHouse == null || character.getHouse() == selectedHouse;
             boolean textMatch = searchText == null || searchText.isEmpty() ||
                     character.getName().toLowerCase().contains(searchText.toLowerCase()) ||
                     (character.getPlayer() != null && character.getPlayer().getName().toLowerCase().contains(searchText.toLowerCase()));
 
-            return retiredMatch && textMatch && mainMatch;
+            return retiredMatch && textMatch && mainMatch && houseMatch;
         });
 
         refreshTable();

@@ -5,12 +5,12 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
-import javafx.scene.control.Pagination;
-import javafx.scene.control.TableRow;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.poolen.backend.db.constants.House;
 
 import java.util.function.Consumer;
 
@@ -23,7 +23,9 @@ public abstract class BaseRosterTableView<T> extends VBox {
     protected final TableView<T> table;
     protected final TextField searchField;
     protected final Pagination pagination;
-    protected final HBox filterBar;
+    protected final HBox topFilterBar; // For subclass-specific filters
+    protected final ComboBox<House> houseFilterBox;
+    protected final Button refreshButton;
 
     protected final ObservableList<T> sourceItems;
     protected final FilteredList<T> filteredData;
@@ -37,14 +39,16 @@ public abstract class BaseRosterTableView<T> extends VBox {
         this.table = new TableView<>();
         this.searchField = new TextField();
         this.pagination = new Pagination();
-        this.filterBar = new HBox(10);
+        this.topFilterBar = new HBox(10);
+        this.houseFilterBox = new ComboBox<>();
+        this.refreshButton = new Button("🔄");
 
         this.sourceItems = FXCollections.observableArrayList();
         this.filteredData = new FilteredList<>(sourceItems, p -> true);
 
         setupCommonUI();
 
-        // Listeners are added here, but setup is now deferred to subclasses
+        // Add listeners now that components are ready
         searchField.textProperty().addListener((obs, old, val) -> applyFilter());
         pagination.setPageFactory(this::createPageFactory);
         pagination.heightProperty().addListener((obs, oldH, newH) -> handleResize());
@@ -53,8 +57,24 @@ public abstract class BaseRosterTableView<T> extends VBox {
     private void setupCommonUI() {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         searchField.setPromptText("Search...");
-        filterBar.getChildren().add(searchField);
-        getChildren().addAll(filterBar, pagination);
+
+        VBox filterContainer = new VBox(10);
+        HBox mainFilterRow = new HBox(10);
+
+        houseFilterBox.getItems().add(null); // Allow "All Houses"
+        houseFilterBox.getItems().addAll(House.values());
+        houseFilterBox.setPromptText("Filter by House");
+        houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
+
+        refreshButton.setOnAction(e -> updateRoster());
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        mainFilterRow.getChildren().addAll(houseFilterBox, topFilterBar, spacer, refreshButton);
+        filterContainer.getChildren().addAll(mainFilterRow, searchField);
+
+        getChildren().addAll(filterContainer, pagination);
     }
 
     // --- Abstract Methods for Subclasses to Implement ---
@@ -62,7 +82,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
     /** Sets up the specific columns for the table. */
     protected abstract void setupTableColumns();
 
-    /** Sets up any additional filter controls and adds them to the filterBar. */
+    /** Sets up any additional filter controls and adds them to the topFilterBar. */
     protected abstract void setupFilters();
 
     /** Applies the specific filtering logic for the table. */
