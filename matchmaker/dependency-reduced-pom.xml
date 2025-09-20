@@ -57,10 +57,24 @@
   </build>
   <repositories>
     <repository>
-      <id>maven-central</id>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>maven-central-public</id>
+      <name>Maven Central</name>
       <url>https://repo.maven.apache.org/maven2/</url>
     </repository>
   </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>maven-central-public</id>
+      <name>Maven Central</name>
+      <url>https://repo.maven.apache.org/maven2/</url>
+    </pluginRepository>
+  </pluginRepositories>
   <dependencies>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
