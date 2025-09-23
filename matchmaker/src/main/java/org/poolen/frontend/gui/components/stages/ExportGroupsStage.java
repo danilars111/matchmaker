@@ -17,10 +17,12 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
+import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Group;
-import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.web.discord.DiscordWebhookManager;
 import org.poolen.web.google.SheetsServiceManager;
 
 import java.time.LocalDate;
@@ -34,10 +36,12 @@ import java.util.List;
  */
 public class ExportGroupsStage extends Stage {
 
+    private final SettingsStore settingsStore = SettingsStore.getInstance();
     private final List<Group> groups;
     private final String spreadsheetId;
     private final VBox loadingBox;
     private final Button writeToSheetButton;
+    private final Button postToDiscordButton;
     private final Button closeButton;
     private final TextArea markdownArea;
 
@@ -60,7 +64,7 @@ public class ExportGroupsStage extends Stage {
         root.setCenter(markdownArea);
 
         // --- Loading Indicator (initially hidden) ---
-        loadingBox = new VBox(10, new Label("Writing to Google Sheets..."), new ProgressIndicator());
+        loadingBox = new VBox(10, new ProgressIndicator());
         loadingBox.setAlignment(Pos.CENTER);
         loadingBox.setVisible(false);
 
@@ -70,8 +74,12 @@ public class ExportGroupsStage extends Stage {
         writeToSheetButton.setStyle("-fx-background-color: #34A853; -fx-text-fill: white; -fx-font-weight: bold;");
         writeToSheetButton.setOnAction(e -> handleWriteToSheet());
 
+        postToDiscordButton = new Button("Post to Discord");
+        postToDiscordButton.setStyle("-fx-background-color: #5865F2; -fx-text-fill: white; -fx-font-weight: bold;");
+        postToDiscordButton.setOnAction(e -> handlePostToDiscord());
+
         Button copyButton = new Button("Copy to Clipboard");
-        Label copyStatusLabel = new Label(); // Our new feedback label!
+        Label copyStatusLabel = new Label();
 
         copyButton.setOnAction(e -> {
             try {
@@ -85,7 +93,6 @@ public class ExportGroupsStage extends Stage {
                 copyStatusLabel.setText("Failed to copy.");
                 copyStatusLabel.setStyle("-fx-text-fill: red;");
             }
-            // Make the label fade away after a couple of seconds for a tidy look.
             PauseTransition pause = new PauseTransition(Duration.seconds(2));
             pause.setOnFinished(event -> copyStatusLabel.setText(""));
             pause.play();
@@ -97,59 +104,83 @@ public class ExportGroupsStage extends Stage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox buttonBox = new HBox(10, copyButton, copyStatusLabel, spacer, writeToSheetButton, closeButton);
+        HBox buttonBox = new HBox(10, copyButton, copyStatusLabel, spacer, postToDiscordButton, writeToSheetButton, closeButton);
         buttonBox.setAlignment(Pos.CENTER_LEFT);
         BorderPane.setMargin(buttonBox, new Insets(15, 0, 0, 0));
         root.setBottom(buttonBox);
 
-        Scene scene = new Scene(root, 600, 450);
+        Scene scene = new Scene(root, 700, 450);
         setScene(scene);
     }
 
-    private void handleWriteToSheet() {
-        // Show loading state and disable buttons
-        BorderPane rootPane = (BorderPane) getScene().getRoot();
-        rootPane.setCenter(loadingBox);
-        loadingBox.setVisible(true);
-        writeToSheetButton.setDisable(true);
-        closeButton.setDisable(true);
-
-        for(Group group : groups) {
-            for(Player player : group.getParty().values()) {
-                player.updatePlayerLog(group);
-                player.setLastSeen(LocalDate.now());
-            }
+    private void handlePostToDiscord() {
+        String webhookUrl = (String) settingsStore.getSetting(Settings.PersistenceSettings.DISCORD_WEB_HOOK).getSettingValue();
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            new ErrorDialog("Please set a Discord Webhook URL in the Settings tab first, darling.", getScene().getRoot()).showAndWait();
+            return;
         }
 
-        Task<Void> exportTask = new Task<>() {
+        String markdown = markdownArea.getText();
+
+        runTask("Posting to Discord...", () -> {
+            DiscordWebhookManager.sendAnnouncement(webhookUrl, markdown);
+            return "Announcement successfully posted to Discord!";
+        });
+    }
+
+
+    private void handleWriteToSheet() {
+        runTask("Writing to Google Sheets...", () -> {
+            SheetsServiceManager.saveData(spreadsheetId);
+            SheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
+            return "Groups have been written to the sheet.";
+        });
+    }
+
+    private void runTask(String loadingMessage, TaskOperation operation) {
+        BorderPane rootPane = (BorderPane) getScene().getRoot();
+        // The loadingBox now needs a Label.
+        Label loadingLabel = new Label(loadingMessage);
+        loadingBox.getChildren().setAll(loadingLabel, new ProgressIndicator());
+        rootPane.setCenter(loadingBox);
+        loadingBox.setVisible(true);
+        setAllButtonsDisabled(true);
+
+        Task<String> exportTask = new Task<>() {
             @Override
-            protected Void call() throws Exception {
-                // First, save the current state of all players (persistence).
-                SheetsServiceManager.saveData(spreadsheetId);
-                // Then, append the new groups to the announcement sheet.
-                SheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
-                return null;
+            protected String call() throws Exception {
+                return operation.execute();
             }
 
             @Override
             protected void succeeded() {
-                new InfoDialog("Groups have been written to the sheet.", getScene().getRoot()).showAndWait();
-                close();
+                new InfoDialog(getValue(), getScene().getRoot()).showAndWait();
+                restoreOriginalView();
             }
 
             @Override
             protected void failed() {
-                new ErrorDialog("Failed to write to sheet: " + getException().getMessage(), getScene().getRoot()).showAndWait();
-                // Restore the original view
-                rootPane.setCenter(new TextArea(generateMarkdown(groups))); // Recreate to be safe
-                loadingBox.setVisible(false);
-                writeToSheetButton.setDisable(false);
-                closeButton.setDisable(false);
+                new ErrorDialog("Operation failed: " + getException().getMessage(), getScene().getRoot()).showAndWait();
+                getException().printStackTrace();
+                restoreOriginalView();
             }
         };
-
         new Thread(exportTask).start();
     }
+
+    private void restoreOriginalView() {
+        BorderPane rootPane = (BorderPane) getScene().getRoot();
+        rootPane.setCenter(markdownArea);
+        loadingBox.setVisible(false);
+        setAllButtonsDisabled(false);
+    }
+
+    private void setAllButtonsDisabled(boolean disabled) {
+        writeToSheetButton.setDisable(disabled);
+        postToDiscordButton.setDisable(disabled);
+        closeButton.setDisable(disabled);
+    }
+
 
     private String generateMarkdown(List<Group> groups) {
         if (groups == null || groups.isEmpty()) {
@@ -166,9 +197,14 @@ public class ExportGroupsStage extends Stage {
                 .toList();
 
         for (Group group : sortedGroups) {
-            markdownBuilder.append(group.toMarkdown()).append("\n---\n\n");
+            markdownBuilder.append(group.toMarkdown()).append("\n\n");
         }
         return markdownBuilder.toString();
+    }
+
+    @FunctionalInterface
+    private interface TaskOperation {
+        String execute() throws Exception;
     }
 }
 
