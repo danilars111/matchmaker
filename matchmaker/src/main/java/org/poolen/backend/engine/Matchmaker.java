@@ -9,10 +9,8 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -181,14 +179,12 @@ public class Matchmaker {
                     totalScore += BUDDY_BONUS;
                 }
 
-                Date lastPlayed = p1.getPlayerLog().get(p2.getUuid());
+                // Assuming p1.getPlayerLog() now returns Map<UUID, LocalDate>
+                LocalDate lastPlayed = p1.getPlayerLog().get(p2.getUuid());
                 final double RECENCY_GRUDGE = settingsStore.getSettingsMap().get(Settings.RECENCY_GRUDGE);
                 final double MAX_REUNION_BONUS = settingsStore.getSetting(Settings.MAX_REUNION_BONUS);
                 if (lastPlayed != null) {
-                    long weeksAgo = ChronoUnit.WEEKS.between(
-                            lastPlayed.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
-                            LocalDate.now()
-                    );
+                    long weeksAgo = ChronoUnit.WEEKS.between(lastPlayed, LocalDate.now());
                     if (weeksAgo < RECENCY_GRUDGE) {
                         // Apply a sliding scale penalty. Max penalty for playing this week.
                         double reunionPenalty = MAX_REUNION_BONUS * (1.0 - ((double) weeksAgo / RECENCY_GRUDGE));
@@ -286,4 +282,3 @@ public class Matchmaker {
         return getTieredHouseScore(player, group);
     }
 }
-

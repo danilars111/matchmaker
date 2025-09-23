@@ -2,12 +2,16 @@ package org.poolen.web.google;
 
 import com.google.gson.*;
 import org.poolen.backend.db.entities.Character;
+import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 
 import java.lang.reflect.Type;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A utility class responsible for mapping application data (Players, Characters)
@@ -16,13 +20,18 @@ import java.util.*;
  */
 public class SheetDataMapper {
 
-    // We only need one sheet now, as players contain their characters.
+    // --- Persistence Section ---
     public static final String PLAYERS_SHEET_NAME = "PlayerData";
-    // The header is now just for our reference, as we won't write it to the sheet.
     public static final List<Object> PLAYERS_HEADER = Arrays.asList("Base64Data");
+
+    // --- Group Announcement Section ---
+    public static final String GROUPS_SHEET_NAME = "First Semester";
+    public static final List<Object> GROUPS_HEADER = Arrays.asList("DM", "Players", "Adventure Description/Recap", "Datum Irl", "Recap Writer", "Kommentar", "Deadline");
+
 
     private static final PlayerStore playerStore = PlayerStore.getInstance();
     private static final CharacterStore characterStore = CharacterStore.getInstance();
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     // A Gson instance configured with custom logic to prevent infinite loops.
     private static final Gson gson = new GsonBuilder()
@@ -53,15 +62,17 @@ public class SheetDataMapper {
             obj.addProperty("name", src.getName());
             obj.addProperty("isDungeonMaster", src.isDungeonMaster());
             if (src.getLastSeen() != null) {
-                obj.addProperty("lastSeen", src.getLastSeen().getTime());
+                // Serialize LocalDate to a string
+                obj.addProperty("lastSeen", DATE_FORMATTER.format(src.getLastSeen()));
             }
 
             obj.add("characters", context.serialize(src.getCharacters()));
 
             JsonObject playerLogJson = new JsonObject();
             if (src.getPlayerLog() != null) {
-                for(Map.Entry<UUID, Date> entry : src.getPlayerLog().entrySet()){
-                    playerLogJson.addProperty(entry.getKey().toString(), entry.getValue().getTime());
+                // The Player class would now have Map<UUID, LocalDate>
+                for(Map.Entry<UUID, LocalDate> entry : src.getPlayerLog().entrySet()){
+                    playerLogJson.addProperty(entry.getKey().toString(), DATE_FORMATTER.format(entry.getValue()));
                 }
             }
             obj.add("playerLog", playerLogJson);
@@ -100,7 +111,8 @@ public class SheetDataMapper {
             Player player = new Player(uuid, name, isDm);
 
             if (obj.has("lastSeen")) {
-                player.setLastSeen(new Date(obj.get("lastSeen").getAsLong()));
+                // Deserialize the string back to a LocalDate
+                player.setLastSeen(LocalDate.parse(obj.get("lastSeen").getAsString(), DATE_FORMATTER));
             }
 
             if (obj.has("characters")) {
@@ -114,9 +126,9 @@ public class SheetDataMapper {
 
             if (obj.has("playerLog")) {
                 JsonObject logObj = obj.getAsJsonObject("playerLog");
-                Map<UUID, Date> playerLog = new HashMap<>();
+                Map<UUID, LocalDate> playerLog = new HashMap<>();
                 for (Map.Entry<String, JsonElement> entry : logObj.entrySet()) {
-                    playerLog.put(UUID.fromString(entry.getKey()), new Date(entry.getValue().getAsLong()));
+                    playerLog.put(UUID.fromString(entry.getKey()), LocalDate.parse(entry.getValue().getAsString(), DATE_FORMATTER));
                 }
                 player.setPlayerLog(playerLog);
             }
@@ -160,14 +172,11 @@ public class SheetDataMapper {
     public static void mapSheetsToData(Map<String, List<List<Object>>> sheetData) {
         List<List<Object>> playerData = sheetData.get(PLAYERS_SHEET_NAME);
 
-        // If the sheet is empty or doesn't exist, there will be no data.
-        // In this case, we do nothing and keep the current in-memory data.
         if (playerData == null || playerData.isEmpty()) {
             System.out.println("No data found in sheet, keeping existing data.");
             return;
         }
 
-        // Only clear the stores if we have new data to load.
         playerStore.clear();
         characterStore.clear();
 
@@ -212,6 +221,48 @@ public class SheetDataMapper {
         }
         mapToRelink.clear();
         mapToRelink.putAll(correctedMap);
+    }
+
+    /**
+     * Converts a list of generated groups into a human-readable format for appending to a sheet.
+     * @param groupsToLog The list of groups to be logged.
+     * @return A list of rows ready to be appended to the Google Sheet.
+     */
+    public static List<List<Object>> mapGroupsToSheet(List<Group> groupsToLog) {
+        List<List<Object>> groupData = new ArrayList<>();
+        // We no longer add a blank line here! The border will be our separator.
+
+        for (Group group : groupsToLog) {
+            List<Object> row = new ArrayList<>();
+            LocalDate sessionDate = group.getDate();
+            if (sessionDate == null) sessionDate = LocalDate.now(); // Fallback to today's date
+
+            // --- Calculate Deadline ---
+            LocalDate deadlineDate = sessionDate.plusMonths(1);
+
+            // --- Assemble Row in Correct Order ---
+            // 1. DM
+            row.add(group.getDungeonMaster() != null ? group.getDungeonMaster().getName() : "N/A");
+            // 2. Players
+            String playerNames = group.getParty().values().stream()
+                    .map(Player::getName)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+            row.add(playerNames);
+            // 3. Adventure Description/Recap (Empty)
+            row.add("");
+            // 4. Datum Irl
+            row.add(sessionDate.format(DATE_FORMATTER));
+            // 5. Recap Writer (Empty)
+            row.add("");
+            // 6. Kommentar (Empty)
+            row.add("");
+            // 7. Deadline
+            row.add(deadlineDate.format(DATE_FORMATTER));
+
+            groupData.add(row);
+        }
+        return groupData;
     }
 }
 

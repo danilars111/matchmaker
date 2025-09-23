@@ -1,5 +1,6 @@
 package org.poolen.backend.db.entities;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -15,10 +16,10 @@ public class Player {
     private Map<UUID, Player> buddylist = new HashMap<>();
     private Map<UUID, Player> blacklist = new HashMap<>();
     private Map<UUID, Player> DmBlacklist = new HashMap<>();
-    private Map<UUID, Date> playerLog = new HashMap<>();
+    private Map<UUID, LocalDate> playerLog = new HashMap<>();
 
     private boolean isDungeonMaster;
-    private Date lastSeen;
+    private LocalDate lastSeen;
 
 
     public Player(String name, boolean isDungeonMaster) {
@@ -103,7 +104,7 @@ public class Player {
 
         // If not, add them to our list and the log...
         this.blacklist.put(player.getUuid(), player);
-        this.playerLog.put(player.getUuid(), new Date());
+        this.playerLog.put(player.getUuid(), LocalDate.now());
 
         // ...and now we can safely tell them to blacklist us back!
         player.blacklist(this);
@@ -123,7 +124,7 @@ public class Player {
         player.unblacklist(this);
     }
 
-    public Date getLastSeen() {
+    public LocalDate getLastSeen() {
         return lastSeen;
     }
 
@@ -138,15 +139,15 @@ public class Player {
         this.DmBlacklist.put(player.getUuid(), player);
     }
 
-    public Map<UUID, Date> getPlayerLog() {
+    public Map<UUID, LocalDate> getPlayerLog() {
         return playerLog;
     }
 
-    public void setPlayerLog(Map<UUID, Date> playerLog) {
+    public void setPlayerLog(Map<UUID, LocalDate> playerLog) {
         this.playerLog = playerLog;
     }
 
-    public void setLastSeen(Date lastSeen) {
+    public void setLastSeen(LocalDate lastSeen) {
         this.lastSeen = lastSeen;
     }
 
@@ -161,5 +162,11 @@ public class Player {
                 .filter(Character::isMain)
                 .findFirst()
                 .orElse(null);
+    }
+
+    public void updatePlayerLog(Group group) {
+        for (Player player : group.getParty().values()) {
+            this.playerLog.put(player.getUuid(), LocalDate.now());
+        }
     }
 }

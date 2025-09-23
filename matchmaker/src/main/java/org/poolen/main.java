@@ -32,7 +32,7 @@ public class main {
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
 
-       // addPlayers();
+        //addPlayers();
         initSettings();
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();
@@ -41,26 +41,6 @@ public class main {
         for(Player player : playerStore.getAllPlayers()) {
             attendingPlayers.put(player.getUuid(), player);
         }
-
-       // GroupSuggester groupSuggester = new GroupSuggester(playerStore.getAllPlayers());
-
-     //   List<House> groups = groupSuggester.suggestGroupThemes();
-
-/*        System.out.println("\nSuggested Groups based on player turnout: ");
-        System.out.println(groups);*/
-
-
-       // Matchmaker matchmaker = new Matchmaker(createGroups(groups), attendingPlayers);
-
-        //ConstraintMatchmaker matchmaker = new ConstraintMatchmaker(createGroups(groups), attendingPlayers);
-
-/*        HybridMatchmaker matchmaker = new HybridMatchmaker(createGroups(groups), attendingPlayers);
-
-        List<Group> completedGroups = matchmaker.match();
-
-        for(Group group : completedGroups) {
-            System.out.println(group.toString() + "\n");
-        }*/
 
         Application.launch(LoginApplication.class, args);
     }
@@ -154,8 +134,8 @@ public class main {
 
         player.getBuddylist().put(player3.getUuid(), player3);
 
-        player.getPlayerLog().put(player3.getUuid(), Date.from(LocalDate.of(2025, Month.AUGUST, 25).atStartOfDay(ZoneId.systemDefault()).toInstant()));
-        player3.getPlayerLog().put(player.getUuid(), Date.from(LocalDate.of(2025, Month.AUGUST, 25).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        player.getPlayerLog().put(player3.getUuid(), LocalDate.of(2025, Month.AUGUST, 25));
+        player3.getPlayerLog().put(player.getUuid(), LocalDate.of(2025, Month.AUGUST, 25));
     }
 
     private static void initSettings() {

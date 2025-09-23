@@ -19,6 +19,7 @@ import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.gui.components.stages.ExportGroupsStage; // I've added this for you!
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
@@ -397,55 +398,11 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             return;
         }
 
-        StringBuilder markdownBuilder = new StringBuilder();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d MMMM, yyyy");
-        markdownBuilder.append("# ").append(eventDate.format(formatter)).append("\n\n");
+        // This is the same hardcoded ID from the LoginApplication.
+        // In a real app, we'd want to pass this in or get it from a settings store!
+        String spreadsheetId = "1YDOjqklvoJOfdV1nvA8IqyPpjqGrCMbP24VCLfC_OrU";
 
-        List<Group> sortedGroups = groups.stream()
-                .sorted(Comparator.comparing(g -> g.getDungeonMaster() != null ? g.getDungeonMaster().getName() : "", String.CASE_INSENSITIVE_ORDER))
-                .toList();
-
-        for (Group group : sortedGroups) {
-            markdownBuilder.append(group.toMarkdown()).append("\n---\n\n");
-        }
-
-
-        Stage exportStage = new Stage();
-        exportStage.initModality(Modality.APPLICATION_MODAL);
-        exportStage.initOwner(this.getTabPane().getScene().getWindow());
-        exportStage.setTitle("Export Groups to Markdown");
-
-        TextArea markdownArea = new TextArea(markdownBuilder.toString());
-        markdownArea.setEditable(false);
-        markdownArea.setWrapText(true);
-
-        Button copyButton = new Button("Copy to Clipboard");
-        Label copyStatusLabel = new Label(); // Our new feedback label!
-
-        copyButton.setOnAction(e -> {
-            try {
-                final Clipboard clipboard = Clipboard.getSystemClipboard();
-                final ClipboardContent content = new ClipboardContent();
-                content.putString(markdownArea.getText());
-                clipboard.setContent(content);
-                copyStatusLabel.setText("Copied!");
-                copyStatusLabel.setStyle("-fx-text-fill: green;");
-            } catch (Exception ex) {
-                copyStatusLabel.setText("Failed to copy.");
-                copyStatusLabel.setStyle("-fx-text-fill: red;");
-            }
-        });
-
-        HBox buttonBar = new HBox(10, copyButton, copyStatusLabel);
-        buttonBar.setAlignment(Pos.CENTER);
-        buttonBar.setPadding(new Insets(10));
-
-        BorderPane layout = new BorderPane();
-        layout.setCenter(markdownArea);
-        layout.setBottom(buttonBar);
-
-        Scene scene = new Scene(layout, 600, 700);
-        exportStage.setScene(scene);
+        ExportGroupsStage exportStage = new ExportGroupsStage(groups, spreadsheetId, getTabPane().getScene().getWindow());
         exportStage.show();
     }
 
@@ -510,4 +467,3 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.updateRoster();
     }
 }
-
