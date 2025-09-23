@@ -32,7 +32,7 @@ public class main {
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
 
-        //addPlayers();
+       // addPlayers();
         initSettings();
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();

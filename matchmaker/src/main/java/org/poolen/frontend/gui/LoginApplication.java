@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -144,7 +145,8 @@ public class LoginApplication extends Application {
 
                         updateMessage("Sign in successful!\nLoading data...");
                         SheetsServiceManager.loadData(SPREADSHEET_ID);
-
+                    } catch (GoogleJsonResponseException e) {
+                        System.out.println("Loading failed: " + e);
                     } catch (Exception e) {
                         // Don't store the exception if it was caused by our cancellation.
                         if (!(e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {

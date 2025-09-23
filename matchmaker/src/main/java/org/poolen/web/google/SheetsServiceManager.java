@@ -7,6 +7,7 @@ import com.google.api.services.sheets.v4.model.*;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,26 +49,21 @@ public class SheetsServiceManager {
             throw new IllegalStateException("Connection to Google Sheets has not been established. Call connect() first.");
         }
 
-        // We need to fetch data from both sheets.
-        List<String> ranges = List.of(SheetDataMapper.PLAYERS_SHEET_NAME, SheetDataMapper.CHARACTERS_SHEET_NAME);
-        BatchGetValuesResponse response = sheetsService.spreadsheets().values()
-                .batchGet(spreadsheetId)
-                .setRanges(ranges)
+        // We only need to fetch data from our single PlayerData sheet now.
+        String range = SheetDataMapper.PLAYERS_SHEET_NAME;
+        ValueRange response = sheetsService.spreadsheets().values()
+                .get(spreadsheetId, range)
                 .execute();
 
         Map<String, List<List<Object>>> allSheetData = new java.util.HashMap<>();
-        for (ValueRange valueRange : response.getValueRanges()) {
-            // The range string is returned in the format "'SheetName'!A1:Z1000", so we need to parse out the sheet name.
-            String sheetName = valueRange.getRange().split("!")[0].replace("'", "");
-            allSheetData.put(sheetName, valueRange.getValues());
-        }
+        allSheetData.put(SheetDataMapper.PLAYERS_SHEET_NAME, response.getValues());
 
         SheetDataMapper.mapSheetsToData(allSheetData);
     }
 
     /**
      * Saves all data from the application's stores to the specified Google Sheet.
-     * It will create the "Players" and "Characters" sheets if they do not exist.
+     * It will create the "PlayerData" sheet if it does not exist.
      *
      * @param spreadsheetId The unique ID of the Google Sheet to save to.
      * @throws IOException If there's a problem communicating with Google's servers.
@@ -77,50 +73,49 @@ public class SheetsServiceManager {
             throw new IllegalStateException("Connection to Google Sheets has not been established. Call connect() first.");
         }
 
-        // Ensure our required sheets exist before we try to write to them.
-        ensureSheetsExist(spreadsheetId);
+        // Ensure our required sheet exists before we try to write to it.
+        ensureSheetExists(spreadsheetId);
 
         Map<String, List<List<Object>>> allSheetData = SheetDataMapper.mapDataToSheets();
 
-        List<ValueRange> data = new ArrayList<>();
-        for (Map.Entry<String, List<List<Object>>> entry : allSheetData.entrySet()) {
-            ValueRange valueRange = new ValueRange();
-            valueRange.setRange(entry.getKey());
-            valueRange.setValues(entry.getValue());
-            data.add(valueRange);
-        }
+        // Since we only have one sheet, we can simplify this.
+        List<List<Object>> values = allSheetData.get(SheetDataMapper.PLAYERS_SHEET_NAME);
+        if (values == null) return; // Nothing to save.
 
-        BatchUpdateValuesRequest body = new BatchUpdateValuesRequest();
-        body.setValueInputOption("USER_ENTERED");
-        body.setData(data);
+        // Before writing, we should clear the old data to prevent stale rows.
+        ClearValuesRequest clearRequest = new ClearValuesRequest();
+        sheetsService.spreadsheets().values()
+                .clear(spreadsheetId, SheetDataMapper.PLAYERS_SHEET_NAME, clearRequest)
+                .execute();
 
-        sheetsService.spreadsheets().values().batchUpdate(spreadsheetId, body).execute();
+        ValueRange body = new ValueRange().setValues(values);
+        sheetsService.spreadsheets().values()
+                .update(spreadsheetId, SheetDataMapper.PLAYERS_SHEET_NAME, body)
+                .setValueInputOption("USER_ENTERED")
+                .execute();
     }
 
     /**
-     * Checks if the "Players" and "Characters" sheets exist in the given spreadsheet,
-     * and creates them if they don't.
+     * Checks if the "PlayerData" sheet exists in the given spreadsheet,
+     * and creates it if it doesn't.
      *
      * @param spreadsheetId The ID of the spreadsheet to check.
      * @throws IOException If there's a problem communicating with the API.
      */
-    private static void ensureSheetsExist(String spreadsheetId) throws IOException {
+    private static void ensureSheetExists(String spreadsheetId) throws IOException {
         Spreadsheet spreadsheet = sheetsService.spreadsheets().get(spreadsheetId).execute();
         List<Sheet> sheets = spreadsheet.getSheets();
 
-        Optional<Sheet> playersSheet = sheets.stream().filter(s -> s.getProperties().getTitle().equals(SheetDataMapper.PLAYERS_SHEET_NAME)).findFirst();
-        Optional<Sheet> charactersSheet = sheets.stream().filter(s -> s.getProperties().getTitle().equals(SheetDataMapper.CHARACTERS_SHEET_NAME)).findFirst();
+        boolean sheetExists = sheets.stream()
+                .anyMatch(s -> s.getProperties().getTitle().equals(SheetDataMapper.PLAYERS_SHEET_NAME));
 
-        List<Request> requests = new ArrayList<>();
-        if (playersSheet.isEmpty()) {
-            requests.add(new Request().setAddSheet(new AddSheetRequest().setProperties(new SheetProperties().setTitle(SheetDataMapper.PLAYERS_SHEET_NAME))));
-        }
-        if (charactersSheet.isEmpty()) {
-            requests.add(new Request().setAddSheet(new AddSheetRequest().setProperties(new SheetProperties().setTitle(SheetDataMapper.CHARACTERS_SHEET_NAME))));
-        }
+        if (!sheetExists) {
+            AddSheetRequest addSheetRequest = new AddSheetRequest()
+                    .setProperties(new SheetProperties().setTitle(SheetDataMapper.PLAYERS_SHEET_NAME));
 
-        if (!requests.isEmpty()) {
-            BatchUpdateSpreadsheetRequest body = new BatchUpdateSpreadsheetRequest().setRequests(requests);
+            BatchUpdateSpreadsheetRequest body = new BatchUpdateSpreadsheetRequest()
+                    .setRequests(Collections.singletonList(new Request().setAddSheet(addSheetRequest)));
+
             sheetsService.spreadsheets().batchUpdate(spreadsheetId, body).execute();
         }
     }
