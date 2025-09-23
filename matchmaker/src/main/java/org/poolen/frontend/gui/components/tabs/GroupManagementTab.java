@@ -19,14 +19,16 @@ import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
-import org.poolen.frontend.gui.components.stages.ExportGroupsStage; // I've added this for you!
+import org.poolen.frontend.gui.components.stages.ExportGroupsStage;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -71,7 +73,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.groupDisplayView = new GroupDisplayView();
         this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, dmingPlayers, onPlayerListChanged);
         this.newPartyMap = new HashMap<>();
-        this.eventDate = LocalDate.now();
+        // Default the event date to the nearest upcoming Friday.
+        this.eventDate = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
 
         cleanUp();
 
@@ -467,3 +470,4 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.updateRoster();
     }
 }
+
