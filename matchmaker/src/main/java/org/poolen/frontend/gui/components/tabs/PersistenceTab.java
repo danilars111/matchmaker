@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui.components.tabs;
 
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -7,13 +8,16 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Tab;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.GridPane;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.poolen.backend.db.constants.Settings;
+import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
 
 /**
@@ -21,13 +25,14 @@ import org.poolen.web.google.SheetsServiceManager;
  */
 public class PersistenceTab extends Tab {
 
-    private final TextField spreadsheetIdField;
-    private final Button connectButton;
-    private final Button saveButton;
-    private final Button loadButton;
-    private final Button logoutButton;
-    private final Label statusLabel;
-    private final ProgressIndicator progressIndicator;
+    private final SettingsStore settingsStore = SettingsStore.getInstance();
+    private Button signInButton;
+    private Button saveButton;
+    private Button loadButton;
+    private Button logoutButton;
+    private Label statusLabel;
+    private ProgressIndicator progressIndicator;
+    private StackPane buttonContainer; // To swap between sign-in and other buttons
     private final Runnable onDataChanged;
     private Runnable onLogoutRequestHandler;
 
@@ -37,53 +42,30 @@ public class PersistenceTab extends Tab {
         this.onDataChanged = onDataChanged;
 
         // --- UI Components ---
-        spreadsheetIdField = new TextField();
-        spreadsheetIdField.setPromptText("Enter Google Sheet ID here...");
-
-        connectButton = new Button("Connect");
+        signInButton = createGoogleSignInButton();
         saveButton = new Button("Save Data");
         loadButton = new Button("Load Data");
         logoutButton = new Button("Logout");
-
-        statusLabel = new Label("Please connect to Google.");
+        statusLabel = new Label("Checking sign-in status...");
         progressIndicator = new ProgressIndicator();
         progressIndicator.setVisible(false);
+        buttonContainer = new StackPane();
 
         // --- Layout ---
         VBox root = new VBox(20);
-        root.setPadding(new Insets(20));
+        root.setPadding(new Insets(40));
         root.setAlignment(Pos.CENTER);
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setAlignment(Pos.CENTER);
-        Label idLabel = new Label("Spreadsheet ID:");
-        grid.add(idLabel, 0, 0);
-        grid.add(spreadsheetIdField, 1, 0);
-        GridPane.setHgrow(spreadsheetIdField, Priority.ALWAYS);
-
-        HBox buttonBox = new HBox(10, connectButton, saveButton, loadButton, logoutButton);
-        buttonBox.setAlignment(Pos.CENTER);
 
         HBox statusBox = new HBox(10, statusLabel, progressIndicator);
         statusBox.setAlignment(Pos.CENTER);
 
-        root.getChildren().addAll(grid, buttonBox, statusBox);
+        buttonContainer.getChildren().addAll(signInButton, createActionButtonsBox());
+
+        root.getChildren().addAll(statusBox, buttonContainer);
         this.setContent(root);
 
-        // --- Initial State ---
-        saveButton.setDisable(true);
-        loadButton.setDisable(true);
-
-        // --- Styling ---
-        connectButton.setStyle("-fx-background-color: #4285F4; -fx-text-fill: white;");
-        saveButton.setStyle("-fx-background-color: #34A853; -fx-text-fill: white;");
-        loadButton.setStyle("-fx-background-color: #FBBC05; -fx-text-fill: black;");
-        logoutButton.setStyle("-fx-background-color: #EA4335; -fx-text-fill: white;");
-
         // --- Event Wiring ---
-        connectButton.setOnAction(e -> handleConnect());
+        signInButton.setOnAction(e -> handleSignIn());
         saveButton.setOnAction(e -> handleSave());
         loadButton.setOnAction(e -> handleLoad());
         logoutButton.setOnAction(e -> {
@@ -91,19 +73,83 @@ public class PersistenceTab extends Tab {
                 onLogoutRequestHandler.run();
             }
         });
+
+        // --- Initial State ---
+        // We add this listener so that when the user switches to this tab,
+        // it re-checks the login status in case it has changed.
+        this.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
+            if (isNowSelected) {
+                updateUiState();
+            }
+        });
+
+        // Initial check when the tab is first created.
+        updateUiState();
     }
 
-    private void handleConnect() {
+    /**
+     * Creates the VBox containing the save, load, and logout buttons, stacked vertically.
+     */
+    private VBox createActionButtonsBox() {
+        saveButton.setStyle("-fx-background-color: #34A853; -fx-text-fill: white;");
+        loadButton.setStyle("-fx-background-color: #FBBC05; -fx-text-fill: black;");
+        logoutButton.setStyle("-fx-background-color: #EA4335; -fx-text-fill: white;");
+
+        // Make buttons take up the full width for a cleaner stacked look
+        saveButton.setMaxWidth(Double.MAX_VALUE);
+        loadButton.setMaxWidth(Double.MAX_VALUE);
+        logoutButton.setMaxWidth(Double.MAX_VALUE);
+
+        VBox actionButtonsBox = new VBox(10, saveButton, loadButton, logoutButton);
+        actionButtonsBox.setAlignment(Pos.CENTER);
+        return actionButtonsBox;
+    }
+
+    /**
+     * Checks the Google sign-in status and updates the UI accordingly.
+     */
+    private void updateUiState() {
+        progressIndicator.setVisible(true);
+        statusLabel.setText("Checking sign-in status...");
+
+        Task<Boolean> checkTask = new Task<>() {
+            @Override
+            protected Boolean call() throws Exception {
+                return GoogleAuthManager.hasStoredCredentials();
+            }
+
+            @Override
+            protected void succeeded() {
+                boolean isSignedIn = getValue();
+                statusLabel.setText(isSignedIn ? "Status: Signed In" : "Status: Signed Out");
+                signInButton.setVisible(!isSignedIn);
+                buttonContainer.getChildren().get(1).setVisible(isSignedIn); // Show the action button box
+                progressIndicator.setVisible(false);
+            }
+
+            @Override
+            protected void failed() {
+                statusLabel.setText("Status: Error checking credentials.");
+                signInButton.setVisible(true);
+                buttonContainer.getChildren().get(1).setVisible(false);
+                progressIndicator.setVisible(false);
+            }
+        };
+        new Thread(checkTask).start();
+    }
+
+
+    private void handleSignIn() {
         runTask(() -> {
             SheetsServiceManager.connect();
-            return "Successfully connected to Google!";
-        }, "Connecting...");
+            return "Successfully signed in to Google!";
+        }, "Signing in...");
     }
 
     private void handleSave() {
-        String spreadsheetId = spreadsheetIdField.getText();
+        String spreadsheetId = (String) settingsStore.getSetting(Settings.PersistenceSettings.SHEETS_ID).getSettingValue();
         if (spreadsheetId == null || spreadsheetId.isBlank()) {
-            new ErrorDialog("Please enter a valid Spreadsheet ID.", this.getTabPane()).showAndWait();
+            new ErrorDialog("Please set a Spreadsheet ID in the Settings tab first, darling.", this.getTabPane()).showAndWait();
             return;
         }
         runTask(() -> {
@@ -113,9 +159,9 @@ public class PersistenceTab extends Tab {
     }
 
     private void handleLoad() {
-        String spreadsheetId = spreadsheetIdField.getText();
+        String spreadsheetId = (String) settingsStore.getSetting(Settings.PersistenceSettings.SHEETS_ID).getSettingValue();
         if (spreadsheetId == null || spreadsheetId.isBlank()) {
-            new ErrorDialog("Please enter a valid Spreadsheet ID.", this.getTabPane()).showAndWait();
+            new ErrorDialog("Please set a Spreadsheet ID in the Settings tab first, darling.", this.getTabPane()).showAndWait();
             return;
         }
         runTask(() -> {
@@ -124,15 +170,10 @@ public class PersistenceTab extends Tab {
         }, "Loading data...");
     }
 
-    /**
-     * A helper method to run a background task and update the UI accordingly.
-     * @param operation The operation to run (should return a success message).
-     * @param statusMessage The message to display while the task is running.
-     */
     private void runTask(TaskOperation operation, String statusMessage) {
         progressIndicator.setVisible(true);
         statusLabel.setText(statusMessage);
-        setButtonsDisabled(true);
+        buttonContainer.setDisable(true);
 
         Task<String> task = new Task<>() {
             @Override
@@ -142,42 +183,42 @@ public class PersistenceTab extends Tab {
 
             @Override
             protected void succeeded() {
-                progressIndicator.setVisible(false);
-                statusLabel.setText("Status: Ready");
-                setButtonsDisabled(false);
-                connectButton.setDisable(true);
                 new InfoDialog(getValue(), PersistenceTab.this.getTabPane()).showAndWait();
-                // Notify the rest of the application that data has changed!
-                onDataChanged.run();
+                onDataChanged.run(); // Notify the app of potential changes
+                updateUiState(); // Re-check and update the button visibility
+                buttonContainer.setDisable(false);
             }
 
             @Override
             protected void failed() {
-                progressIndicator.setVisible(false);
-                statusLabel.setText("Status: Error");
-                setButtonsDisabled(false);
                 Throwable error = getException();
                 new ErrorDialog("Operation failed: " + error.getMessage(), PersistenceTab.this.getTabPane()).showAndWait();
                 error.printStackTrace();
+                updateUiState(); // Still update UI on failure
+                buttonContainer.setDisable(false);
             }
         };
 
         new Thread(task).start();
     }
 
-    private void setButtonsDisabled(boolean disabled) {
-        connectButton.setDisable(disabled);
-        saveButton.setDisable(disabled);
-        loadButton.setDisable(disabled);
-        logoutButton.setDisable(disabled);
+    private Button createGoogleSignInButton() {
+        Image signInImage = new Image(getClass().getResourceAsStream("/images/google_sign_in_button.png"));
+        ImageView signInImageView = new ImageView(signInImage);
+        signInImageView.setFitHeight(40);
+        signInImageView.setPreserveRatio(true);
+        Button googleButton = new Button();
+        googleButton.setGraphic(signInImageView);
+        googleButton.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        googleButton.setOnMouseEntered(e -> googleButton.setOpacity(0.9));
+        googleButton.setOnMouseExited(e -> googleButton.setOpacity(1.0));
+        return googleButton;
     }
 
     public void setOnLogoutRequestHandler(Runnable handler) {
         this.onLogoutRequestHandler = handler;
     }
 
-
-    // A functional interface for our background tasks.
     @FunctionalInterface
     private interface TaskOperation {
         String execute() throws Exception;
