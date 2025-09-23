@@ -27,13 +27,11 @@ import java.util.UUID;
 public class main {
     static PlayerStore playerStore = PlayerStore.getInstance();
     static CharacterStore characterStore = CharacterStore.getInstance();
-    static SettingsStore settingsStore = SettingsStore.getInstance();
 
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
 
         //addPlayers();
-        initSettings();
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();
 
@@ -43,19 +41,6 @@ public class main {
         }
 
         Application.launch(LoginApplication.class, args);
-    }
-
-    private static List<Group> createGroups(List<House> suggestedGroups) {
-
-        List<Player> dms = playerStore.getDungeonMasters();
-        List<Group> groups = new ArrayList<>();
-
-        for(int i = 0; i < dms.size(); i++) {
-            groups.add(new Group(dms.get(i), List.of(suggestedGroups.get(i)), LocalDate.now()));
-        }
-
-
-        return groups;
     }
 
     private static void addPlayers() {
@@ -136,26 +121,5 @@ public class main {
 
         player.getPlayerLog().put(player3.getUuid(), LocalDate.of(2025, Month.AUGUST, 25));
         player3.getPlayerLog().put(player.getUuid(), LocalDate.of(2025, Month.AUGUST, 25));
-    }
-
-    private static void initSettings() {
-        // MATCHMAKING
-        settingsStore.getSettingsMap().put(Settings.HOUSE_BONUS, 500.0);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_SECOND_CHOICE_MULTIPLIER, 0.5);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_THIRD_CHOICE_MULTIPLIER, 0.25);
-        settingsStore.getSettingsMap().put(Settings.HOUSE_FOURTH_CHOICE_MULTIPLIER, 0.1);
-
-
-        settingsStore.getSettingsMap().put(Settings.MAIN_CHARACTER_MULTIPLIER, 2.0);
-
-        settingsStore.getSettingsMap().put(Settings.BLACKLIST_BONUS, -5.0);
-        settingsStore.getSettingsMap().put(Settings.BUDDY_BONUS, 3.0);
-
-
-        settingsStore.getSettingsMap().put(Settings.RECENCY_GRUDGE, 4.0);
-        settingsStore.getSettingsMap().put(Settings.MAX_REUNION_BONUS, 10.0);
-
-  /*      List<House> amberPriorities;
-        settingsStore.getSettingsMap().put(Settings.AMBER_PRIORITIES, ); */
     }
 }

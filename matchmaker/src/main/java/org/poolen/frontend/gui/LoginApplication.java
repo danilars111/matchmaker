@@ -14,6 +14,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.web.google.GoogleAuthManager;
@@ -23,14 +24,13 @@ import java.net.BindException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEETS_ID;
+
 /**
  * The main entry point for the application. This class handles the initial
  * Google authentication and data loading before showing the main application window.
  */
 public class LoginApplication extends Application {
-
-    private static final String SPREADSHEET_ID = "1YDOjqklvoJOfdV1nvA8IqyPpjqGrCMbP24VCLfC_OrU";
-
     private Stage primaryStage;
     private VBox root;
     private Label statusLabel;
@@ -40,6 +40,8 @@ public class LoginApplication extends Application {
     private ProgressIndicator loadingIndicator;
     private Task<Exception> signInTask; // A reference to our running task
     private boolean hasAttemptedBindExceptionRetry = false; // Prevents infinite loops
+    private static final SettingsStore settingsStore = SettingsStore.getInstance();
+    private static String SPREADSHEET_ID = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
 
     @Override
     public void start(Stage primaryStage) {
