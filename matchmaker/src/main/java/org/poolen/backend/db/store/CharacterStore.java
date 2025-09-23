@@ -49,4 +49,6 @@ public class CharacterStore {
     }
 
     public void removeCharacter(Character character) { this.characterMap.remove(character.getUuid()); }
+
+    public void clear() { this.characterMap.clear(); }
 }

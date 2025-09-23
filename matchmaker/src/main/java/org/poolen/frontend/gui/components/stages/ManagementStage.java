@@ -13,11 +13,15 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.LoginApplication;
+import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
+import org.poolen.frontend.gui.components.tabs.PersistenceTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
+import org.poolen.web.google.GoogleAuthManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,13 +51,12 @@ public class ManagementStage extends Stage {
         PlayerManagementTab playerTab = new PlayerManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
         GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
         addPlayerUpdateListener(groupTab);
-        // This is our new connection! We're telling the main stage to notify the player roster view of any updates.
         addPlayerUpdateListener(playerTab.getRosterView());
 
         CharacterManagementTab characterTab = new CharacterManagementTab(this::notifyPlayerUpdateListeners);
         Tab settingsTab = new SettingsTab();
-        Tab persistenceTab = new Tab("Persistence");
-        persistenceTab.setContent(new Label("Persistence will go here!"));
+        PersistenceTab persistenceTab = new PersistenceTab(this::notifyPlayerUpdateListeners);
+
 
         makeTabDetachable(playerTab);
         makeTabDetachable(characterTab);
@@ -61,7 +64,7 @@ public class ManagementStage extends Stage {
         makeTabDetachable(settingsTab);
         makeTabDetachable(persistenceTab);
 
-        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab, persistenceTab);
+        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, persistenceTab, settingsTab);
 
         // --- Player <-> Character Navigation Wiring ---
         characterTab.getCharacterForm().setOnOpenPlayerRequestHandler(player -> {
@@ -103,6 +106,23 @@ public class ManagementStage extends Stage {
             characterTab.createCharacterForPlayer(player);
         });
 
+        // --- Persistence Wiring ---
+        persistenceTab.setOnLogoutRequestHandler(() -> {
+            try {
+                GoogleAuthManager.logout();
+                this.close(); // Close the management stage
+                new ArrayList<>(detachedTabMap.values()).forEach(Stage::close); // Close all detached tabs
+
+                // Restart the login application
+                LoginApplication loginApp = new LoginApplication();
+                Stage loginStage = new Stage();
+                loginApp.start(loginStage);
+
+            } catch (Exception e) {
+                new ErrorDialog("Failed to logout: " + e.getMessage(), tabPane).showAndWait();
+            }
+        });
+
 
         this.setOnCloseRequest(event -> {
             new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
@@ -140,7 +160,11 @@ public class ManagementStage extends Stage {
             }
         });
         tab.setGraphic(header);
-        tab.setText(null);
+        // We set the tab text to null because our custom graphic now contains the title.
+        // If you want both, you can remove this line.
+        if (!tab.getText().isEmpty()) {
+            tab.setText(null);
+        }
 
         detachButton.setOnAction(event -> {
             TabPane parent = tab.getTabPane();

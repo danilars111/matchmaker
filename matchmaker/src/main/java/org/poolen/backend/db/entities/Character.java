@@ -13,7 +13,11 @@ public class Character {
     private boolean isRetired;
 
     public Character(String name, House house) {
-        this.uuid = UUID.randomUUID();
+        this(UUID.randomUUID(), name, house);
+    }
+
+    public Character(UUID uuid, String name, House house) {
+        this.uuid = uuid;
         this.name = name;
         this.house = house;
     }

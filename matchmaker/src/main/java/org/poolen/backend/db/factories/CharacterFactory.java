@@ -5,6 +5,8 @@ import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
 
+import java.util.UUID;
+
 /**
  * A factory for creating Character objects and associating them with players.
  * It ensures business rules, like having only one main character, are followed.
@@ -27,7 +29,7 @@ public class CharacterFactory {
     }
 
     /**
-     * Creates a new character for a given player.
+     * Creates a new character for a given player with a generated UUID
      * It enforces business rules, such as a player can only have one main character,
      * and a maximum of two non-retired characters.
      * @param player The player who will own the new character.
@@ -38,6 +40,23 @@ public class CharacterFactory {
      * @throws IllegalArgumentException if a business rule is violated.
      */
     public Character create(Player player, String name, House house, boolean isMain) {
+        return create(null, player, name, house, isMain);
+    }
+
+    /**
+     * Creates a new character for a given player with a set UUID
+     * It enforces business rules, such as a player can only have one main character,
+     * and a maximum of two non-retired characters.
+     * This should only be used when creating objects from DB data
+     * @param uuid The UUID of the new character.
+     * @param player The player who will own the new character.
+     * @param name The name of the new character.
+     * @param house The house the new character belongs to.
+     * @param isMain True if this should be the player's main character.
+     * @return The newly created Character object.
+     * @throws IllegalArgumentException if a business rule is violated.
+     */
+    public Character create(UUID uuid, Player player, String name, House house, boolean isMain) {
 
         // Rule 1: A player cannot have more than two active (non-retired) characters.
         long unretiredCount = player.getCharacters().stream().filter(c -> !c.isRetired()).count();
@@ -55,7 +74,7 @@ public class CharacterFactory {
         }
 
         // A new character is never retired from the start.
-        Character newCharacter = new Character(name, house);
+        Character newCharacter = uuid == null ?  new Character(name, house) : new Character(uuid, name, house);
         newCharacter.setPlayer(player);
         newCharacter.setMain(isMain);
 

@@ -18,3 +18,7 @@
 
 ### Mac OS ###
 .DS_Store
+
+### Appliation Specifics ###
+/tokens/
+/src/main/resources/credentials/credentials.json

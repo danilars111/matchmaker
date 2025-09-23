@@ -6,13 +6,13 @@ import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.SheetsScopes;
 
-import java.io.FileNotFoundException;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -21,44 +21,96 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Manages the authorization flow to obtain credentials for accessing Google APIs.
- * This class handles the OAuth 2.0 flow for a desktop application.
+ * Handles the OAuth 2.0 authorization flow with Google.
+ * It ensures the user grants necessary permissions and securely stores
+ * credentials for future sessions.
  */
 public class GoogleAuthManager {
 
+    private static final String CREDENTIALS_FILE_PATH = "/credentials/credentials.json";
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-    private static final String CREDENTIALS_FILE_PATH = "/credentials.json";
-    private static final String TOKENS_DIRECTORY_PATH = "tokens";
     private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
-    private static final String APPLICATION_NAME = "D&D Matchmaker";
+    // Directory to store the user's access and refresh tokens.
+    private static final String TOKENS_DIRECTORY_PATH = "tokens";
+    private static HttpTransport HTTP_TRANSPORT;
+
+    static {
+        try {
+            HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+        } catch (GeneralSecurityException | IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
 
     /**
      * Creates an authorized Credential object.
-     * This method will prompt the user for authorization if required and store the credentials
-     * for future runs.
+     * If the user has not previously granted access, it will launch a browser
+     * to obtain the user's consent.
      *
      * @return An authorized Credential object.
-     * @throws IOException If the credentials file cannot be found or read.
-     * @throws GeneralSecurityException If there's an issue with the HTTP transport.
+     * @throws IOException If the credentials.json file cannot be found or read.
      */
-    public static Credential getCredentials() throws IOException, GeneralSecurityException {
-        final NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-
-        // Load client secrets from the resources folder.
+    public static Credential getCredentials() throws IOException {
         InputStream in = GoogleAuthManager.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
         if (in == null) {
-            throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
+            throw new IOException("Resource not found: " + CREDENTIALS_FILE_PATH);
         }
         GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
 
-        // Build the flow and trigger the user authorization request.
+        // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                httpTransport, JSON_FACTORY, clientSecrets, SCOPES)
+                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
                 .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
                 .setAccessType("offline")
                 .build();
-
         LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
+        // This is the line that will either load existing tokens or pop open a browser for the user to log in.
         return new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
     }
+
+    /**
+     * Deletes the stored user credentials, effectively logging them out.
+     * The user will be prompted to log in again on the next connection attempt.
+     * @throws IOException if the token file cannot be deleted.
+     */
+    public static void logout() throws IOException {
+        File tokenFolder = new File(TOKENS_DIRECTORY_PATH);
+        if (tokenFolder.exists()) {
+            File credentialFile = new File(tokenFolder, "StoredCredential");
+            if (credentialFile.exists()) {
+                if (!credentialFile.delete()) {
+                    // Attempt to delete the directory if the file deletion fails or if it's the only thing left.
+                    // This is a more robust way to clean up.
+                    String[] files = tokenFolder.list();
+                    if (files == null || files.length == 0) {
+                        if (!tokenFolder.delete()) {
+                            throw new IOException("Failed to delete token folder.");
+                        }
+                    } else {
+                        throw new IOException("Failed to delete token file.");
+                    }
+                }
+            }
+        }
+    }
+
+
+    /**
+     * Gets the shared HttpTransport instance.
+     * @return The HttpTransport.
+     */
+    public static HttpTransport getHttpTransport() {
+        return HTTP_TRANSPORT;
+    }
+
+    /**
+     * Gets the shared JsonFactory instance.
+     * @return The JsonFactory.
+     */
+    public static JsonFactory getJsonFactory() {
+        return JSON_FACTORY;
+    }
 }
+

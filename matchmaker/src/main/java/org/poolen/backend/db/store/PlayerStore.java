@@ -50,4 +50,6 @@ public class PlayerStore {
     public void removePlayer(Player player) {
         this.playerMap.remove(player.getUuid());
     }
+
+    public void clear() { this.playerMap.clear(); }
 }

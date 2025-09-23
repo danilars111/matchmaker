@@ -10,8 +10,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
-import org.poolen.backend.engine.GroupSuggester;
-import org.poolen.frontend.gui.MainFrame;
+import org.poolen.frontend.gui.LoginApplication;
 
 
 import java.time.LocalDate;
@@ -33,7 +32,7 @@ public class main {
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
 
-        addPlayers();
+        //addPlayers();
         initSettings();
 
         Map<UUID, Player> attendingPlayers = new HashMap<>();
@@ -63,7 +62,7 @@ public class main {
             System.out.println(group.toString() + "\n");
         }*/
 
-        Application.launch(MainFrame.class, args);
+        Application.launch(LoginApplication.class, args);
     }
 
     private static List<Group> createGroups(List<House> suggestedGroups) {

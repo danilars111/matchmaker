@@ -20,8 +20,13 @@ public class Player {
     private boolean isDungeonMaster;
     private Date lastSeen;
 
+
     public Player(String name, boolean isDungeonMaster) {
-        this.uuid = UUID.randomUUID();
+        this(UUID.randomUUID(), name, isDungeonMaster);
+    }
+
+    public Player(UUID uuid, String name, boolean isDungeonMaster) {
+        this.uuid = uuid;
         this.name = name;
         this.isDungeonMaster = isDungeonMaster;
     }
