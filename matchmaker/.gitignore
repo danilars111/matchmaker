@@ -1,6 +1,6 @@
 ### Maven ###
 /target/
-.mvn
+.mvn/settings.xml
 dependency-reduced-pom.xml
 
 
