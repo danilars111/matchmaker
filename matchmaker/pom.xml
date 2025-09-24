@@ -6,15 +6,24 @@
 
   <groupId>com.example</groupId>
   <artifactId>matchmaker</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0.1-SNAPSHOT</version>
   <name>matchmaker</name>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <junit.version>5.9.2</junit.version>
+    <github.global.server>github</github.global.server>
   </properties>
 
+  <scm>
+    <connection>scm:git:https://github.com/danilars111/matchmaker.git</connection>
+    <developerConnection>scm:git:https://github.com/danilars111/matchmaker.git</developerConnection>
+    <url>https://github.com/danilars111/matchmaker</url>
+    <tag>HEAD</tag>
+  </scm>
+
   <dependencies>
+    <!-- ... existing dependencies ... -->
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-controls</artifactId>
@@ -58,7 +67,6 @@
       <artifactId>ortools-java</artifactId>
       <version>9.10.4067</version>
     </dependency>
-    <!-- Google API Dependencies -->
     <dependency>
       <groupId>com.google.api-client</groupId>
       <artifactId>google-api-client</artifactId>
@@ -79,7 +87,6 @@
       <artifactId>gson</artifactId>
       <version>2.10.1</version>
     </dependency>
-    <!-- Our new friend for talking to Discord! -->
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
@@ -103,6 +110,7 @@
 
   <build>
     <plugins>
+      <!-- ... your other plugins ... -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -117,7 +125,6 @@
         <artifactId>javafx-maven-plugin</artifactId>
         <version>0.0.8</version>
         <executions>
-          <!-- Default configuration for running with: mvn clean javafx:run -->
           <execution>
             <id>default-cli</id>
             <configuration>
@@ -151,6 +158,44 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>3.0.1</version>
+        <configuration>
+          <tagNameFormat>v@{project.version}</tagNameFormat>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>de.jutzig</groupId>
+        <artifactId>github-release-plugin</artifactId>
+        <version>1.5.0</version>
+        <executions>
+          <execution>
+            <id>github-upload</id>
+            <phase>deploy</phase>
+            <goals>
+              <goal>release</goal>
+            </goals>
+            <configuration>
+              <!-- This is the corrected bit, darling! -->
+              <releaseName>Release ${project.version}</releaseName>
+              <tag>v${project.version}</tag>
+              <artifact>${project.build.directory}/${project.build.finalName}.jar</artifact>
+              <overwriteArtifact>true</overwriteArtifact>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- This is our new little note to the grumpy postman! -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.1.1</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
       </plugin>
     </plugins>
   </build>
