@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.example</groupId>
+  <groupId>org.poolen</groupId>
   <artifactId>matchmaker</artifactId>
   <version>1.0.1-SNAPSHOT</version>
   <name>matchmaker</name>
@@ -23,7 +23,6 @@
   </scm>
 
   <dependencies>
-    <!-- ... existing dependencies ... -->
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-controls</artifactId>
@@ -110,7 +109,6 @@
 
   <build>
     <plugins>
-      <!-- ... your other plugins ... -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -179,7 +177,6 @@
               <goal>release</goal>
             </goals>
             <configuration>
-              <!-- This is the corrected bit, darling! -->
               <releaseName>Release ${project.version}</releaseName>
               <tag>v${project.version}</tag>
               <artifact>${project.build.directory}/${project.build.finalName}.jar</artifact>
@@ -188,7 +185,6 @@
           </execution>
         </executions>
       </plugin>
-      <!-- This is our new little note to the grumpy postman! -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-deploy-plugin</artifactId>
