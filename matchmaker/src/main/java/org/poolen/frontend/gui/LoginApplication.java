@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -13,6 +14,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.web.github.GitHubUpdateChecker;
@@ -31,29 +33,31 @@ import java.nio.file.Files;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEETS_ID;
+
 /**
  * The main entry point for the application. This class handles the initial
- * update check, Google authentication, and data loading.
+ * update check, Google authentication, and data loading before showing the main application window.
  */
 public class LoginApplication extends Application {
-
-    private static final String SPREADSHEET_ID = "1YDOjqklvoJOfdV1nvA8IqyPpjqGrCMbP24VCLfC_OrU";
-
     private Stage primaryStage;
     private VBox root;
     private Label statusLabel;
     private Button signInButton;
     private Button exitButton;
-    private Button cancelButton;
+    private Button cancelButton; // Our new cancel button!
     private ProgressIndicator loadingIndicator;
-    private Task<Exception> signInTask;
-    private boolean hasAttemptedBindExceptionRetry = false;
+    private Task<Exception> signInTask; // A reference to our running task
+    private boolean hasAttemptedBindExceptionRetry = false; // Prevents infinite loops
+    private static final SettingsStore settingsStore = SettingsStore.getInstance();
+    // This now correctly gets the ID from your settings!
+    private static String SPREADSHEET_ID = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
 
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        primaryStage.setTitle("D&D Matchmaker Deluxe");
-        primaryStage.setResizable(false);
+        primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
+        primaryStage.setResizable(false); // Make the window non-resizable
 
         root = new VBox(20);
         root.setAlignment(Pos.CENTER);
@@ -61,7 +65,7 @@ public class LoginApplication extends Application {
 
         statusLabel = new Label("Starting up...");
         statusLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #2F4F4F;");
-        statusLabel.setTextAlignment(TextAlignment.CENTER);
+        statusLabel.setTextAlignment(TextAlignment.CENTER); // Center multiline text
 
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setPrefSize(50, 50);
@@ -169,7 +173,10 @@ public class LoginApplication extends Application {
 
     private void createUpdaterAndRestart(File currentJar, File newJar) throws IOException {
         String os = System.getProperty("os.name").toLowerCase();
+        File oldJar = new File(currentJar.getParentFile(), currentJar.getName() + ".old");
+
         if (os.contains("win")) {
+            // The more robust Windows script that renames instead of deleting immediately.
             String script = "@echo off\n" +
                     "echo Updating application...\n" +
                     "timeout /t 2 /nobreak > NUL\n" +
@@ -178,17 +185,29 @@ public class LoginApplication extends Application {
                     "echo Update complete. Restarting...\n" +
                     "start javaw -jar \"" + currentJar.getAbsolutePath() + "\"\n" +
                     "del \"%~f0\"";
-            File scriptFile = File.createTempFile("updater", ".bat");
-            Files.writeString(scriptFile.toPath(), script);
-            Runtime.getRuntime().exec("cmd /c start " + scriptFile.getAbsolutePath());
+            File batFile = File.createTempFile("updater", ".bat");
+            Files.writeString(batFile.toPath(), script);
+
+            // This is our new, sneaky VBScript launcher! It creates a VBScript file that
+            // runs our batch script in a hidden window.
+            String vbsScript = "Set WshShell = CreateObject(\"WScript.Shell\") \n"
+                    + "WshShell.Run \"\"\"" + batFile.getAbsolutePath() + "\"\"\", 0, False";
+            File vbsFile = File.createTempFile("launcher", ".vbs");
+            Files.writeString(vbsFile.toPath(), vbsScript);
+
+            Runtime.getRuntime().exec("wscript.exe \"" + vbsFile.getAbsolutePath() + "\"");
+
         } else {
+            // Unix/Mac script is generally more robust and should be okay.
             String script = "#!/bin/bash\n" +
                     "echo \"Updating application...\"\n" +
-                    "sleep 2\n" +
-                    "rm \"" + currentJar.getAbsolutePath() + "\"\n" +
+                    "sleep 3\n" +
+                    "mv \"" + currentJar.getAbsolutePath() + "\" \"" + oldJar.getAbsolutePath() + "\"\n" +
                     "mv \"" + newJar.getAbsolutePath() + "\" \"" + currentJar.getAbsolutePath() + "\"\n" +
                     "echo \"Update complete. Restarting...\"\n" +
                     "java -jar \"" + currentJar.getAbsolutePath() + "\" &\n" +
+                    "sleep 3\n" +
+                    "rm \"" + oldJar.getAbsolutePath() + "\"\n" +
                     "rm -- \"$0\"";
             File scriptFile = File.createTempFile("updater", ".sh");
             Files.writeString(scriptFile.toPath(), script);
@@ -197,6 +216,7 @@ public class LoginApplication extends Application {
 
         System.exit(0);
     }
+
 
     private void initialCheck() {
         Task<Boolean> checkTask = new Task<>() {
@@ -230,6 +250,7 @@ public class LoginApplication extends Application {
     }
 
     private void attemptSignInAndLoad() {
+        // Update UI for loading state
         statusLabel.setText("Connecting...");
         loadingIndicator.setVisible(true);
         signInButton.setVisible(false);
@@ -246,10 +267,15 @@ public class LoginApplication extends Application {
                     try {
                         updateMessage("Attempting to connect...\nPlease check your browser to sign in.");
                         SheetsServiceManager.connect();
+
                         Platform.runLater(() -> cancelButton.setVisible(false));
+
                         if (Thread.currentThread().isInterrupted()) return;
+
                         updateMessage("Sign in successful!\nLoading data...");
                         SheetsServiceManager.loadData(SPREADSHEET_ID);
+                    } catch (GoogleJsonResponseException e) {
+                        System.out.println("Loading failed: " + e);
                     } catch (Exception e) {
                         if (!(e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
                             connectionException.set(e);
@@ -258,6 +284,7 @@ public class LoginApplication extends Application {
                 });
 
                 worker.start();
+
                 try {
                     worker.join();
                 } catch (InterruptedException e) {
@@ -278,7 +305,10 @@ public class LoginApplication extends Application {
                 Exception loadDataError = getValue();
 
                 if (loadDataError != null) {
-                    new ErrorDialog("Sign-in was successful, but we couldn't load your data from the sheet, darling.", root).showAndWait();
+                    new ErrorDialog(
+                            "Sign-in was successful, but we couldn't load your data from the sheet, darling.",
+                            root
+                    ).showAndWait();
                 }
                 showManagementStage();
             }
@@ -289,6 +319,7 @@ public class LoginApplication extends Application {
                 cancelButton.setVisible(false);
                 GoogleAuthManager.logout();
                 System.out.println("Sign-in cancelled by user.");
+
                 statusLabel.setText("Please sign in to continue.");
                 loadingIndicator.setVisible(false);
                 signInButton.setVisible(true);
@@ -300,6 +331,7 @@ public class LoginApplication extends Application {
                 statusLabel.textProperty().unbind();
                 cancelButton.setVisible(false);
                 Throwable error = getException();
+
                 if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
                     hasAttemptedBindExceptionRetry = true;
                     Platform.runLater(() -> {
@@ -309,9 +341,11 @@ public class LoginApplication extends Application {
                     });
                     return;
                 }
+
                 System.err.println("Failed to connect: " + error.getMessage());
                 error.printStackTrace();
                 new ErrorDialog("Failed to connect: " + error.getMessage(), root).showAndWait();
+
                 statusLabel.setText("Please sign in to continue.");
                 loadingIndicator.setVisible(false);
                 signInButton.setVisible(true);
@@ -342,6 +376,11 @@ public class LoginApplication extends Application {
         return googleButton;
     }
 
+    /**
+     * A helper method to check if the root cause of an exception is a BindException.
+     * @param throwable The exception to check.
+     * @return True if the root cause is a BindException, false otherwise.
+     */
     private boolean isRootCauseBindException(Throwable throwable) {
         if (throwable == null) return false;
         Throwable cause = throwable;
