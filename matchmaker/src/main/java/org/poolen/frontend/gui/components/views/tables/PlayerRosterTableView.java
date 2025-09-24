@@ -70,9 +70,10 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> implement
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
 
         TableColumn<Player, String> charCol = new TableColumn<>("Characters");
+
         charCol.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getCharacters().stream()
-                        .map(c -> c.getHouse().toString())
+                        .map(c -> c.getHouse() != null ? c.getHouse().toString() : "")
                         .collect(Collectors.joining(", "))
         ));
 

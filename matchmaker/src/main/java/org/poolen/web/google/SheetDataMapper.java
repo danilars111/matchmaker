@@ -234,14 +234,15 @@ public class SheetDataMapper {
         }
 
         // --- Load Players ---
+        playerStore.clear();
+        characterStore.clear();
         List<List<Object>> playerData = sheetData.get(playerDataSheetName);
         if (playerData == null || playerData.isEmpty()) {
-            System.out.println("No player data found in sheet, keeping existing data.");
+            System.out.println("No player data found in sheet");
             return;
         }
 
-        playerStore.clear();
-        characterStore.clear();
+
 
         for (List<Object> row : playerData) {
             if (row.isEmpty() || row.get(0) == null) continue;

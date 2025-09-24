@@ -61,8 +61,10 @@ public class Character {
                 }
             }
             // Now, ensure this character is at the front of the line!
-            this.player.getCharacters().remove(this);
-            this.player.getCharacters().add(0, this);
+            if(player.getCharacters().contains(this)) {
+                this.player.getCharacters().remove(this);
+                this.player.getCharacters().add(0, this);
+            }
         }
     }
     public Player getPlayer() {
