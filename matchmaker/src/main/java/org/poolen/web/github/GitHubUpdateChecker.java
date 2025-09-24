@@ -27,7 +27,7 @@ public class GitHubUpdateChecker {
 
     private static String loadVersionFromPomProperties() {
         try (InputStream is = GitHubUpdateChecker.class.getResourceAsStream(
-                "/META-INF/maven/com.example/matchmaker/pom.properties"
+                "/META-INF/maven/org.poolen/matchmaker/pom.properties"
         )) {
             if (is != null) {
                 Properties props = new Properties();

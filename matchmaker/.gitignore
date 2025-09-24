@@ -1,5 +1,5 @@
 ### Maven ###
-/target/
+target/
 .mvn/settings.xml
 dependency-reduced-pom.xml
 
