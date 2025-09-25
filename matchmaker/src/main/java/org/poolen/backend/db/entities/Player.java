@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class Player {
@@ -166,7 +167,21 @@ public class Player {
 
     public void updatePlayerLog(Group group) {
         for (Player player : group.getParty().values()) {
-            this.playerLog.put(player.getUuid(), LocalDate.now());
+            if (player.equals(this)) { continue; }
+            this.playerLog.put(player.getUuid(), group.getDate());
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) { return true; }
+        if (o == null || getClass() != o.getClass()) {return false; }
+        Player player = (Player) o;
+        return Objects.equals(this.uuid, player.uuid);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(uuid, name, characters, buddylist, blacklist, DmBlacklist, playerLog, isDungeonMaster, lastSeen);
     }
 }

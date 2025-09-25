@@ -19,6 +19,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Group;
+import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
@@ -30,6 +31,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 
+import static org.poolen.backend.db.constants.Settings.PersistenceSettings.DISCORD_WEB_HOOK;
+import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEETS_ID;
+
 /**
  * A dialog window for exporting generated groups, either as Markdown text
  * or by writing them directly to a Google Sheet.
@@ -38,16 +42,14 @@ public class ExportGroupsStage extends Stage {
 
     private final SettingsStore settingsStore = SettingsStore.getInstance();
     private final List<Group> groups;
-    private final String spreadsheetId;
     private final VBox loadingBox;
     private final Button writeToSheetButton;
     private final Button postToDiscordButton;
     private final Button closeButton;
     private final TextArea markdownArea;
 
-    public ExportGroupsStage(List<Group> groups, String spreadsheetId, Window owner) {
+    public ExportGroupsStage(List<Group> groups, Window owner) {
         this.groups = groups;
-        this.spreadsheetId = spreadsheetId;
 
         initModality(Modality.WINDOW_MODAL);
         initOwner(owner);
@@ -114,7 +116,7 @@ public class ExportGroupsStage extends Stage {
     }
 
     private void handlePostToDiscord() {
-        String webhookUrl = (String) settingsStore.getSetting(Settings.PersistenceSettings.DISCORD_WEB_HOOK).getSettingValue();
+        String webhookUrl = (String) settingsStore.getSetting(DISCORD_WEB_HOOK).getSettingValue();
         if (webhookUrl == null || webhookUrl.isBlank()) {
             new ErrorDialog("Please set a Discord Webhook URL in the Settings tab first, darling.", getScene().getRoot()).showAndWait();
             return;
@@ -130,6 +132,10 @@ public class ExportGroupsStage extends Stage {
 
 
     private void handleWriteToSheet() {
+        String spreadsheetId = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
+
+        updatePlayerLogs();
+
         runTask("Writing to Google Sheets...", () -> {
             SheetsServiceManager.saveData(spreadsheetId);
             SheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
@@ -181,6 +187,13 @@ public class ExportGroupsStage extends Stage {
         closeButton.setDisable(disabled);
     }
 
+    private void updatePlayerLogs() {
+        groups.forEach(group ->
+                group.getParty().values().forEach(player ->
+                        player.updatePlayerLog(group)
+                )
+        );
+    }
 
     private String generateMarkdown(List<Group> groups) {
         if (groups == null || groups.isEmpty()) {

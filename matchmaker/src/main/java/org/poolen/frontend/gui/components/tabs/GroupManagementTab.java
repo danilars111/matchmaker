@@ -401,11 +401,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             return;
         }
 
-        // This is the same hardcoded ID from the LoginApplication.
-        // In a real app, we'd want to pass this in or get it from a settings store!
-        String spreadsheetId = "1YDOjqklvoJOfdV1nvA8IqyPpjqGrCMbP24VCLfC_OrU";
-
-        ExportGroupsStage exportStage = new ExportGroupsStage(groups, spreadsheetId, getTabPane().getScene().getWindow());
+        ExportGroupsStage exportStage = new ExportGroupsStage(groups, getTabPane().getScene().getWindow());
         exportStage.show();
     }
 
