@@ -14,6 +14,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import org.poolen.MatchmakerApplication;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
@@ -30,8 +31,9 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEETS_ID;
 
@@ -40,6 +42,7 @@ import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEET
  * update check, Google authentication, and data loading before showing the main application window.
  */
 public class LoginApplication extends Application {
+    private ConfigurableApplicationContext springContext;
     private Stage primaryStage;
     private VBox root;
     private Label statusLabel;
@@ -52,6 +55,11 @@ public class LoginApplication extends Application {
     private static final SettingsStore settingsStore = SettingsStore.getInstance();
     // This now correctly gets the ID from your settings!
     private static String SPREADSHEET_ID = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
+
+    @Override
+    public void init() throws Exception {
+        springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
+    }
 
     @Override
     public void start(Stage primaryStage) {

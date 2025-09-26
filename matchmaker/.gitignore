@@ -3,6 +3,8 @@ target/
 .mvn/settings.xml
 dependency-reduced-pom.xml
 
+### Spring ###
+/src/main/resources/application.properties
 
 ### IntelliJ IDEA ###
 .idea/
