@@ -4,9 +4,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 public class Player {
@@ -14,9 +16,9 @@ public class Player {
     private String name;
     private ArrayList<Character> characters = new ArrayList<>();
 
-    private Map<UUID, Player> buddylist = new HashMap<>();
-    private Map<UUID, Player> blacklist = new HashMap<>();
-    private Map<UUID, Player> DmBlacklist = new HashMap<>();
+    private Set<UUID> buddylist = new HashSet<>();
+    private Set<UUID> blacklist = new HashSet<>();
+    private Set<UUID> DmBlacklist = new HashSet<>();
     private Map<UUID, LocalDate> playerLog = new HashMap<>();
 
     private boolean isDungeonMaster;
@@ -81,30 +83,30 @@ public class Player {
         isDungeonMaster = dungeonMaster;
     }
 
-    public Map<UUID, Player> getBuddylist() {
+    public Set<UUID> getBuddylist() {
         return buddylist;
     }
 
-    public void setBuddylist(Map<UUID, Player> buddylist) {
+    public void setBuddylist(Set<UUID> buddylist) {
         this.buddylist = buddylist;
     }
 
-    public Map<UUID, Player> getBlacklist() {
+    public Set<UUID> getBlacklist() {
         return blacklist;
     }
 
-    public void setBlacklist(Map<UUID, Player> blacklist) {
+    public void setBlacklist(Set<UUID> blacklist) {
         this.blacklist = blacklist;
     }
     public void blacklist(Player player) {
         // First, check if we've already blacklisted this player.
         // If we have, our work is done and we can stop!
-        if (this.blacklist.containsKey(player.getUuid())) {
+        if (this.blacklist.contains(player.getUuid())) {
             return;
         }
 
         // If not, add them to our list and the log...
-        this.blacklist.put(player.getUuid(), player);
+        this.blacklist.add(player.getUuid());
         this.playerLog.put(player.getUuid(), LocalDate.now());
 
         // ...and now we can safely tell them to blacklist us back!
@@ -114,7 +116,7 @@ public class Player {
     public void unblacklist(Player player) {
         // First, check if we've actually blacklisted this player.
         // If we have, our work is done and we can stop!
-        if (!this.blacklist.containsKey(player.getUuid())) {
+        if (!this.blacklist.contains(player.getUuid())) {
             return;
         }
 
@@ -129,15 +131,15 @@ public class Player {
         return lastSeen;
     }
 
-    public Map<UUID, Player> getDmBlacklist() {
+    public Set<UUID> getDmBlacklist() {
         return DmBlacklist;
     }
 
-    public void setDmBlacklist(Map<UUID, Player> dmBlacklist) {
+    public void setDmBlacklist(Set<UUID> dmBlacklist) {
         DmBlacklist = dmBlacklist;
     }
     public void blacklistDm(Player player) {
-        this.DmBlacklist.put(player.getUuid(), player);
+        this.DmBlacklist.add(player.getUuid());
     }
 
     public Map<UUID, LocalDate> getPlayerLog() {

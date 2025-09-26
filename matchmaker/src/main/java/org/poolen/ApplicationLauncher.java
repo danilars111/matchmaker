@@ -98,7 +98,7 @@ public class ApplicationLauncher {
         characterStore.addCharacter(character6);
         playerStore.addPlayer(player3);
 
-        player.getBuddylist().put(player3.getUuid(), player3);
+       // player.getBuddylist().put(player3.getUuid(), player3);
 
         player.getPlayerLog().put(player3.getUuid(), LocalDate.of(2025, Month.AUGUST, 25));
         player3.getPlayerLog().put(player.getUuid(), LocalDate.of(2025, Month.AUGUST, 25));

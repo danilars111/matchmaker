@@ -1,6 +1,13 @@
 package org.poolen.backend.db.jpa.repository;
 
-import org.poolen.backend.db.interfaces.IRepository;
+import org.poolen.backend.db.jpa.entities.PlayerEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-public class PlayerRepository implements IRepository {
+import java.util.UUID;
+
+@Repository
+public interface PlayerRepository extends JpaRepository<PlayerEntity, Long> {
+    PlayerEntity findByUuid(UUID uuid);
+
 }

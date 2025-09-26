@@ -69,9 +69,9 @@ public class SheetDataMapper {
                 }
             }
             obj.add("playerLog", playerLogJson);
-            obj.add("buddylist", serializePlayerMap(src.getBuddylist()));
+/*            obj.add("buddylist", serializePlayerMap(src.getBuddylist()));
             obj.add("blacklist", serializePlayerMap(src.getBlacklist()));
-            obj.add("DmBlacklist", serializePlayerMap(src.getDmBlacklist()));
+            obj.add("DmBlacklist", serializePlayerMap(src.getDmBlacklist()));*/
             return obj;
         }
 
@@ -115,9 +115,9 @@ public class SheetDataMapper {
                 }
                 player.setPlayerLog(playerLog);
             }
-            if (obj.has("buddylist")) player.setBuddylist(deserializePlayerMap(obj.getAsJsonObject("buddylist")));
+/*            if (obj.has("buddylist")) player.setBuddylist(deserializePlayerMap(obj.getAsJsonObject("buddylist")));
             if (obj.has("blacklist")) player.setBlacklist(deserializePlayerMap(obj.getAsJsonObject("blacklist")));
-            if (obj.has("DmBlacklist")) player.setDmBlacklist(deserializePlayerMap(obj.getAsJsonObject("DmBlacklist")));
+            if (obj.has("DmBlacklist")) player.setDmBlacklist(deserializePlayerMap(obj.getAsJsonObject("DmBlacklist")));*/
             return player;
         }
 
@@ -263,9 +263,9 @@ public class SheetDataMapper {
                     characterStore.addCharacter(character);
                 }
             }
-            relinkPlayerMap(player.getBlacklist());
+/*            relinkPlayerMap(player.getBlacklist());
             relinkPlayerMap(player.getBuddylist());
-            relinkPlayerMap(player.getDmBlacklist());
+            relinkPlayerMap(player.getDmBlacklist());*/
         }
     }
 

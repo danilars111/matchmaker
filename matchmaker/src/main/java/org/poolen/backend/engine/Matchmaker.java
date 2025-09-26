@@ -192,10 +192,10 @@ public class Matchmaker {
                 Player p1 = party.get(i);
                 Player p2 = party.get(j);
 
-                if (p1.getBlacklist().containsKey(p2.getUuid()) || p2.getBlacklist().containsKey(p1.getUuid())) {
+                if (p1.getBlacklist().contains(p2.getUuid()) || p2.getBlacklist().contains(p1.getUuid())) {
                     totalScore += BLACKLIST_MATCH_BONUS;
                 }
-                if (p1.getBuddylist().containsKey(p2.getUuid()) || p2.getBuddylist().containsKey(p1.getUuid())) {
+                if (p1.getBuddylist().contains(p2.getUuid()) || p2.getBuddylist().contains(p1.getUuid())) {
                     totalScore += BUDDY_MATCH_BONUS;
                 }
 
@@ -218,7 +218,7 @@ public class Matchmaker {
 
         // Part 2: Calculate DM Blacklist score (now runs just once per group!)
         for (Player player : party) {
-            if (player.getDmBlacklist().containsKey(group.getDungeonMaster().getUuid())) {
+            if (player.getDmBlacklist().contains(group.getDungeonMaster().getUuid())) {
                 totalScore += BLACKLIST_MATCH_BONUS;
             }
         }

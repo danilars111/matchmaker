@@ -220,7 +220,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> implement
         searchField.setDisable(true);
         attendingColumn.setEditable(false);
         dmingColumn.setEditable(false);
-        filteredData.setPredicate(player -> editingPlayer.getBlacklist().containsKey(player.getUuid()));
+        filteredData.setPredicate(player -> editingPlayer.getBlacklist().contains(player.getUuid()));
     }
 
     public void showAllPlayers() {
