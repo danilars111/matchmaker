@@ -8,7 +8,7 @@ import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.entities.Setting;
-import org.poolen.backend.db.interfaces.ISetting;
+import org.poolen.backend.db.interfaces.ISettings;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
@@ -142,13 +142,13 @@ public class SheetDataMapper {
             String description = obj.get("description").getAsString();
             JsonElement valueElement = obj.get("settingValue");
 
-            ISetting settingEnum = findSettingEnum(nameStr);
+            ISettings settingEnum = findSettingEnum(nameStr);
             if (settingEnum == null) {
                 return null;
             }
 
             Object value = null;
-            if (settingEnum instanceof Settings.MatchmakerBonusSetting || settingEnum instanceof Settings.MatchmakerMultiplierSetting) {
+            if (settingEnum instanceof Settings.MatchmakerBonusSettings || settingEnum instanceof Settings.MatchmakerMultiplierSettings) {
                 value = valueElement.getAsDouble();
             } else if (settingEnum instanceof Settings.PersistenceSettings) {
                 // Handle both String and Integer for PersistenceSettings
@@ -157,7 +157,7 @@ public class SheetDataMapper {
                 } else {
                     value = valueElement.getAsString();
                 }
-            } else if (settingEnum instanceof Settings.MatchmakerPrioritySetting) {
+            } else if (settingEnum instanceof Settings.MatchmakerPrioritySettings) {
                 Type listType = new TypeToken<ArrayList<House>>() {}.getType();
                 value = context.deserialize(valueElement, listType);
             }
@@ -165,9 +165,9 @@ public class SheetDataMapper {
             return new Setting<>(settingEnum, description, value);
         }
 
-        private ISetting findSettingEnum(String name) {
-            for (Class<? extends ISetting> category : List.of(Settings.MatchmakerBonusSetting.class, Settings.MatchmakerMultiplierSetting.class, Settings.MatchmakerPrioritySetting.class, Settings.PersistenceSettings.class)) {
-                for (ISetting setting : category.getEnumConstants()) {
+        private ISettings findSettingEnum(String name) {
+            for (Class<? extends ISettings> category : List.of(Settings.MatchmakerBonusSettings.class, Settings.MatchmakerMultiplierSettings.class, Settings.MatchmakerPrioritySettings.class, Settings.PersistenceSettings.class)) {
+                for (ISettings setting : category.getEnumConstants()) {
                     if (setting.toString().equals(name)) {
                         return setting;
                     }

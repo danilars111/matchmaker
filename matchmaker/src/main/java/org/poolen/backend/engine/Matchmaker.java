@@ -16,19 +16,19 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySetting.AMBER_PRIORITIES;
-import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySetting.AVENTURINE_PRIORITIES;
-import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySetting.OPAL_PRIORITIES;
-import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySetting.GARNET_PRIORITIES;
-import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSetting.HOUSE_BONUS;
-import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSetting.BUDDY_BONUS;
-import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSetting.BLACKLIST_BONUS;
-import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSetting.MAX_REUNION_BONUS;
-import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSetting.RECENCY_GRUDGE;
-import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetting.HOUSE_SECOND_CHOICE_MULTIPLIER;
-import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetting.HOUSE_FOURTH_CHOICE_MULTIPLIER;
-import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetting.HOUSE_THIRD_CHOICE_MULTIPLIER;
-import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetting.MAIN_CHARACTER_MULTIPLIER;
+import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.AMBER_PRIORITIES;
+import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.AVENTURINE_PRIORITIES;
+import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.OPAL_PRIORITIES;
+import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.GARNET_PRIORITIES;
+import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.HOUSE_BONUS;
+import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.BUDDY_BONUS;
+import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.BLACKLIST_BONUS;
+import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.MAX_REUNION_BONUS;
+import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.RECENCY_GRUDGE;
+import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.HOUSE_SECOND_CHOICE_MULTIPLIER;
+import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.HOUSE_FOURTH_CHOICE_MULTIPLIER;
+import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.HOUSE_THIRD_CHOICE_MULTIPLIER;
+import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.MAIN_CHARACTER_MULTIPLIER;
 
 public class Matchmaker {
     private List<Group> groups;

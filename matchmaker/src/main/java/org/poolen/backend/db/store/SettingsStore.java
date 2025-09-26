@@ -3,16 +3,16 @@ package org.poolen.backend.db.store;
 
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Setting;
-import org.poolen.backend.db.interfaces.ISetting;
+import org.poolen.backend.db.interfaces.ISettings;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSetting.*;
-import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetting.*;
-import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySetting.*;
+import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.*;
+import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.*;
+import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.*;
 import static org.poolen.backend.db.constants.Settings.PersistenceSettings.*;
 
 public class SettingsStore {
@@ -20,7 +20,7 @@ public class SettingsStore {
     // The single, final instance of our class.
     private static final SettingsStore INSTANCE = new SettingsStore();
 
-    private Map<ISetting, Setting> settingsMap;
+    private Map<ISettings, Setting> settingsMap;
 
     // Private constructor to prevent additional instances and to enforce
     // singleton
@@ -32,14 +32,14 @@ public class SettingsStore {
         return INSTANCE;
     }
 
-    public Setting getSetting(ISetting setting){
+    public Setting getSetting(ISettings setting){
         return this.settingsMap.get(setting);
     }
-    public Map<ISetting, Setting> getSettingsMap() {
+    public Map<ISettings, Setting> getSettingsMap() {
         return this.settingsMap;
     }
 
-    public <T> void updateSetting(ISetting setting, T value) {
+    public <T> void updateSetting(ISettings setting, T value) {
         if (!this.settingsMap.containsKey(setting)) {
             throw new IllegalArgumentException("Oh no! The setting '" + setting.toString() + "' doesn't exist. I can't update something that isn't here!");
         }

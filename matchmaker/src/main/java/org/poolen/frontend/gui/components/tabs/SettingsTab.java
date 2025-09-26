@@ -9,7 +9,7 @@ import javafx.scene.layout.*;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Setting;
-import org.poolen.backend.db.interfaces.ISetting;
+import org.poolen.backend.db.interfaces.ISettings;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
@@ -32,12 +32,12 @@ public class SettingsTab extends Tab {
 
     private final SettingsStore settingsStore = SettingsStore.getInstance();
     private final Accordion accordion = new Accordion();
-    private final Map<ISetting, Node> settingControls = new HashMap<>();
+    private final Map<ISettings, Node> settingControls = new HashMap<>();
     private final HBox buttonBox;
     private final BorderPane root;
 
-    private static final List<ISetting> HIDDEN_SETTINGS = List.of(
-            Settings.MatchmakerBonusSetting.BUDDY_BONUS
+    private static final List<ISettings> HIDDEN_SETTINGS = List.of(
+            Settings.MatchmakerBonusSettings.BUDDY_BONUS
     );
 
     public SettingsTab() {
@@ -87,18 +87,18 @@ public class SettingsTab extends Tab {
         settingControls.clear();
         accordion.getPanes().clear();
 
-        List<Class<? extends ISetting>> settingCategories = List.of(
-                Settings.MatchmakerBonusSetting.class,
-                Settings.MatchmakerMultiplierSetting.class,
-                Settings.MatchmakerPrioritySetting.class,
+        List<Class<? extends ISettings>> settingCategories = List.of(
+                Settings.MatchmakerBonusSettings.class,
+                Settings.MatchmakerMultiplierSettings.class,
+                Settings.MatchmakerPrioritySettings.class,
                 Settings.PersistenceSettings.class
         );
 
-        for (Class<? extends ISetting> categoryClass : settingCategories) {
+        for (Class<? extends ISettings> categoryClass : settingCategories) {
             GridPane grid = createGridPane();
             int rowIndex = 0;
 
-            for (ISetting settingEnum : categoryClass.getEnumConstants()) {
+            for (ISettings settingEnum : categoryClass.getEnumConstants()) {
                 if (HIDDEN_SETTINGS.contains(settingEnum)) continue;
 
                 Setting<?> setting = settingsStore.getSetting(settingEnum);
@@ -127,7 +127,7 @@ public class SettingsTab extends Tab {
     private Node createControlForSetting(Setting<?> setting) {
         Object value = setting.getSettingValue();
 
-        if (setting.getName() instanceof Settings.MatchmakerPrioritySetting) {
+        if (setting.getName() instanceof Settings.MatchmakerPrioritySettings) {
             return createPriorityEditor((List<House>) value);
         } else if (value instanceof String || value == null) {
             return new TextField((String) value);
@@ -199,8 +199,8 @@ public class SettingsTab extends Tab {
     private void saveSettings() {
         // --- Step 1: Update the in-memory store from the UI ---
         try {
-            for (Map.Entry<ISetting, Node> entry : settingControls.entrySet()) {
-                ISetting settingEnum = entry.getKey();
+            for (Map.Entry<ISettings, Node> entry : settingControls.entrySet()) {
+                ISettings settingEnum = entry.getKey();
                 Node control = entry.getValue();
                 Object originalValue = settingsStore.getSetting(settingEnum).getSettingValue();
 

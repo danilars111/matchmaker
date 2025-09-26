@@ -1,23 +1,23 @@
 package org.poolen.backend.db.entities;
 
-import org.poolen.backend.db.interfaces.ISetting;
+import org.poolen.backend.db.interfaces.ISettings;
 
 public class Setting<T> {
-    ISetting name;
+    ISettings name;
     String description;
     T settingValue;
 
-    public Setting(ISetting name, String description, T settingValue) {
+    public Setting(ISettings name, String description, T settingValue) {
         this.name = name;
         this.settingValue = settingValue;
         this.description = description;
     }
 
-    public ISetting getName() {
+    public ISettings getName() {
         return name;
     }
 
-    public void setName(ISetting name) {
+    public void setName(ISettings name) {
         this.name = name;
     }
 
