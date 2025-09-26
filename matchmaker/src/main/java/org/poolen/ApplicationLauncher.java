@@ -3,43 +3,24 @@ package org.poolen;
 import com.google.ortools.Loader;
 import javafx.application.Application;
 import org.poolen.backend.db.constants.House;
-import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Character;
-import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.LoginApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 
 import java.time.LocalDate;
 import java.time.Month;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.UUID;
 
-public class main {
+public class ApplicationLauncher {
     static PlayerStore playerStore = PlayerStore.getInstance();
     static CharacterStore characterStore = CharacterStore.getInstance();
 
     public static void main(String[] args) {
         Loader.loadNativeLibraries();
-
-        //addPlayers();
-
-        Map<UUID, Player> attendingPlayers = new HashMap<>();
-
-
-        for(Player player : playerStore.getAllPlayers()) {
-            attendingPlayers.put(player.getUuid(), player);
-        }
-
         Application.launch(LoginApplication.class, args);
     }
 
