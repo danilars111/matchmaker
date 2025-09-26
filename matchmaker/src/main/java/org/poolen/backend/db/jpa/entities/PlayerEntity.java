@@ -70,7 +70,7 @@ public class PlayerEntity {
     // --- Constructors ---
 
     public PlayerEntity() {
-        this.uuid = UUID.randomUUID();
+        //this.uuid = UUID.randomUUID();
     }
 
     public PlayerEntity(String name, boolean isDungeonMaster) {

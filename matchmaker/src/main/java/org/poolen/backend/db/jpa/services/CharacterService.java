@@ -83,8 +83,12 @@ public class CharacterService implements IService<Character, CharacterEntity> {
 
         // Find the associated PlayerEntity and link it.
         if (character.getPlayer() != null) {
-            PlayerEntity playerEntity = playerRepository.findByUuid(character.getPlayer());
+            PlayerEntity playerEntity = playerRepository.findByUuid(character.getPlayer().getUuid());
+            if(playerEntity != null) {
             entity.setPlayer(playerEntity);
+            } else {
+                entity.setPlayer(new PlayerEntity());
+            }
         } else {
             entity.setPlayer(null);
         }
