@@ -15,6 +15,7 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
@@ -74,14 +75,19 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Map<Group, Player> playersToPromoteToDm = new HashMap<>();
     private final Map<Group, Player> dmsToReassignAsPlayer = new HashMap<>();
     private final PlayerStore playerStore;
+    private final SettingsStore settingsStore;
+    private final Matchmaker matchmaker;
 
 
     @Autowired
-    private GroupManagementTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore) {
+    private GroupManagementTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore,
+                               Matchmaker matchmaker, SettingsStore settingsStore) {
         super("Group Management");
 
         this.sheetsServiceManager = sheetsServiceManager;
         this.playerStore = playerStore;
+        this.settingsStore = settingsStore;
+        this.matchmaker = matchmaker;
     }
 
     public void start() {
@@ -241,7 +247,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 for (Group group : groups) {
                     new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
                 }
-                Matchmaker matchmaker = new Matchmaker(this.groups, this.attendingPlayers);
                 this.groups = matchmaker.match(); // The matchmaker returns the populated list.
                 cleanUp();
             }
@@ -420,7 +425,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             return;
         }
 
-        ExportGroupsStage exportStage = new ExportGroupsStage(groups, getTabPane().getScene().getWindow(), sheetsServiceManager);
+        ExportGroupsStage exportStage = new ExportGroupsStage(groups, getTabPane().getScene().getWindow(), sheetsServiceManager, settingsStore);
         exportStage.show();
     }
 

@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Lazy
 public class SettingsTab extends Tab {
 
-    private final SettingsStore settingsStore = SettingsStore.getInstance();
+    private final SettingsStore settingsStore;
     private final Accordion accordion = new Accordion();
     private final Map<ISettings, Node> settingControls = new HashMap<>();
     private final HBox buttonBox;
@@ -47,9 +47,10 @@ public class SettingsTab extends Tab {
     );
 
     @Autowired
-    public SettingsTab(SheetsServiceManager sheetsServiceManager) {
+    public SettingsTab(SheetsServiceManager sheetsServiceManager, SettingsStore settingsStore) {
         super("Settings");
         this.sheetsServiceManager = sheetsServiceManager;
+        this.settingsStore = settingsStore;
 
         // --- Main Layout ---
         root = new BorderPane();

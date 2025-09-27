@@ -4,38 +4,49 @@ package org.poolen.backend.db.store;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Setting;
 import org.poolen.backend.db.interfaces.ISettings;
+import org.poolen.backend.db.jpa.services.SettingService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.*;
 import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.*;
 import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.*;
 import static org.poolen.backend.db.constants.Settings.PersistenceSettings.*;
 
+@Component
+@Lazy
 public class SettingsStore {
-
-    // The single, final instance of our class.
-    private static final SettingsStore INSTANCE = new SettingsStore();
-
-    private Map<ISettings, Setting> settingsMap;
+    private Map<ISettings, Setting<?>> settingsMap;
+    SettingService service;
 
     // Private constructor to prevent additional instances and to enforce
     // singleton
-    private SettingsStore() {
+    @Autowired
+    private SettingsStore(SettingService service) {
         this.settingsMap = new HashMap<>();
+        this.service = service;
         setDefaultSettings();
     }
-    public static SettingsStore getInstance() {
-        return INSTANCE;
+
+    public void init() {
+        service.findAll().forEach(setting -> settingsMap.put(setting.getName(), setting));
     }
 
+    public void saveAll() {
+        service.saveAll(settingsMap.values().stream().collect(Collectors.toCollection(HashSet::new)));
+    }
     public Setting getSetting(ISettings setting){
         return this.settingsMap.get(setting);
     }
-    public Map<ISettings, Setting> getSettingsMap() {
+    public Map<ISettings, Setting<?>> getSettingsMap() {
         return this.settingsMap;
     }
 

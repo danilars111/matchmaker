@@ -34,7 +34,7 @@ import org.springframework.stereotype.Component;
 @Lazy
 public class PersistenceTab extends Tab {
 
-    private final SettingsStore settingsStore = SettingsStore.getInstance();
+    private final SettingsStore settingsStore;
     private Button signInButton;
     private Button saveButton;
     private Button loadButton;
@@ -44,16 +44,18 @@ public class PersistenceTab extends Tab {
     private StackPane buttonContainer; // To swap between sign-in and other buttons
     private Runnable onDataChanged;
     private Runnable onLogoutRequestHandler;
-    private SheetsServiceManager sheetsServiceManager;
     private final PlayerStore playerStore;
     private final CharacterStore characterStore;
+    private final SheetsServiceManager sheetsServiceManager;
 
     @Autowired
-    public PersistenceTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore, CharacterStore characterStore) {
+    public PersistenceTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore, CharacterStore characterStore, SettingsStore settingsStore) {
         super("Persistence");
 
         this.characterStore = characterStore;
         this.playerStore = playerStore;
+        this.sheetsServiceManager = sheetsServiceManager;
+        this.settingsStore = settingsStore;
 
         // --- UI Components ---
         signInButton = createGoogleSignInButton();
@@ -170,6 +172,7 @@ public class PersistenceTab extends Tab {
             //sheetsServiceManager.saveData(spreadsheetId);
             playerStore.saveAll();
             characterStore.saveAll();
+            settingsStore.saveAll();
 
             return "Data successfully saved to Google Sheet!";
         }, "Saving data...");
@@ -182,7 +185,10 @@ public class PersistenceTab extends Tab {
             return;
         }
         runTask(() -> {
-            sheetsServiceManager.loadData(spreadsheetId);
+            //sheetsServiceManager.loadData(spreadsheetId);
+            playerStore.init();
+            characterStore.init();
+            settingsStore.init();
             return "Data successfully loaded from Google Sheet!";
         }, "Loading data...");
     }

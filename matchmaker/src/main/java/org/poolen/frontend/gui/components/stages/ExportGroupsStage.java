@@ -43,7 +43,7 @@ import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEET
  */
 public class ExportGroupsStage extends Stage {
 
-    private final SettingsStore settingsStore = SettingsStore.getInstance();
+    private final SettingsStore settingsStore;
     private final List<Group> groups;
     private final VBox loadingBox;
     private final Button writeToSheetButton;
@@ -52,7 +52,8 @@ public class ExportGroupsStage extends Stage {
     private final TextArea markdownArea;
     private final SheetsServiceManager sheetsServiceManager;
 
-    public ExportGroupsStage(List<Group> groups, Window owner, SheetsServiceManager sheetsServiceManager) {
+    public ExportGroupsStage(List<Group> groups, Window owner, SheetsServiceManager sheetsServiceManager, SettingsStore settingsStore) {
+        this.settingsStore = settingsStore;
         this.groups = groups;
         this.sheetsServiceManager = sheetsServiceManager;
 

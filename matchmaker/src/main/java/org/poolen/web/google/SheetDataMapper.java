@@ -35,7 +35,7 @@ public class SheetDataMapper {
 
     private final PlayerStore playerStore;
     private final CharacterStore characterStore;
-    private final SettingsStore settingsStore = SettingsStore.getInstance();
+    private final SettingsStore settingsStore;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final Gson gson = new GsonBuilder()
@@ -54,9 +54,10 @@ public class SheetDataMapper {
             })
             .create();
     @Autowired
-    public SheetDataMapper(CharacterStore characterStore, PlayerStore playerStore) {
+    public SheetDataMapper(CharacterStore characterStore, PlayerStore playerStore, SettingsStore settingsStore) {
         this.characterStore = characterStore;
         this.playerStore = playerStore;
+        this.settingsStore = settingsStore;
     }
 
     // --- Custom (De)serializers ---

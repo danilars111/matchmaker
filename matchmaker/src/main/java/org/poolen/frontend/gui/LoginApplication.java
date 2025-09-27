@@ -1,8 +1,6 @@
 package org.poolen.frontend.gui;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.ortools.Loader;
-import com.sun.tools.javac.Main;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -39,8 +37,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 
-import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEETS_ID;
-
 /**
  * The main entry point for the application. This class handles the initial
  * update check, Google authentication, and data loading before showing the main application window.
@@ -56,9 +52,6 @@ public class LoginApplication extends Application {
     private ProgressIndicator loadingIndicator;
     private Task<Exception> signInTask; // A reference to our running task
     private boolean hasAttemptedBindExceptionRetry = false; // Prevents infinite loops
-    private static final SettingsStore settingsStore = SettingsStore.getInstance();
-    // This now correctly gets the ID from your settings!
-    private static String SPREADSHEET_ID = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
     private SheetsServiceManager sheetsServiceManager;
 
     @Override
@@ -288,6 +281,7 @@ public class LoginApplication extends Application {
                         updateMessage("Loading data...");
                         springContext.getBean(PlayerStore.class).init();
                         springContext.getBean(CharacterStore.class).init();
+                        springContext.getBean(SettingsStore.class).init();
                     } catch (GoogleJsonResponseException e) {
                         System.out.println("Loading failed: " + e);
                     } catch (Exception e) {

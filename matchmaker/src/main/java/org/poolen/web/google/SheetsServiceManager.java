@@ -27,12 +27,13 @@ import java.util.regex.Pattern;
 public class SheetsServiceManager {
 
     private static Sheets sheetsService;
-    private static final SettingsStore settingsStore = SettingsStore.getInstance();
+    private final SettingsStore settingsStore;
 
     private final SheetDataMapper sheetDataMapper;
 
-    public SheetsServiceManager(SheetDataMapper sheetDataMapper) {
+    public SheetsServiceManager(SheetDataMapper sheetDataMapper, SettingsStore settingsStore) {
         this.sheetDataMapper = sheetDataMapper;
+        this.settingsStore = settingsStore;
     }
 
     public static void connect() throws GeneralSecurityException, IOException {

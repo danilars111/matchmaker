@@ -6,6 +6,9 @@ import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -13,8 +16,6 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.AMBER_PRIORITIES;
 import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.AVENTURINE_PRIORITIES;
@@ -30,24 +31,26 @@ import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetti
 import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.HOUSE_THIRD_CHOICE_MULTIPLIER;
 import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSettings.MAIN_CHARACTER_MULTIPLIER;
 
+@Service
+@Lazy
 public class Matchmaker {
     private List<Group> groups;
-    private final List<Player> players;
+    private List<Player> players;
 
-    private static SettingsStore settingsStore = SettingsStore.getInstance();
+    private SettingsStore settingsStore;
     // --- Scoring Weights ---
     // The House Score is now part of this balanced system.
-    private static final double HOUSE_MATCH_BONUS = (double) settingsStore.getSetting(HOUSE_BONUS).getSettingValue();
-    private static final double HOUSE_DEFAULT_SCORE = 1.0;
-    private static final double BUDDY_MATCH_BONUS = (double) settingsStore.getSetting(BUDDY_BONUS).getSettingValue();
-    private static final double BLACKLIST_MATCH_BONUS = (double) settingsStore.getSetting(BLACKLIST_BONUS).getSettingValue();
+    private final double HOUSE_MATCH_BONUS;
+    private final double HOUSE_DEFAULT_SCORE;
+    private final double BUDDY_MATCH_BONUS;
+    private final double BLACKLIST_MATCH_BONUS;
 
-    private final double RECENCY_GRUDGE_PERIOD = (double) settingsStore.getSetting(RECENCY_GRUDGE).getSettingValue();
-    private final double MAX_REUNION_MATCH_BONUS = (double) settingsStore.getSetting(MAX_REUNION_BONUS).getSettingValue();
-    private final double MAIN_CHARACTER_MATCH_MULTIPLIER = (double) settingsStore.getSetting(MAIN_CHARACTER_MULTIPLIER).getSettingValue();
-    private final double HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_SECOND_CHOICE_MULTIPLIER).getSettingValue();
-    private final double HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_THIRD_CHOICE_MULTIPLIER).getSettingValue();
-    private final double HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_FOURTH_CHOICE_MULTIPLIER).getSettingValue();
+    private final double RECENCY_GRUDGE_PERIOD;
+    private final double MAX_REUNION_MATCH_BONUS;
+    private final double MAIN_CHARACTER_MATCH_MULTIPLIER;
+    private final double HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER;
+    private final double HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER;
+    private final double HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER;
 
 
     // Constants for the initial assignment pass
@@ -55,20 +58,30 @@ public class Matchmaker {
 
     // --- House Priority Map ---
     // This defines the "second best" choices for autofilling.
-    private static final Map<House, List<House>> housePriorityMap = new EnumMap<>(House.class);
-    static {
+    private final Map<House, List<House>> housePriorityMap = new EnumMap<>(House.class);
+
+
+
+    public Matchmaker(SettingsStore settingsStore) {
+        this.settingsStore = settingsStore;
+
         housePriorityMap.put(House.GARNET, (List<House>) settingsStore.getSetting(GARNET_PRIORITIES).getSettingValue());
         housePriorityMap.put(House.AMBER, (List<House>) settingsStore.getSetting(AMBER_PRIORITIES).getSettingValue());
         housePriorityMap.put(House.AVENTURINE, (List<House>) settingsStore.getSetting(AVENTURINE_PRIORITIES).getSettingValue());
         housePriorityMap.put(House.OPAL, (List<House>) settingsStore.getSetting(OPAL_PRIORITIES).getSettingValue());
-    }
 
+        HOUSE_MATCH_BONUS = (double) settingsStore.getSetting(HOUSE_BONUS).getSettingValue();
+        HOUSE_DEFAULT_SCORE = 1.0;
+        BUDDY_MATCH_BONUS = (double) settingsStore.getSetting(BUDDY_BONUS).getSettingValue();
+        BLACKLIST_MATCH_BONUS = (double) settingsStore.getSetting(BLACKLIST_BONUS).getSettingValue();
 
-    public Matchmaker(List<Group> groups, Map<UUID, Player> attendingPlayers) {
-        this.groups = new ArrayList<>(groups);
-        this.players = attendingPlayers.values().stream()
-                .filter(p -> !p.isDungeonMaster())
-                .collect(Collectors.toList());
+        RECENCY_GRUDGE_PERIOD = (double) settingsStore.getSetting(RECENCY_GRUDGE).getSettingValue();
+        MAX_REUNION_MATCH_BONUS = (double) settingsStore.getSetting(MAX_REUNION_BONUS).getSettingValue();
+        MAIN_CHARACTER_MATCH_MULTIPLIER = (double) settingsStore.getSetting(MAIN_CHARACTER_MULTIPLIER).getSettingValue();
+        HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_SECOND_CHOICE_MULTIPLIER).getSettingValue();
+        HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_THIRD_CHOICE_MULTIPLIER).getSettingValue();
+        HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_FOURTH_CHOICE_MULTIPLIER).getSettingValue();
+
     }
 
     public List<Group> match() {
@@ -297,5 +310,21 @@ public class Matchmaker {
 
     private double initialHouseScore(Player player, Group group) {
         return getTieredHouseScore(player, group);
+    }
+
+    public List<Group> getGroups() {
+        return groups;
+    }
+
+    public void setGroups(List<Group> groups) {
+        this.groups = groups;
+    }
+
+    public List<Player> getPlayers() {
+        return players;
+    }
+
+    public void setPlayers(List<Player> players) {
+        this.players = players;
     }
 }
