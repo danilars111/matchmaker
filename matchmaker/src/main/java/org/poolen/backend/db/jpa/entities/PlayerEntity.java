@@ -62,7 +62,7 @@ public class PlayerEntity {
             joinColumns = @JoinColumn(name = "player_id"),
             inverseJoinColumns = @JoinColumn(name = "blacklisted_dm_id")
     )
-    private Set<PlayerEntity> DmBlacklist = new HashSet<>();
+    private Set<PlayerEntity> dmBlacklist = new HashSet<>();
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<PlayLogEntity> playerLog = new HashSet<>();
@@ -146,11 +146,11 @@ public class PlayerEntity {
     }
 
     public Set<PlayerEntity> getDmBlacklist() {
-        return DmBlacklist;
+        return dmBlacklist;
     }
 
     public void setDmBlacklist(Set<PlayerEntity> dmBlacklist) {
-        DmBlacklist = dmBlacklist;
+        this.dmBlacklist = dmBlacklist;
     }
 
     public Set<PlayLogEntity> getPlayerLog() {

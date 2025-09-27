@@ -13,8 +13,11 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class CharacterService implements IService<Character, CharacterEntity> {
@@ -49,6 +52,14 @@ public class CharacterService implements IService<Character, CharacterEntity> {
     public Optional<Character> findByUuid(UUID uuid) {
         CharacterEntity entity = characterRepository.findByUuid(uuid);
         return Optional.ofNullable(toDomainObject(entity));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<Character> findAll() {
+        return characterRepository.findAllWithDetails().stream()
+                .map(this::toDomainObject)
+                .collect(Collectors.toCollection(HashSet::new));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package org.poolen.backend.db.interfaces;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -26,6 +27,12 @@ public interface IService<T, E> {
      * @return An Optional containing the domain object if found, otherwise empty.
      */
     Optional<T> findByUuid(UUID uuid);
+
+    /**
+     * Finds all domain objects.
+     * @return A Set containing all domain objects.
+     */
+    Set<T> findAll();
 
     /**
      * Converts a database entity into a domain object.

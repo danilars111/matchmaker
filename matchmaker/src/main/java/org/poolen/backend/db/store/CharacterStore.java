@@ -1,5 +1,6 @@
 package org.poolen.backend.db.store;
 
+import jakarta.annotation.PostConstruct;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.jpa.services.CharacterService;
@@ -30,12 +31,9 @@ public class CharacterStore {
         this.characterMap = new HashMap<>();
         this.service = service;
     }
-
-/*
-    public static CharacterStore getInstance() {
-        return INSTANCE;
+    public void init() {
+        service.findAll().forEach(this::addCharacter);
     }
-*/
 
     public List<Character> getCharactersByHouse(House house) {
         return this.characterMap.values().stream()

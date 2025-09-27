@@ -1,5 +1,6 @@
 package org.poolen.backend.db.store;
 
+import jakarta.annotation.PostConstruct;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.jpa.services.PlayerService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -25,6 +27,10 @@ public class PlayerStore {
     private PlayerStore(PlayerService service) {
         this.playerMap = new HashMap<>();
         this.service = service;
+    }
+
+    public void init() {
+        service.findAll().forEach(this::addPlayer);
     }
 
     public List<Player> getDungeonMasters() {
@@ -50,7 +56,7 @@ public class PlayerStore {
         playerMap.values().forEach(service::save);
     }
 
-    public void addPlayer(List<Player> players) {
+    public void addPlayer(Set<Player> players) {
         players.forEach(this::addPlayer);
     }
 

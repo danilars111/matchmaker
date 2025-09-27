@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -91,6 +92,14 @@ public class PlayerService implements IPlayerService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Set<Player> findAll() {
+        return playerRepository.findAllWithDetails().stream()
+                .map(this::toDomainObject)
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    @Override
     public Player toDomainObject(PlayerEntity entity) {
         if (entity == null) {
             return null;
@@ -101,7 +110,7 @@ public class PlayerService implements IPlayerService {
             player.setCharacters(
                     entity.getCharacters().stream()
                             .map(characterService::toDomainObject) // Recursive call
-                            .collect(Collectors.toSet())
+                            .collect(Collectors.toCollection(HashSet::new))
             );
         }
         return player;
@@ -116,9 +125,9 @@ public class PlayerService implements IPlayerService {
         Player player = new Player(entity.getUuid(), entity.getName(), entity.isDungeonMaster());
         player.setLastSeen(entity.getLastSeen());
 
-        player.setBlacklist(entity.getBlacklist().stream().map(PlayerEntity::getUuid).collect(Collectors.toSet()));
-        player.setBuddylist(entity.getBuddylist().stream().map(PlayerEntity::getUuid).collect(Collectors.toSet()));
-        player.setDmBlacklist(entity.getDmBlacklist().stream().map(PlayerEntity::getUuid).collect(Collectors.toSet()));
+        player.setBlacklist(entity.getBlacklist().stream().map(PlayerEntity::getUuid).collect(Collectors.toCollection(HashSet::new)));
+        player.setBuddylist(entity.getBuddylist().stream().map(PlayerEntity::getUuid).collect(Collectors.toCollection(HashSet::new)));
+        player.setDmBlacklist(entity.getDmBlacklist().stream().map(PlayerEntity::getUuid).collect(Collectors.toCollection(HashSet::new)));
 
         Map<UUID, java.time.LocalDate> playerLog = entity.getPlayerLog().stream()
                 .collect(Collectors.toMap(

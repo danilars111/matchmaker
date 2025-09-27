@@ -17,6 +17,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import org.poolen.MatchmakerApplication;
+import org.poolen.backend.db.store.CharacterStore;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
@@ -283,9 +285,9 @@ public class LoginApplication extends Application {
 
                         if (Thread.currentThread().isInterrupted()) return;
 
-                        updateMessage("Sign in successful!\nLoading data...");
-                        sheetsServiceManager = springContext.getBean(SheetsServiceManager.class);
-                        sheetsServiceManager.loadData(SPREADSHEET_ID);
+                        updateMessage("Loading data...");
+                        springContext.getBean(CharacterStore.class).init();
+                        springContext.getBean(PlayerStore.class).init();
                     } catch (GoogleJsonResponseException e) {
                         System.out.println("Loading failed: " + e);
                     } catch (Exception e) {
