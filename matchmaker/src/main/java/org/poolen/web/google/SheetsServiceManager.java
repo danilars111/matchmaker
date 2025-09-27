@@ -6,6 +6,7 @@ import com.google.api.services.sheets.v4.model.*;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.store.SettingsStore;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -22,10 +23,17 @@ import java.util.regex.Pattern;
  * Manages all interactions with the Google Sheets API, including authentication,
  * reading data, and writing data.
  */
+@Service
 public class SheetsServiceManager {
 
     private static Sheets sheetsService;
     private static final SettingsStore settingsStore = SettingsStore.getInstance();
+
+    private final SheetDataMapper sheetDataMapper;
+
+    public SheetsServiceManager(SheetDataMapper sheetDataMapper) {
+        this.sheetDataMapper = sheetDataMapper;
+    }
 
     public static void connect() throws GeneralSecurityException, IOException {
         Credential credential = GoogleAuthManager.getCredentials();
@@ -40,7 +48,7 @@ public class SheetsServiceManager {
     /**
      * Loads all data (players and settings) from the specified Google Sheet.
      */
-    public static void loadData(String spreadsheetId) throws IOException {
+    public  void loadData(String spreadsheetId) throws IOException {
         if (sheetsService == null) throw new IllegalStateException("Not connected to Google Sheets.");
 
         String playerDataSheet = (String) settingsStore.getSetting(Settings.PersistenceSettings.PLAYER_DATA_SHEET_NAME).getSettingValue();
@@ -58,13 +66,13 @@ public class SheetsServiceManager {
             allSheetData.put(sheetName, valueRange.getValues());
         }
 
-        SheetDataMapper.mapSheetsToData(allSheetData);
+        sheetDataMapper.mapSheetsToData(allSheetData);
     }
 
     /**
      * Saves all data (players and settings) to the specified Google Sheet.
      */
-    public static void saveData(String spreadsheetId) throws IOException {
+    public void saveData(String spreadsheetId) throws IOException {
         if (sheetsService == null) throw new IllegalStateException("Not connected to Google Sheets.");
 
         String playerDataSheet = (String) settingsStore.getSetting(Settings.PersistenceSettings.PLAYER_DATA_SHEET_NAME).getSettingValue();
@@ -73,7 +81,7 @@ public class SheetsServiceManager {
         ensureSheetExists(spreadsheetId, playerDataSheet);
         ensureSheetExists(spreadsheetId, settingsDataSheet);
 
-        Map<String, List<List<Object>>> allSheetData = SheetDataMapper.mapDataToSheets();
+        Map<String, List<List<Object>>> allSheetData = sheetDataMapper.mapDataToSheets();
 
         List<String> rangesToClear = new ArrayList<>();
         List<ValueRange> dataToWrite = new ArrayList<>();
@@ -95,14 +103,14 @@ public class SheetsServiceManager {
     /**
      * Appends the provided groups to the recap sheet and adds formatting.
      */
-    public static void appendGroupsToSheet(String spreadsheetId, List<Group> groups) throws IOException {
+    public void appendGroupsToSheet(String spreadsheetId, List<Group> groups) throws IOException {
         if (sheetsService == null) throw new IllegalStateException("Not connected to Google Sheets.");
 
         String recapSheetName = (String) settingsStore.getSetting(Settings.PersistenceSettings.RECAP_SHEET_NAME).getSettingValue();
 
         ensureSheetAndHeaderExist(spreadsheetId, recapSheetName, SheetDataMapper.GROUPS_HEADER);
 
-        List<List<Object>> valuesToAppend = SheetDataMapper.mapGroupsToSheet(groups);
+        List<List<Object>> valuesToAppend = sheetDataMapper.mapGroupsToSheet(groups);
         if (valuesToAppend.isEmpty()) return;
 
         ValueRange body = new ValueRange().setValues(valuesToAppend);

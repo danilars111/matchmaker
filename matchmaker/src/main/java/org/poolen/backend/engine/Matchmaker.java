@@ -240,8 +240,7 @@ public class Matchmaker {
         List<House> groupHouses = group.getHouses(); // Get the list of themes for the group
 
         // Iterate through all of the player's characters to find their best possible score
-        for (int i = 0; i < player.getCharacters().size(); i++) {
-            Character character = player.getCharacters().get(i);
+        for (Character character : player.getCharacters()) {
             House playerHouse = character.getHouse();
 
             double bestScoreForThisCharacter = 0;
@@ -283,7 +282,7 @@ public class Matchmaker {
             }
 
             // Add the main character bonus if this is their first character
-            if (i == 0) {
+            if (character.isMain()) {
                 bestScoreForThisCharacter += MAIN_CHARACTER_MATCH_MULTIPLIER;
             }
 

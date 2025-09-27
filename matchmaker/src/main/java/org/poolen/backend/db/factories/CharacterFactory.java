@@ -4,6 +4,8 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
@@ -12,21 +14,25 @@ import java.util.UUID;
  * It ensures business rules, like having only one main character, are followed.
  * This follows the Singleton pattern.
  */
+@Service
 public class CharacterFactory {
-    private static final CharacterStore characterStore = CharacterStore.getInstance();
-    private static final CharacterFactory INSTANCE = new CharacterFactory();
+   // private static final CharacterFactory INSTANCE = new CharacterFactory();
+    CharacterStore store;
 
 
     // Private constructor to enforce the singleton pattern
-    private CharacterFactory() {}
+    @Autowired
+    public CharacterFactory(CharacterStore store) {
+        this.store = store;
+    }
 
     /**
      * Gets the single instance of the CharacterFactory.
      * @return The singleton instance.
      */
-    public static CharacterFactory getInstance() {
+/*    public static CharacterFactory getInstance() {
         return INSTANCE;
-    }
+    }*/
 
     /**
      * Creates a new character for a given player with a generated UUID
@@ -68,7 +74,7 @@ public class CharacterFactory {
         if (isMain) {
             // We'll check both the isMain flag and the convention that the main character is at index 0.
             boolean hasMain = player.getCharacters().stream().anyMatch(Character::isMain);
-            if (hasMain || (!player.getCharacters().isEmpty() && player.getCharacters().get(0).isMain())) {
+            if (hasMain) {
                 throw new IllegalArgumentException("Cannot create a new main character for a player who already has one, darling!");
             }
         }
@@ -79,14 +85,10 @@ public class CharacterFactory {
         newCharacter.setMain(isMain);
 
 
-        if (isMain) {
-            // Add the main character to the very beginning of the list to maintain our convention.
-            player.getCharacters().add(0, newCharacter);
-        } else {
-            // An alt character just gets added to the end.
-            player.addCharacter(newCharacter);
-        }
-        characterStore.addCharacter(newCharacter);
+
+        player.addCharacter(newCharacter);
+
+        store.addCharacter(newCharacter);
         return newCharacter;
     }
 }

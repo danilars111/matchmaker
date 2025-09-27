@@ -22,16 +22,22 @@ import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.web.google.GoogleAuthManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * A dedicated pop-up window for all management tasks, organized into detachable tabs.
  */
+@Component
+@Lazy
 public class ManagementStage extends Stage {
 
     private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
@@ -39,7 +45,8 @@ public class ManagementStage extends Stage {
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
 
-    public ManagementStage() {
+    @Autowired
+    public ManagementStage(PlayerManagementTab playerTab, CharacterManagementTab characterTab, GroupManagementTab groupTab, SettingsTab settingsTab, PersistenceTab persistenceTab) {
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
@@ -47,15 +54,22 @@ public class ManagementStage extends Stage {
         this.attendingPlayers = new HashMap<>();
 
         TabPane tabPane = new TabPane();
+        playerTab.setAttendingPlayers(attendingPlayers);
+        playerTab.setDmingPlayers(dmingPlayers);
+        playerTab.setOnPlayerListChanged(this::notifyPlayerUpdateListeners);
+        playerTab.start();
 
-        PlayerManagementTab playerTab = new PlayerManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
-        GroupManagementTab groupTab = new GroupManagementTab(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
+        groupTab.setAttendingPlayers(attendingPlayers);
+        groupTab.setDmingPlayers(dmingPlayers);
+        groupTab.setOnPlayerListChanged(this::notifyPlayerUpdateListeners);
+        groupTab.start();
+
         addPlayerUpdateListener(groupTab);
         addPlayerUpdateListener(playerTab.getRosterView());
 
-        CharacterManagementTab characterTab = new CharacterManagementTab(this::notifyPlayerUpdateListeners);
-        Tab settingsTab = new SettingsTab();
-        PersistenceTab persistenceTab = new PersistenceTab(this::notifyPlayerUpdateListeners);
+        characterTab.setOnListChanged(this::notifyPlayerUpdateListeners);
+        persistenceTab.setOnLogoutRequestHandler(this::notifyPlayerUpdateListeners);
+        persistenceTab.setOnDataChanged(this::notifyPlayerUpdateListeners);
 
 
         makeTabDetachable(playerTab);
@@ -89,7 +103,7 @@ public class ManagementStage extends Stage {
             // Auto-select their main or first character
             Character charToEdit = player.getMainCharacter();
             if (charToEdit == null && player.hasCharacters()) {
-                charToEdit = player.getCharacters().get(0);
+                charToEdit = player.getCharacters().stream().collect(Collectors.toList()).get(0);
             }
             if (charToEdit != null) {
                 characterTab.getCharacterForm().populateForm(charToEdit);

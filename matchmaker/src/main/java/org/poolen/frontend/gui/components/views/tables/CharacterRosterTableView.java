@@ -8,21 +8,28 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.util.function.Consumer;
 
 /**
  * A reusable table view for displaying and filtering Characters, inheriting from BaseRosterTableView.
  */
+@Component
+@Lazy
 public class CharacterRosterTableView extends BaseRosterTableView<Character> {
 
-    private final CharacterStore characterStore = CharacterStore.getInstance();
+    private final CharacterStore characterStore;
     private CheckBox retiredFilterCheckBox;
     private CheckBox mainsFilterCheckBox;
     private Player selectedPlayer; // Can be null to show all characters
 
-    public CharacterRosterTableView() {
+    @Autowired
+    public CharacterRosterTableView(CharacterStore characterStore) {
         super();
+        this.characterStore = characterStore;
         this.searchField.setPromptText("Search by character or player name...");
         setupTableColumns();
         setupFilters();

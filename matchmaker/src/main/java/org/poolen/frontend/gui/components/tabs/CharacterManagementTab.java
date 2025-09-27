@@ -14,29 +14,38 @@ import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
 import org.poolen.frontend.gui.components.views.tables.CharacterRosterTableView;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 /**
  * A dedicated tab for creating, viewing, and managing characters.
  */
+@Component
+@Lazy
 public class CharacterManagementTab extends Tab {
 
     private final CharacterFormView characterForm;
     private final CharacterRosterTableView rosterView;
     private final SplitPane root;
-    private final Runnable onListChanged;
-    private final CharacterFactory characterFactory = CharacterFactory.getInstance();
-    private final CharacterStore characterStore = CharacterStore.getInstance();
-    private final PlayerStore playerStore = PlayerStore.getInstance();
+    private Runnable onListChanged;
+    private final CharacterFactory characterFactory;
+    private final CharacterStore characterStore;
+    private final PlayerStore playerStore;
 
-    public CharacterManagementTab(Runnable onListChanged) {
+    @Autowired
+    public CharacterManagementTab(CharacterStore characterStore, CharacterFactory characterFactory, CharacterRosterTableView rosterView,
+                                  PlayerStore playerStore) {
         super("Character Management");
-        this.onListChanged = onListChanged;
+        this.characterFactory = characterFactory;
+        this.characterStore = characterStore;
+        this.playerStore = playerStore;
 
         this.root = new SplitPane();
-        this.characterForm = new CharacterFormView();
-        this.rosterView = new CharacterRosterTableView();
+        this.characterForm = new CharacterFormView(playerStore);
+        this.rosterView = rosterView;
 
         // --- Layout ---
         root.getItems().addAll(characterForm, rosterView);
@@ -195,6 +204,10 @@ public class CharacterManagementTab extends Tab {
                 rosterView.filterByPlayer(null);
             }
         }
+    }
+
+    public void setOnListChanged(Runnable onListChanged) {
+        this.onListChanged = onListChanged;
     }
 }
 

@@ -15,6 +15,9 @@ import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.web.google.SheetsServiceManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +31,8 @@ import java.util.stream.Collectors;
  * A dedicated tab for viewing and editing application settings, built to dynamically
  * handle the new SettingsStore architecture.
  */
+@Component
+@Lazy
 public class SettingsTab extends Tab {
 
     private final SettingsStore settingsStore = SettingsStore.getInstance();
@@ -35,13 +40,16 @@ public class SettingsTab extends Tab {
     private final Map<ISettings, Node> settingControls = new HashMap<>();
     private final HBox buttonBox;
     private final BorderPane root;
+    private SheetsServiceManager sheetsServiceManager;
 
     private static final List<ISettings> HIDDEN_SETTINGS = List.of(
             Settings.MatchmakerBonusSettings.BUDDY_BONUS
     );
 
-    public SettingsTab() {
+    @Autowired
+    public SettingsTab(SheetsServiceManager sheetsServiceManager) {
         super("Settings");
+        this.sheetsServiceManager = sheetsServiceManager;
 
         // --- Main Layout ---
         root = new BorderPane();
@@ -238,7 +246,7 @@ public class SettingsTab extends Tab {
         Task<Void> saveTask = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                SheetsServiceManager.saveData(spreadsheetId);
+                sheetsServiceManager.saveData(spreadsheetId);
                 return null;
             }
 

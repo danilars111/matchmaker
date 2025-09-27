@@ -35,9 +35,11 @@ public class CharacterFormView extends BaseFormView<Character> {
     private Button createSecondCharacterButton;
     private Consumer<Player> onOpenPlayerRequestHandler;
     private Consumer<Player> onCreateSecondCharacterRequestHandler;
+    private final PlayerStore playerStore;
 
-    public CharacterFormView() {
+    public CharacterFormView(PlayerStore playerStore) {
         super();
+        this.playerStore = playerStore;
         setupFormControls();
         clearForm(); // Set initial state
     }
@@ -52,7 +54,7 @@ public class CharacterFormView extends BaseFormView<Character> {
         houseComboBox.setMaxWidth(Double.MAX_VALUE);
         playerComboBox.setMaxWidth(Double.MAX_VALUE);
 
-        List<Player> sortedPlayers = PlayerStore.getInstance().getAllPlayers().stream()
+        List<Player> sortedPlayers = playerStore.getAllPlayers().stream()
                 .sorted(Comparator.comparing(Player::getName))
                 .collect(Collectors.toList());
         playerComboBox.setItems(FXCollections.observableArrayList(sortedPlayers));

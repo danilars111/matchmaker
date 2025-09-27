@@ -12,6 +12,9 @@ import org.poolen.backend.db.interfaces.ISettings;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Type;
 import java.time.LocalDate;
@@ -23,17 +26,19 @@ import java.util.stream.Collectors;
  * A utility class responsible for mapping application data (Players, Characters, Settings)
  * to and from the format required by the Google Sheets API.
  */
+@Service
+@Lazy
 public class SheetDataMapper {
 
     // --- Headers ---
     public static final List<Object> GROUPS_HEADER = Arrays.asList("DM", "Players", "Adventure Description/Recap", "Datum Irl", "Recap Writer", "Kommentar", "Deadline");
 
-    private static final PlayerStore playerStore = PlayerStore.getInstance();
-    private static final CharacterStore characterStore = CharacterStore.getInstance();
-    private static final SettingsStore settingsStore = SettingsStore.getInstance();
+    private final PlayerStore playerStore;
+    private final CharacterStore characterStore;
+    private final SettingsStore settingsStore = SettingsStore.getInstance();
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    private static final Gson gson = new GsonBuilder()
+    private final Gson gson = new GsonBuilder()
             .registerTypeAdapter(Player.class, new PlayerSerializer())
             .registerTypeAdapter(Player.class, new PlayerDeserializer())
             .registerTypeAdapter(Setting.class, new SettingDeserializer())
@@ -48,6 +53,11 @@ public class SheetDataMapper {
                 }
             })
             .create();
+    @Autowired
+    public SheetDataMapper(CharacterStore characterStore, PlayerStore playerStore) {
+        this.characterStore = characterStore;
+        this.playerStore = playerStore;
+    }
 
     // --- Custom (De)serializers ---
 
@@ -96,17 +106,29 @@ public class SheetDataMapper {
             String name = obj.get("name").getAsString();
             boolean isDm = obj.get("isDungeonMaster").getAsBoolean();
             Player player = new Player(uuid, name, isDm);
+
+            // ... (rest of the code for lastSeen, playerLog, buddylist, etc. remains the same)
+
             if (obj.has("lastSeen")) {
                 player.setLastSeen(LocalDate.parse(obj.get("lastSeen").getAsString(), DATE_FORMATTER));
             }
+
+            // 👇 **THIS IS THE BIT THAT CHANGES!** 👇
             if (obj.has("characters")) {
                 JsonArray charsArray = obj.getAsJsonArray("characters");
-                ArrayList<Character> characters = new ArrayList<>();
+
+                // Changed from ArrayList to HashSet!
+                Set<Character> characters = new HashSet<>();
+
                 for (JsonElement charElement : charsArray) {
                     characters.add(context.deserialize(charElement, Character.class));
                 }
+
+                // Assuming your Player class now uses setCharacters(Set<Character> characters)
                 player.setCharacters(characters);
             }
+            // 👆 **END OF THE CHANGE** 👆
+
             if (obj.has("playerLog")) {
                 JsonObject logObj = obj.getAsJsonObject("playerLog");
                 Map<UUID, LocalDate> playerLog = new HashMap<>();
@@ -115,13 +137,15 @@ public class SheetDataMapper {
                 }
                 player.setPlayerLog(playerLog);
             }
-/*            if (obj.has("buddylist")) player.setBuddylist(deserializePlayerMap(obj.getAsJsonObject("buddylist")));
+
+            if (obj.has("buddylist")) player.setBuddylist(deserializePlayerMap(obj.getAsJsonObject("buddylist")));
             if (obj.has("blacklist")) player.setBlacklist(deserializePlayerMap(obj.getAsJsonObject("blacklist")));
-            if (obj.has("DmBlacklist")) player.setDmBlacklist(deserializePlayerMap(obj.getAsJsonObject("DmBlacklist")));*/
+            if (obj.has("DmBlacklist")) player.setDmBlacklist(deserializePlayerMap(obj.getAsJsonObject("DmBlacklist")));
+
             return player;
         }
 
-        private Map<UUID, Player> deserializePlayerMap(JsonObject mapObj) {
+        private Set<UUID> deserializePlayerMap(JsonObject mapObj) {
             Map<UUID, Player> map = new HashMap<>();
             if (mapObj != null) {
                 for (Map.Entry<String, JsonElement> entry : mapObj.entrySet()) {
@@ -130,7 +154,11 @@ public class SheetDataMapper {
                     map.put(playerUuid, new Player(playerUuid, "stub", false));
                 }
             }
-            return map;
+            Set<UUID> set = new HashSet();
+            for(UUID uuid : map.keySet()) {
+                set.add(uuid);
+            }
+            return set;
         }
     }
 
@@ -178,10 +206,12 @@ public class SheetDataMapper {
     }
 
 
+
+
     /**
      * Converts all application data (players and settings) into a format for Google Sheets.
      */
-    public static Map<String, List<List<Object>>> mapDataToSheets() {
+    public Map<String, List<List<Object>>> mapDataToSheets() {
         Map<String, List<List<Object>>> allSheetData = new HashMap<>();
         String playerDataSheetName = (String) settingsStore.getSetting(Settings.PersistenceSettings.PLAYER_DATA_SHEET_NAME).getSettingValue();
         String settingsDataSheetName = (String) settingsStore.getSetting(Settings.PersistenceSettings.SETTINGS_DATA_SHEET_NAME).getSettingValue();
@@ -209,7 +239,7 @@ public class SheetDataMapper {
     /**
      * Takes raw data from Google Sheets and populates the application's data stores.
      */
-    public static void mapSheetsToData(Map<String, List<List<Object>>> sheetData) {
+    public void mapSheetsToData(Map<String, List<List<Object>>> sheetData) {
         String playerDataSheetName = (String) settingsStore.getSetting(Settings.PersistenceSettings.PLAYER_DATA_SHEET_NAME).getSettingValue();
         String settingsDataSheetName = (String) settingsStore.getSetting(Settings.PersistenceSettings.SETTINGS_DATA_SHEET_NAME).getSettingValue();
 
@@ -252,7 +282,7 @@ public class SheetDataMapper {
                 Player player = gson.fromJson(json, Player.class);
                 if (player != null) playerStore.addPlayer(player);
             } catch (Exception e) {
-                System.err.println("Skipping invalid player row: " + row + ". Reason: " + e.getMessage());
+                System.err.println("Skipping invalid player row. Reason: " + e.getMessage());
             }
         }
 
@@ -269,7 +299,8 @@ public class SheetDataMapper {
         }
     }
 
-    private static void relinkPlayerMap(Map<UUID, Player> mapToRelink) {
+/*
+    private Set relinkPlayerMap(Map<UUID, Player> mapToRelink) {
         if (mapToRelink == null || mapToRelink.isEmpty()) return;
         Map<UUID, Player> correctedMap = new HashMap<>();
         for (Player stubPlayer : mapToRelink.values()) {
@@ -280,9 +311,15 @@ public class SheetDataMapper {
         }
         mapToRelink.clear();
         mapToRelink.putAll(correctedMap);
+        Set set = new HashSet<>();
+        for(UUID uuid : correctedMap.keySet()) {
+            set.add(uuid);
+        }
+        return set;
     }
+*/
 
-    public static List<List<Object>> mapGroupsToSheet(List<Group> groupsToLog) {
+    public List<List<Object>> mapGroupsToSheet(List<Group> groupsToLog) {
         List<List<Object>> groupData = new ArrayList<>();
         // Get the deadline from our new setting!
         int deadlineInWeeks = (Integer) settingsStore.getSetting(Settings.PersistenceSettings.RECAP_DEADLINE).getSettingValue();

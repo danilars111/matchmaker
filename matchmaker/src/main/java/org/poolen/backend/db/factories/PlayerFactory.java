@@ -2,6 +2,9 @@ package org.poolen.backend.db.factories;
 
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
@@ -9,19 +12,15 @@ import java.util.UUID;
  * A factory for creating Player objects, ensuring consistent creation logic.
  * This follows the Singleton pattern to ensure there's only one factory.
  */
+@Service
+@Lazy
 public class PlayerFactory {
-    private static final PlayerStore playerStore = PlayerStore.getInstance();
-    private static final PlayerFactory INSTANCE = new PlayerFactory();
+    private final PlayerStore playerStore;
 
     // Private constructor to enforce the singleton pattern
-    private PlayerFactory() {}
-
-    /**
-     * Gets the single instance of the PlayerFactory.
-     * @return The singleton instance.
-     */
-    public static PlayerFactory getInstance() {
-        return INSTANCE;
+    @Autowired
+    private PlayerFactory(PlayerStore playerStore) {
+        this.playerStore = playerStore;
     }
 
     /**

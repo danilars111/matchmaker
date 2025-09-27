@@ -14,7 +14,7 @@ import java.util.UUID;
 public class Player {
     private UUID uuid;
     private String name;
-    private ArrayList<Character> characters = new ArrayList<>();
+    private Set<Character> characters = new HashSet<>();
 
     private Set<UUID> buddylist = new HashSet<>();
     private Set<UUID> blacklist = new HashSet<>();
@@ -67,11 +67,11 @@ public class Player {
         }
     }
 
-    public ArrayList<Character> getCharacters() {
+    public Set<Character> getCharacters() {
         return characters;
     }
 
-    public void setCharacters(ArrayList<Character> characters) {
+    public void setCharacters(Set<Character> characters) {
         this.characters = characters;
     }
 

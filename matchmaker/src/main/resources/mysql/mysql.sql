@@ -21,7 +21,7 @@ CREATE TABLE characters (
                             id BIGINT AUTO_INCREMENT PRIMARY KEY,
                             uuid BINARY(16) NOT NULL UNIQUE,
                             player_id BIGINT NOT NULL,
-                            name VARCHAR(255) NOT NULL,
+                            name VARCHAR(255),
                             house VARCHAR(255),
                             is_main BOOLEAN NOT NULL DEFAULT FALSE,
                             is_retired BOOLEAN NOT NULL DEFAULT FALSE,

@@ -31,7 +31,7 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> implement
         GROUP_ASSIGNMENT
     }
 
-    private final PlayerStore playerStore = PlayerStore.getInstance();
+    private final PlayerStore playerStore;
     private final RosterMode mode;
     private final Map<UUID, Player> attendingPlayers;
     private final Map<UUID, Player> dmingPlayers;
@@ -52,11 +52,12 @@ public class PlayerRosterTableView extends BaseRosterTableView<Player> implement
     private TableColumn<Player, Boolean> dmingColumn;
 
 
-    public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
+    public PlayerRosterTableView(RosterMode mode, Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, PlayerStore playerStore) {
         super();
         this.mode = mode;
         this.attendingPlayers = attendingPlayers;
         this.dmingPlayers = dmingPlayers;
+        this.playerStore = playerStore;
         this.searchField.setPromptText("Search by name or UUID...");
 
         setupTableColumns();

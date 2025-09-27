@@ -1,6 +1,4 @@
 package org.poolen.backend.db.jpa.repository;
 
-import org.poolen.backend.db.interfaces.IRepository;
-
-public class SettingRepository implements IRepository {
+public class SettingRepository {
 }

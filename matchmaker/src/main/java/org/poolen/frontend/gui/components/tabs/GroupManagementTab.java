@@ -14,6 +14,7 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
@@ -24,6 +25,10 @@ import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
+import org.poolen.web.google.SheetsServiceManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -40,41 +45,55 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT;
+
 /**
  * A dedicated tab for creating, viewing, and managing groups that listens for player updates.
  */
+
+@Component
+@Lazy
 public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private static final GroupFactory groupFactory = GroupFactory.getInstance();
-    private final GroupFormView groupForm;
-    private final SplitPane root;
-    private final PlayerRosterTableView rosterView;
+    private GroupFormView groupForm;
+    private SplitPane root;
+    private PlayerRosterTableView rosterView;
     private boolean isPlayerRosterVisible = false;
 
-    private final Map<UUID, Player> newPartyMap;
-    private final Map<UUID, Player> attendingPlayers;
-    private final Map<UUID, Player> dmingPlayers;
+    private Map<UUID, Player> newPartyMap;
+    private  Map<UUID, Player> attendingPlayers;
+    private  Map<UUID, Player> dmingPlayers;
+    private  Runnable onPlayerListChanged;
+    private SheetsServiceManager sheetsServiceManager;
     private List<Group> groups = new ArrayList<>();
-    private final GroupDisplayView groupDisplayView;
+    private GroupDisplayView groupDisplayView;
     private LocalDate eventDate;
 
     private final Map<Group, Player> dmsToReassignAsDm = new HashMap<>();
     private final Map<Group, Player> playersToPromoteToDm = new HashMap<>();
     private final Map<Group, Player> dmsToReassignAsPlayer = new HashMap<>();
+    private final PlayerStore playerStore;
 
 
-    public GroupManagementTab(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
+    @Autowired
+    private GroupManagementTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore) {
         super("Group Management");
 
+        this.sheetsServiceManager = sheetsServiceManager;
+        this.playerStore = playerStore;
+    }
+
+    public void start() {
+
         this.root = new SplitPane();
-        this.attendingPlayers = attendingPlayers;
-        this.dmingPlayers = dmingPlayers;
         this.groupForm = new GroupFormView();
         this.groupDisplayView = new GroupDisplayView();
-        this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT, attendingPlayers, dmingPlayers, onPlayerListChanged);
         this.newPartyMap = new HashMap<>();
         // Default the event date to the nearest upcoming Friday.
         this.eventDate = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
+
+        this.rosterView = new PlayerRosterTableView(GROUP_ASSIGNMENT, attendingPlayers, dmingPlayers, playerStore);
 
         cleanUp();
 
@@ -401,7 +420,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             return;
         }
 
-        ExportGroupsStage exportStage = new ExportGroupsStage(groups, getTabPane().getScene().getWindow());
+        ExportGroupsStage exportStage = new ExportGroupsStage(groups, getTabPane().getScene().getWindow(), sheetsServiceManager);
         exportStage.show();
     }
 
@@ -464,6 +483,30 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         System.out.println("Heard a player update! Refreshing DM list and roster...");
         updateDmList();
         rosterView.updateRoster();
+    }
+
+    public Map<UUID, Player> getAttendingPlayers() {
+        return attendingPlayers;
+    }
+
+    public void setAttendingPlayers(Map<UUID, Player> attendingPlayers) {
+        this.attendingPlayers = attendingPlayers;
+    }
+
+    public Map<UUID, Player> getDmingPlayers() {
+        return dmingPlayers;
+    }
+
+    public void setDmingPlayers(Map<UUID, Player> dmingPlayers) {
+        this.dmingPlayers = dmingPlayers;
+    }
+
+    public Runnable getOnPlayerListChanged() {
+        return onPlayerListChanged;
+    }
+
+    public void setOnPlayerListChanged(Runnable onPlayerListChanged) {
+        this.onPlayerListChanged = onPlayerListChanged;
     }
 }
 

@@ -60,11 +60,6 @@ public class Character {
                     otherChar.setMain(false); // Recursion is fine here, as it will just flip the boolean.
                 }
             }
-            // Now, ensure this character is at the front of the line!
-            if(player.getCharacters().contains(this)) {
-                this.player.getCharacters().remove(this);
-                this.player.getCharacters().add(0, this);
-            }
         }
     }
     public Player getPlayer() {

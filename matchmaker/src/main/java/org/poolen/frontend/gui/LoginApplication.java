@@ -57,6 +57,7 @@ public class LoginApplication extends Application {
     private static final SettingsStore settingsStore = SettingsStore.getInstance();
     // This now correctly gets the ID from your settings!
     private static String SPREADSHEET_ID = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
+    private SheetsServiceManager sheetsServiceManager;
 
     @Override
     public void init() throws Exception {
@@ -283,7 +284,8 @@ public class LoginApplication extends Application {
                         if (Thread.currentThread().isInterrupted()) return;
 
                         updateMessage("Sign in successful!\nLoading data...");
-                        SheetsServiceManager.loadData(SPREADSHEET_ID);
+                        sheetsServiceManager = springContext.getBean(SheetsServiceManager.class);
+                        sheetsServiceManager.loadData(SPREADSHEET_ID);
                     } catch (GoogleJsonResponseException e) {
                         System.out.println("Loading failed: " + e);
                     } catch (Exception e) {
@@ -369,7 +371,7 @@ public class LoginApplication extends Application {
 
     private void showManagementStage() {
         primaryStage.close();
-        ManagementStage managementStage = new ManagementStage();
+        ManagementStage managementStage = springContext.getBean(ManagementStage.class);
         managementStage.show();
     }
 

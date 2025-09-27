@@ -14,15 +14,24 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.Settings;
+import org.poolen.backend.db.jpa.services.CharacterService;
+import org.poolen.backend.db.jpa.services.PlayerService;
+import org.poolen.backend.db.store.CharacterStore;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 /**
  * A tab dedicated to handling data persistence via Google Sheets.
  */
+@Component
+@Lazy
 public class PersistenceTab extends Tab {
 
     private final SettingsStore settingsStore = SettingsStore.getInstance();
@@ -33,13 +42,18 @@ public class PersistenceTab extends Tab {
     private Label statusLabel;
     private ProgressIndicator progressIndicator;
     private StackPane buttonContainer; // To swap between sign-in and other buttons
-    private final Runnable onDataChanged;
+    private Runnable onDataChanged;
     private Runnable onLogoutRequestHandler;
+    private SheetsServiceManager sheetsServiceManager;
+    private final PlayerStore playerStore;
+    private final CharacterStore characterStore;
 
-
-    public PersistenceTab(Runnable onDataChanged) {
+    @Autowired
+    public PersistenceTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore, CharacterStore characterStore) {
         super("Persistence");
-        this.onDataChanged = onDataChanged;
+
+        this.characterStore = characterStore;
+        this.playerStore = playerStore;
 
         // --- UI Components ---
         signInButton = createGoogleSignInButton();
@@ -153,7 +167,10 @@ public class PersistenceTab extends Tab {
             return;
         }
         runTask(() -> {
-            SheetsServiceManager.saveData(spreadsheetId);
+            //sheetsServiceManager.saveData(spreadsheetId);
+            playerStore.saveAll();
+            //characterStore.saveAll();
+
             return "Data successfully saved to Google Sheet!";
         }, "Saving data...");
     }
@@ -165,7 +182,7 @@ public class PersistenceTab extends Tab {
             return;
         }
         runTask(() -> {
-            SheetsServiceManager.loadData(spreadsheetId);
+            sheetsServiceManager.loadData(spreadsheetId);
             return "Data successfully loaded from Google Sheet!";
         }, "Loading data...");
     }
@@ -222,6 +239,14 @@ public class PersistenceTab extends Tab {
     @FunctionalInterface
     private interface TaskOperation {
         String execute() throws Exception;
+    }
+
+    public Runnable getOnLogoutRequestHandler() {
+        return onLogoutRequestHandler;
+    }
+
+    public void setOnDataChanged(Runnable onDataChanged) {
+        this.onDataChanged = onDataChanged;
     }
 }
 

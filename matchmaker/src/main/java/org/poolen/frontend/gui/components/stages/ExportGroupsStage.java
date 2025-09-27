@@ -24,7 +24,10 @@ import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.web.discord.DiscordWebhookManager;
+import org.poolen.web.google.SheetDataMapper;
 import org.poolen.web.google.SheetsServiceManager;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -47,9 +50,11 @@ public class ExportGroupsStage extends Stage {
     private final Button postToDiscordButton;
     private final Button closeButton;
     private final TextArea markdownArea;
+    private final SheetsServiceManager sheetsServiceManager;
 
-    public ExportGroupsStage(List<Group> groups, Window owner) {
+    public ExportGroupsStage(List<Group> groups, Window owner, SheetsServiceManager sheetsServiceManager) {
         this.groups = groups;
+        this.sheetsServiceManager = sheetsServiceManager;
 
         initModality(Modality.WINDOW_MODAL);
         initOwner(owner);
@@ -137,8 +142,8 @@ public class ExportGroupsStage extends Stage {
         updatePlayerLogs();
 
         runTask("Writing to Google Sheets...", () -> {
-            SheetsServiceManager.saveData(spreadsheetId);
-            SheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
+            sheetsServiceManager.saveData(spreadsheetId);
+            sheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
             return "Groups have been written to the sheet.";
         });
     }

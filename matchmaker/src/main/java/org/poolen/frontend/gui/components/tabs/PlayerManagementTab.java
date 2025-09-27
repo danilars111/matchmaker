@@ -10,32 +10,46 @@ import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import static org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView.RosterMode.PLAYER_MANAGEMENT;
+
 /**
  * A dedicated tab for creating, viewing, and managing players.
  */
+@Component
+@Lazy
 public class PlayerManagementTab extends Tab {
 
     private final PlayerFormView playerForm;
-    private final PlayerRosterTableView rosterView;
+    private PlayerRosterTableView rosterView;
     private final SplitPane root;
-    private final Runnable onPlayerListChanged;
-    private static final PlayerStore playerStore = PlayerStore.getInstance();
-    private static final PlayerFactory playerFactory = PlayerFactory.getInstance();
+    private Runnable onPlayerListChanged;
+    private Map<UUID, Player> attendingPlayers;
+    private Map<UUID, Player> dmingPlayers;
+    private final PlayerStore playerStore;
+    private final PlayerFactory playerFactory;
     private boolean isShowingBlacklist = false;
 
-    public PlayerManagementTab(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
+    @Autowired
+    private PlayerManagementTab(PlayerStore playerStore, PlayerFactory playerFactory) {
         super("Player Management");
 
-        this.onPlayerListChanged = onPlayerListChanged;
+        this.playerStore = playerStore;
+        this.playerFactory = playerFactory;
         this.root = new SplitPane();
         this.playerForm = new PlayerFormView();
-        this.rosterView = new PlayerRosterTableView(PlayerRosterTableView.RosterMode.PLAYER_MANAGEMENT, attendingPlayers, dmingPlayers, onPlayerListChanged);
+    }
+
+    public void start() {
+        this.rosterView = new PlayerRosterTableView(PLAYER_MANAGEMENT, attendingPlayers, dmingPlayers, playerStore);
 
         // --- Layout ---
         root.getItems().addAll(playerForm, rosterView);
@@ -157,6 +171,30 @@ public class PlayerManagementTab extends Tab {
         } else {
             rosterView.updateRoster();
         }
+    }
+
+    public Runnable getOnPlayerListChanged() {
+        return onPlayerListChanged;
+    }
+
+    public void setOnPlayerListChanged(Runnable onPlayerListChanged) {
+        this.onPlayerListChanged = onPlayerListChanged;
+    }
+
+    public Map<UUID, Player> getAttendingPlayers() {
+        return attendingPlayers;
+    }
+
+    public void setAttendingPlayers(Map<UUID, Player> attendingPlayers) {
+        this.attendingPlayers = attendingPlayers;
+    }
+
+    public Map<UUID, Player> getDmingPlayers() {
+        return dmingPlayers;
+    }
+
+    public void setDmingPlayers(Map<UUID, Player> dmingPlayers) {
+        this.dmingPlayers = dmingPlayers;
     }
 }
 
