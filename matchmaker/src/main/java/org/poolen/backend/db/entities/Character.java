@@ -76,7 +76,7 @@ public class Character {
 
     public void setRetired(boolean retired) {
         this.isRetired = retired;
-        if(this.isMain) {
+        if(retired && this.isMain) {
             this.isMain = false;
         }
     }

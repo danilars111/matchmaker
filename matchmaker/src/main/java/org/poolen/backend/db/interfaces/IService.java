@@ -22,6 +22,13 @@ public interface IService<T, E> {
     T save(T domainObject);
 
     /**
+     * Saves a collection of domain objects to the database in a single transaction.
+     * @param domainObjects The set of domain objects to save.
+     * @return The set of saved domain objects.
+     */
+    Set<T> saveAll(Set<T> domainObjects);
+
+    /**
      * Finds a domain object by its public UUID.
      * @param uuid The UUID of the object to find.
      * @return An Optional containing the domain object if found, otherwise empty.
@@ -29,8 +36,8 @@ public interface IService<T, E> {
     Optional<T> findByUuid(UUID uuid);
 
     /**
-     * Finds all domain objects.
-     * @return A Set containing all domain objects.
+     * Finds all domain objects of this type.
+     * @return A set of all domain objects.
      */
     Set<T> findAll();
 
@@ -48,3 +55,4 @@ public interface IService<T, E> {
      */
     void updateEntity(E entity, T domainObject);
 }
+

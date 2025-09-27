@@ -286,8 +286,8 @@ public class LoginApplication extends Application {
                         if (Thread.currentThread().isInterrupted()) return;
 
                         updateMessage("Loading data...");
-                        springContext.getBean(CharacterStore.class).init();
                         springContext.getBean(PlayerStore.class).init();
+                        springContext.getBean(CharacterStore.class).init();
                     } catch (GoogleJsonResponseException e) {
                         System.out.println("Loading failed: " + e);
                     } catch (Exception e) {

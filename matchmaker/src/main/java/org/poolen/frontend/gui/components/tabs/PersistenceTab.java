@@ -169,7 +169,7 @@ public class PersistenceTab extends Tab {
         runTask(() -> {
             //sheetsServiceManager.saveData(spreadsheetId);
             playerStore.saveAll();
-            //characterStore.saveAll();
+            characterStore.saveAll();
 
             return "Data successfully saved to Google Sheet!";
         }, "Saving data...");

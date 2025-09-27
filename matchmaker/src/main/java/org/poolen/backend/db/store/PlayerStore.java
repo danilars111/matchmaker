@@ -53,7 +53,7 @@ public class PlayerStore {
     }
 
     public void saveAll() {
-        playerMap.values().forEach(service::save);
+        service.saveAll(playerMap.values().stream().collect(Collectors.toSet()));
     }
 
     public void addPlayer(Set<Player> players) {

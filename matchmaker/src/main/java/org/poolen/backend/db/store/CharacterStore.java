@@ -63,6 +63,6 @@ public class CharacterStore {
     public void clear() { this.characterMap.clear(); }
 
     public void saveAll() {
-        characterMap.values().forEach(service::save);
+        service.saveAll(characterMap.values().stream().collect(Collectors.toSet()));
     }
 }
