@@ -8,6 +8,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.CharacterFactory;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.backend.db.store.Store;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
@@ -36,12 +37,11 @@ public class CharacterManagementTab extends Tab {
     private final PlayerStore playerStore;
 
     @Autowired
-    public CharacterManagementTab(CharacterStore characterStore, CharacterFactory characterFactory, CharacterRosterTableView rosterView,
-                                  PlayerStore playerStore) {
+    public CharacterManagementTab(Store store, CharacterFactory characterFactory, CharacterRosterTableView rosterView) {
         super("Character Management");
         this.characterFactory = characterFactory;
-        this.characterStore = characterStore;
-        this.playerStore = playerStore;
+        this.characterStore = store.getCharacterStore();
+        this.playerStore = store.getPlayerStore();
 
         this.root = new SplitPane();
         this.characterForm = new CharacterFormView(playerStore);

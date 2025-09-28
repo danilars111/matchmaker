@@ -4,6 +4,7 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
+import org.poolen.backend.db.store.Store;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +23,8 @@ public class CharacterFactory {
 
     // Private constructor to enforce the singleton pattern
     @Autowired
-    public CharacterFactory(CharacterStore store) {
-        this.store = store;
+    public CharacterFactory(Store store) {
+        this.store = store.getCharacterStore();
     }
 
     /**

@@ -6,6 +6,7 @@ import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.PlayerFactory;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.backend.db.store.Store;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
@@ -39,10 +40,10 @@ public class PlayerManagementTab extends Tab {
     private boolean isShowingBlacklist = false;
 
     @Autowired
-    private PlayerManagementTab(PlayerStore playerStore, PlayerFactory playerFactory) {
+    private PlayerManagementTab(Store store, PlayerFactory playerFactory) {
         super("Player Management");
 
-        this.playerStore = playerStore;
+        this.playerStore = store.getPlayerStore();
         this.playerFactory = playerFactory;
         this.root = new SplitPane();
         this.playerForm = new PlayerFormView();

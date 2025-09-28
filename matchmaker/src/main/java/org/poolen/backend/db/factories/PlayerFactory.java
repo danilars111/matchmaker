@@ -2,6 +2,7 @@ package org.poolen.backend.db.factories;
 
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.backend.db.store.Store;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -19,8 +20,8 @@ public class PlayerFactory {
 
     // Private constructor to enforce the singleton pattern
     @Autowired
-    private PlayerFactory(PlayerStore playerStore) {
-        this.playerStore = playerStore;
+    private PlayerFactory(Store store) {
+        this.playerStore = store.getPlayerStore();
     }
 
     /**

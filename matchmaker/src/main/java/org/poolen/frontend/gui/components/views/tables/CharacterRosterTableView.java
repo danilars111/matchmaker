@@ -8,6 +8,7 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
+import org.poolen.backend.db.store.Store;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -27,9 +28,9 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     private Player selectedPlayer; // Can be null to show all characters
 
     @Autowired
-    public CharacterRosterTableView(CharacterStore characterStore) {
+    public CharacterRosterTableView(Store store) {
         super();
-        this.characterStore = characterStore;
+        this.characterStore = store.getCharacterStore();
         this.searchField.setPromptText("Search by character or player name...");
         setupTableColumns();
         setupFilters();

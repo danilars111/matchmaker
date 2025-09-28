@@ -1,36 +1,39 @@
 package org.poolen.backend.db.store;
 
-import jakarta.annotation.PostConstruct;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.jpa.services.PlayerService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Component
 public class PlayerStore {
 
     // The single, final instance of our class.
+    private static final PlayerStore INSTANCE = new PlayerStore();
+
     private final Map<UUID, Player> playerMap;
-    private final PlayerService service;
 
     // Private constructor to prevent additional instances and to enforce
     // singleton
-    @Autowired
-    private PlayerStore(PlayerService service) {
+    private PlayerStore() {
         this.playerMap = new HashMap<>();
-        this.service = service;
     }
 
-    public void init() {
-        service.findAll().forEach(this::addPlayer);
+    protected static PlayerStore getInstance() {
+        return INSTANCE;
+    }
+
+    public void saveAll() {
+        // service.saveAll(playerMap.values().stream().collect(Collectors.toSet()));
+    }
+
+    public void init(Set<Player> players) {
+        players.forEach(this::addPlayer);
     }
 
     public List<Player> getDungeonMasters() {
@@ -39,8 +42,8 @@ public class PlayerStore {
                 .collect(Collectors.toList());
     }
 
-    public List<Player> getAllPlayers() {
-        return this.playerMap.values().stream().toList();
+    public Set<Player> getAllPlayers() {
+        return new HashSet<>(playerMap.values());
     }
 
     public Player getPlayerByUuid(UUID uuid) {
@@ -50,10 +53,6 @@ public class PlayerStore {
     public void addPlayer(Player player) {
         this.playerMap.put(player.getUuid(), player);
         //this.service.save(player);
-    }
-
-    public void saveAll() {
-        service.saveAll(playerMap.values().stream().collect(Collectors.toSet()));
     }
 
     public void addPlayer(Set<Player> players) {

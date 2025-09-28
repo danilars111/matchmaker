@@ -6,8 +6,8 @@ import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
+import org.poolen.backend.db.store.Store;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -62,8 +62,8 @@ public class Matchmaker {
 
 
 
-    public Matchmaker(SettingsStore settingsStore) {
-        this.settingsStore = settingsStore;
+    public Matchmaker(Store store) {
+        this.settingsStore = store.getSettingsStore();
 
         housePriorityMap.put(House.GARNET, (List<House>) settingsStore.getSetting(GARNET_PRIORITIES).getSettingValue());
         housePriorityMap.put(House.AMBER, (List<House>) settingsStore.getSetting(AMBER_PRIORITIES).getSettingValue());

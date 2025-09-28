@@ -6,6 +6,7 @@ import com.google.api.services.sheets.v4.model.*;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.store.SettingsStore;
+import org.poolen.backend.db.store.Store;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -31,12 +32,12 @@ public class SheetsServiceManager {
 
     private final SheetDataMapper sheetDataMapper;
 
-    public SheetsServiceManager(SheetDataMapper sheetDataMapper, SettingsStore settingsStore) {
+    public SheetsServiceManager(SheetDataMapper sheetDataMapper, Store store) {
         this.sheetDataMapper = sheetDataMapper;
-        this.settingsStore = settingsStore;
+        this.settingsStore = store.getSettingsStore();
     }
 
-    public static void connect() throws GeneralSecurityException, IOException {
+    public void connect() throws GeneralSecurityException, IOException {
         Credential credential = GoogleAuthManager.getCredentials();
         sheetsService = new Sheets.Builder(
                 GoogleAuthManager.getHttpTransport(),
@@ -44,61 +45,6 @@ public class SheetsServiceManager {
                 credential)
                 .setApplicationName("Matchmaker")
                 .build();
-    }
-
-    /**
-     * Loads all data (players and settings) from the specified Google Sheet.
-     */
-    public  void loadData(String spreadsheetId) throws IOException {
-        if (sheetsService == null) throw new IllegalStateException("Not connected to Google Sheets.");
-
-        String playerDataSheet = (String) settingsStore.getSetting(Settings.PersistenceSettings.PLAYER_DATA_SHEET_NAME).getSettingValue();
-        String settingsDataSheet = (String) settingsStore.getSetting(Settings.PersistenceSettings.SETTINGS_DATA_SHEET_NAME).getSettingValue();
-
-        List<String> ranges = List.of(playerDataSheet, settingsDataSheet);
-        BatchGetValuesResponse response = sheetsService.spreadsheets().values()
-                .batchGet(spreadsheetId)
-                .setRanges(ranges)
-                .execute();
-
-        Map<String, List<List<Object>>> allSheetData = new java.util.HashMap<>();
-        for (ValueRange valueRange : response.getValueRanges()) {
-            String sheetName = valueRange.getRange().split("!")[0].replace("'", "");
-            allSheetData.put(sheetName, valueRange.getValues());
-        }
-
-        sheetDataMapper.mapSheetsToData(allSheetData);
-    }
-
-    /**
-     * Saves all data (players and settings) to the specified Google Sheet.
-     */
-    public void saveData(String spreadsheetId) throws IOException {
-        if (sheetsService == null) throw new IllegalStateException("Not connected to Google Sheets.");
-
-        String playerDataSheet = (String) settingsStore.getSetting(Settings.PersistenceSettings.PLAYER_DATA_SHEET_NAME).getSettingValue();
-        String settingsDataSheet = (String) settingsStore.getSetting(Settings.PersistenceSettings.SETTINGS_DATA_SHEET_NAME).getSettingValue();
-
-        ensureSheetExists(spreadsheetId, playerDataSheet);
-        ensureSheetExists(spreadsheetId, settingsDataSheet);
-
-        Map<String, List<List<Object>>> allSheetData = sheetDataMapper.mapDataToSheets();
-
-        List<String> rangesToClear = new ArrayList<>();
-        List<ValueRange> dataToWrite = new ArrayList<>();
-
-        for (Map.Entry<String, List<List<Object>>> entry : allSheetData.entrySet()) {
-            rangesToClear.add(entry.getKey());
-            dataToWrite.add(new ValueRange().setRange(entry.getKey()).setValues(entry.getValue()));
-        }
-
-        BatchClearValuesRequest clearBody = new BatchClearValuesRequest().setRanges(rangesToClear);
-        sheetsService.spreadsheets().values().batchClear(spreadsheetId, clearBody).execute();
-
-        BatchUpdateValuesRequest updateBody = new BatchUpdateValuesRequest()
-                .setData(dataToWrite)
-                .setValueInputOption("USER_ENTERED");
-        sheetsService.spreadsheets().values().batchUpdate(spreadsheetId, updateBody).execute();
     }
 
     /**

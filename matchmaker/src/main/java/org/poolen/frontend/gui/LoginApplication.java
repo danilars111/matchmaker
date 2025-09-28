@@ -1,9 +1,7 @@
 package org.poolen.frontend.gui;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.concurrent.Task;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -15,31 +13,21 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import org.poolen.MatchmakerApplication;
-import org.poolen.backend.db.store.CharacterStore;
-import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
+import org.poolen.frontend.util.services.UiGithubTaskService;
+import org.poolen.frontend.util.services.UiGoogleTaskService;
+import org.poolen.frontend.util.services.UiPersistenceService;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.web.github.GitHubUpdateChecker;
 import org.poolen.web.google.GoogleAuthManager;
-import org.poolen.web.google.SheetsServiceManager;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.BindException;
-import java.net.URL;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.file.Files;
-import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import java.net.BindException;
 
 /**
- * The main entry point for the application. This class handles the initial
- * update check, Google authentication, and data loading before showing the main application window.
+ * The main entry point for the application. This class orchestrates the startup
+ * sequence by delegating to various UI services for async operations.
  */
 public class LoginApplication extends Application {
     private ConfigurableApplicationContext springContext;
@@ -48,22 +36,31 @@ public class LoginApplication extends Application {
     private Label statusLabel;
     private Button signInButton;
     private Button exitButton;
-    private Button cancelButton; // Our new cancel button!
     private ProgressIndicator loadingIndicator;
-    private Task<Exception> signInTask; // A reference to our running task
-    private boolean hasAttemptedBindExceptionRetry = false; // Prevents infinite loops
-    private SheetsServiceManager sheetsServiceManager;
+
+    private boolean hasAttemptedBindExceptionRetry = false;
+
+    // Our beautifully separated services!
+    private UiTaskExecutor uiTaskExecutor;
+    private UiPersistenceService uiPersistenceService;
+    private UiGoogleTaskService uiGoogleTaskService;
+    private UiGithubTaskService uiGithubTaskService;
 
     @Override
-    public void init() throws Exception {
+    public void init() {
         springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
+        // Get the beans for our services after the context is initialized.
+        uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
+        uiPersistenceService = springContext.getBean(UiPersistenceService.class);
+        uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
+        uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
     }
 
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
         primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
-        primaryStage.setResizable(false); // Make the window non-resizable
+        primaryStage.setResizable(false);
 
         root = new VBox(20);
         root.setAlignment(Pos.CENTER);
@@ -71,298 +68,124 @@ public class LoginApplication extends Application {
 
         statusLabel = new Label("Starting up...");
         statusLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #2F4F4F;");
-        statusLabel.setTextAlignment(TextAlignment.CENTER); // Center multiline text
+        statusLabel.setTextAlignment(TextAlignment.CENTER);
 
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setPrefSize(50, 50);
 
         signInButton = createGoogleSignInButton();
         signInButton.setVisible(false);
-        signInButton.setOnAction(e -> attemptSignInAndLoad());
+        signInButton.setOnAction(e -> connectAndLoadData());
 
         exitButton = new Button("Exit");
         exitButton.setStyle("-fx-font-size: 14px; -fx-background-color: #6c757d; -fx-text-fill: white;");
         exitButton.setVisible(false);
         exitButton.setOnAction(e -> Platform.exit());
 
-        cancelButton = new Button("Cancel");
-        cancelButton.setStyle("-fx-font-size: 14px; -fx-background-color: #f44336; -fx-text-fill: white;");
-        cancelButton.setVisible(false);
-        cancelButton.setOnAction(e -> {
-            if (signInTask != null) {
-                GoogleAuthManager.abortAuthorization();
-                signInTask.cancel(true);
-            }
-        });
-
-        root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, cancelButton, exitButton);
+        root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, exitButton);
 
         Scene scene = new Scene(root, 400, 300);
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        // The new first step: check for updates!
         checkForUpdates();
     }
 
     private void checkForUpdates() {
-        statusLabel.setText("Checking for updates...");
-        loadingIndicator.setVisible(true);
-
-        Task<GitHubUpdateChecker.UpdateInfo> updateTask = new Task<>() {
-            @Override
-            protected GitHubUpdateChecker.UpdateInfo call() throws Exception {
-                return GitHubUpdateChecker.checkForUpdate();
-            }
-
-            @Override
-            protected void succeeded() {
-                GitHubUpdateChecker.UpdateInfo info = getValue();
-                if (info.isNewVersionAvailable() && info.assetDownloadUrl() != null) {
-                    downloadAndApplyUpdate(info);
-                } else {
-                    initialCheck();
+        uiGithubTaskService.checkForUpdate(
+                primaryStage,
+                (updateInfo) -> {
+                    if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
+                        downloadAndApplyUpdate(updateInfo);
+                    } else {
+                        initialCredentialCheck();
+                    }
+                },
+                (error) -> {
+                    System.err.println("Update check failed: " + error.getMessage());
+                    initialCredentialCheck();
                 }
-            }
-
-            @Override
-            protected void failed() {
-                System.err.println("Update check failed: " + getException().getMessage());
-                initialCheck();
-            }
-        };
-        new Thread(updateTask).start();
+        );
     }
 
     private void downloadAndApplyUpdate(GitHubUpdateChecker.UpdateInfo info) {
-        statusLabel.setText("Update found! Downloading version " + info.latestVersion() + "...");
-
-        Task<File> downloadTask = new Task<>() {
-            @Override
-            protected File call() throws Exception {
-                URL downloadUrl = new URL(info.assetDownloadUrl());
-                File tempFile = File.createTempFile("matchmaker-update-", ".jar");
-                try (InputStream in = downloadUrl.openStream();
-                     ReadableByteChannel rbc = Channels.newChannel(in);
-                     FileOutputStream fos = new FileOutputStream(tempFile)) {
-                    fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+        uiGithubTaskService.downloadUpdate(
+                primaryStage,
+                info,
+                (newJarFile) -> {
+                    // On successful download, ask the service to apply the update.
+                    uiGithubTaskService.applyUpdateAndRestart(
+                            newJarFile,
+                            () -> {
+                                new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait();
+                                initialCredentialCheck();
+                            },
+                            (error) -> {
+                                new ErrorDialog("Update failed: " + error.getMessage(), root).showAndWait();
+                                initialCredentialCheck();
+                            }
+                    );
+                },
+                (error) -> { // This runs if the download fails
+                    new ErrorDialog("Failed to download update: " + error.getMessage(), root).showAndWait();
+                    initialCredentialCheck();
                 }
-                return tempFile;
-            }
+        );
+    }
 
-            @Override
-            protected void succeeded() {
-                try {
-                    File newJar = getValue();
-                    File currentJar = new File(LoginApplication.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-
-                    if (currentJar.isFile() && currentJar.getName().endsWith(".jar")) {
-                        createUpdaterAndRestart(currentJar, newJar);
+    private void initialCredentialCheck() {
+        uiTaskExecutor.execute(
+                primaryStage,
+                "Checking for existing session...",
+                (progressUpdater) -> GoogleAuthManager.hasStoredCredentials(),
+                (hasCredentials) -> {
+                    if (hasCredentials) {
+                        connectAndLoadData();
                     } else {
-                        new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait();
-                        initialCheck();
+                        showLoginUI("Please sign in to continue.");
                     }
-                } catch (Exception e) {
-                    new ErrorDialog("Update failed: " + e.getMessage(), root).showAndWait();
-                    initialCheck();
+                },
+                (error) -> {
+                    showLoginUI("An error occurred. Please try signing in.");
+                    new ErrorDialog("Failed to check for credentials: " + error.getMessage(), root).showAndWait();
                 }
-            }
-
-            @Override
-            protected void failed() {
-                new ErrorDialog("Failed to download update: " + getException().getMessage(), root).showAndWait();
-                initialCheck();
-            }
-        };
-        new Thread(downloadTask).start();
+        );
     }
 
-    private void createUpdaterAndRestart(File currentJar, File newJar) throws IOException {
-        String os = System.getProperty("os.name").toLowerCase();
-        File oldJar = new File(currentJar.getParentFile(), currentJar.getName() + ".old");
-
-        if (os.contains("win")) {
-            // The more robust Windows script that renames instead of deleting immediately.
-            String script = "@echo off\n" +
-                    "echo Updating application...\n" +
-                    "timeout /t 2 /nobreak > NUL\n" +
-                    "del \"" + currentJar.getAbsolutePath() + "\"\n" +
-                    "move \"" + newJar.getAbsolutePath() + "\" \"" + currentJar.getAbsolutePath() + "\"\n" +
-                    "echo Update complete. Restarting...\n" +
-                    "start javaw -jar \"" + currentJar.getAbsolutePath() + "\"\n" +
-                    "del \"%~f0\"";
-            File batFile = File.createTempFile("updater", ".bat");
-            Files.writeString(batFile.toPath(), script);
-
-            // This is our new, sneaky VBScript launcher! It creates a VBScript file that
-            // runs our batch script in a hidden window.
-            String vbsScript = "Set WshShell = CreateObject(\"WScript.Shell\") \n"
-                    + "WshShell.Run \"\"\"" + batFile.getAbsolutePath() + "\"\"\", 0, False";
-            File vbsFile = File.createTempFile("launcher", ".vbs");
-            Files.writeString(vbsFile.toPath(), vbsScript);
-
-            Runtime.getRuntime().exec("wscript.exe \"" + vbsFile.getAbsolutePath() + "\"");
-
-        } else {
-            // Unix/Mac script is generally more robust and should be okay.
-            String script = "#!/bin/bash\n" +
-                    "echo \"Updating application...\"\n" +
-                    "sleep 3\n" +
-                    "mv \"" + currentJar.getAbsolutePath() + "\" \"" + oldJar.getAbsolutePath() + "\"\n" +
-                    "mv \"" + newJar.getAbsolutePath() + "\" \"" + currentJar.getAbsolutePath() + "\"\n" +
-                    "echo \"Update complete. Restarting...\"\n" +
-                    "java -jar \"" + currentJar.getAbsolutePath() + "\" &\n" +
-                    "sleep 3\n" +
-                    "rm \"" + oldJar.getAbsolutePath() + "\"\n" +
-                    "rm -- \"$0\"";
-            File scriptFile = File.createTempFile("updater", ".sh");
-            Files.writeString(scriptFile.toPath(), script);
-            new ProcessBuilder("sh", scriptFile.getAbsolutePath()).start();
-        }
-
-        System.exit(0);
+    private void connectAndLoadData() {
+        uiTaskExecutor.execute(
+                primaryStage,
+                "Connecting...",
+                (progressUpdater) -> {
+                    uiGoogleTaskService.connectToGoogle(progressUpdater);
+                    uiPersistenceService.findAllWithProgress(progressUpdater);
+                    return "Successfully connected and loaded data!";
+                },
+                (successMessage) -> {
+                    System.out.println(successMessage);
+                    showManagementStage();
+                },
+                (error) -> {
+                    if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
+                        hasAttemptedBindExceptionRetry = true;
+                        Platform.runLater(() -> {
+                            GoogleAuthManager.logout();
+                            showLoginUI("Port is busy. Please try signing in again.");
+                        });
+                        return;
+                    }
+                    error.printStackTrace();
+                    new ErrorDialog("Failed to connect or load data: " + error.getMessage(), root).showAndWait();
+                    showLoginUI("Please sign in to continue.");
+                }
+        );
     }
 
-
-    private void initialCheck() {
-        Task<Boolean> checkTask = new Task<>() {
-            @Override
-            protected Boolean call() {
-                return GoogleAuthManager.hasStoredCredentials();
-            }
-
-            @Override
-            protected void succeeded() {
-                if (getValue()) {
-                    attemptSignInAndLoad();
-                } else {
-                    statusLabel.setText("Please sign in to continue.");
-                    loadingIndicator.setVisible(false);
-                    signInButton.setVisible(true);
-                    exitButton.setVisible(true);
-                }
-            }
-
-            @Override
-            protected void failed() {
-                statusLabel.setText("An error occurred. Please try signing in.");
-                loadingIndicator.setVisible(false);
-                signInButton.setVisible(true);
-                exitButton.setVisible(true);
-                new ErrorDialog("Failed to check for credentials: " + getException().getMessage(), root).showAndWait();
-            }
-        };
-        new Thread(checkTask).start();
-    }
-
-    private void attemptSignInAndLoad() {
-        // Update UI for loading state
-        statusLabel.setText("Connecting...");
-        loadingIndicator.setVisible(true);
-        signInButton.setVisible(false);
-        exitButton.setVisible(false);
-        cancelButton.setVisible(true);
-
-        signInTask = new Task<>() {
-            @Override
-            protected Exception call() throws Exception {
-                final AtomicReference<Exception> connectionException = new AtomicReference<>(null);
-                final AtomicReference<Exception> loadDataException = new AtomicReference<>(null);
-
-                final Thread worker = new Thread(() -> {
-                    try {
-                        updateMessage("Attempting to connect...\nPlease check your browser to sign in.");
-                        SheetsServiceManager.connect();
-
-                        Platform.runLater(() -> cancelButton.setVisible(false));
-
-                        if (Thread.currentThread().isInterrupted()) return;
-
-                        updateMessage("Loading data...");
-                        springContext.getBean(PlayerStore.class).init();
-                        springContext.getBean(CharacterStore.class).init();
-                        springContext.getBean(SettingsStore.class).init();
-                    } catch (GoogleJsonResponseException e) {
-                        System.out.println("Loading failed: " + e);
-                    } catch (Exception e) {
-                        if (!(e instanceof InterruptedException || e.getCause() instanceof InterruptedException)) {
-                            connectionException.set(e);
-                        }
-                    }
-                });
-
-                worker.start();
-
-                try {
-                    worker.join();
-                } catch (InterruptedException e) {
-                    if (isCancelled()) {
-                        worker.interrupt();
-                        return null;
-                    }
-                }
-
-                if (connectionException.get() != null) throw connectionException.get();
-                return loadDataException.get();
-            }
-
-            @Override
-            protected void succeeded() {
-                statusLabel.textProperty().unbind();
-                cancelButton.setVisible(false);
-                Exception loadDataError = getValue();
-
-                if (loadDataError != null) {
-                    new ErrorDialog(
-                            "Sign-in was successful, but we couldn't load your data from the sheet, darling.",
-                            root
-                    ).showAndWait();
-                }
-                showManagementStage();
-            }
-
-            @Override
-            protected void cancelled() {
-                statusLabel.textProperty().unbind();
-                cancelButton.setVisible(false);
-                GoogleAuthManager.logout();
-                System.out.println("Sign-in cancelled by user.");
-
-                statusLabel.setText("Please sign in to continue.");
-                loadingIndicator.setVisible(false);
-                signInButton.setVisible(true);
-                exitButton.setVisible(true);
-            }
-
-            @Override
-            protected void failed() {
-                statusLabel.textProperty().unbind();
-                cancelButton.setVisible(false);
-                Throwable error = getException();
-
-                if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
-                    hasAttemptedBindExceptionRetry = true;
-                    Platform.runLater(() -> {
-                        statusLabel.setText("Port is busy. Attempting to reset sign-in...");
-                        GoogleAuthManager.logout();
-                        attemptSignInAndLoad();
-                    });
-                    return;
-                }
-
-                System.err.println("Failed to connect: " + error.getMessage());
-                error.printStackTrace();
-                new ErrorDialog("Failed to connect: " + error.getMessage(), root).showAndWait();
-
-                statusLabel.setText("Please sign in to continue.");
-                loadingIndicator.setVisible(false);
-                signInButton.setVisible(true);
-                exitButton.setVisible(true);
-            }
-        };
-
-        statusLabel.textProperty().bind(signInTask.messageProperty());
-        new Thread(signInTask).start();
+    private void showLoginUI(String message) {
+        statusLabel.setText(message);
+        loadingIndicator.setVisible(false);
+        signInButton.setVisible(true);
+        exitButton.setVisible(true);
     }
 
     private void showManagementStage() {
@@ -384,11 +207,6 @@ public class LoginApplication extends Application {
         return googleButton;
     }
 
-    /**
-     * A helper method to check if the root cause of an exception is a BindException.
-     * @param throwable The exception to check.
-     * @return True if the root cause is a BindException, false otherwise.
-     */
     private boolean isRootCauseBindException(Throwable throwable) {
         if (throwable == null) return false;
         Throwable cause = throwable;
@@ -396,6 +214,12 @@ public class LoginApplication extends Application {
             cause = cause.getCause();
         }
         return cause instanceof BindException;
+    }
+
+    @Override
+    public void stop() {
+        springContext.close();
+        Platform.exit();
     }
 }
 

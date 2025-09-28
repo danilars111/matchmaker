@@ -14,13 +14,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.Settings;
-import org.poolen.backend.db.jpa.services.CharacterService;
-import org.poolen.backend.db.jpa.services.PlayerService;
-import org.poolen.backend.db.store.CharacterStore;
-import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.util.services.UiPersistenceService;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +31,6 @@ import org.springframework.stereotype.Component;
 @Lazy
 public class PersistenceTab extends Tab {
 
-    private final SettingsStore settingsStore;
     private Button signInButton;
     private Button saveButton;
     private Button loadButton;
@@ -44,18 +40,13 @@ public class PersistenceTab extends Tab {
     private StackPane buttonContainer; // To swap between sign-in and other buttons
     private Runnable onDataChanged;
     private Runnable onLogoutRequestHandler;
-    private final PlayerStore playerStore;
-    private final CharacterStore characterStore;
-    private final SheetsServiceManager sheetsServiceManager;
+    private final UiPersistenceService uiPersistenceService;
 
     @Autowired
-    public PersistenceTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore, CharacterStore characterStore, SettingsStore settingsStore) {
+    public PersistenceTab(UiPersistenceService uiPersistenceService) {
         super("Persistence");
 
-        this.characterStore = characterStore;
-        this.playerStore = playerStore;
-        this.sheetsServiceManager = sheetsServiceManager;
-        this.settingsStore = settingsStore;
+        this.uiPersistenceService = uiPersistenceService;
 
         // --- UI Components ---
         signInButton = createGoogleSignInButton();
@@ -157,40 +148,17 @@ public class PersistenceTab extends Tab {
 
     private void handleSignIn() {
         runTask(() -> {
-            SheetsServiceManager.connect();
+            //SheetsServiceManager.connect();
             return "Successfully signed in to Google!";
         }, "Signing in...");
     }
 
     private void handleSave() {
-        String spreadsheetId = (String) settingsStore.getSetting(Settings.PersistenceSettings.SHEETS_ID).getSettingValue();
-        if (spreadsheetId == null || spreadsheetId.isBlank()) {
-            new ErrorDialog("Please set a Spreadsheet ID in the Settings tab first, darling.", this.getTabPane()).showAndWait();
-            return;
-        }
-        runTask(() -> {
-            //sheetsServiceManager.saveData(spreadsheetId);
-            playerStore.saveAll();
-            characterStore.saveAll();
-            settingsStore.saveAll();
-
-            return "Data successfully saved to Google Sheet!";
-        }, "Saving data...");
+        uiPersistenceService.saveAll(getTabPane().getScene().getWindow(), onDataChanged);
     }
 
     private void handleLoad() {
-        String spreadsheetId = (String) settingsStore.getSetting(Settings.PersistenceSettings.SHEETS_ID).getSettingValue();
-        if (spreadsheetId == null || spreadsheetId.isBlank()) {
-            new ErrorDialog("Please set a Spreadsheet ID in the Settings tab first, darling.", this.getTabPane()).showAndWait();
-            return;
-        }
-        runTask(() -> {
-            //sheetsServiceManager.loadData(spreadsheetId);
-            playerStore.init();
-            characterStore.init();
-            settingsStore.init();
-            return "Data successfully loaded from Google Sheet!";
-        }, "Loading data...");
+        uiPersistenceService.findAll(getTabPane().getScene().getWindow(), onDataChanged);
     }
 
     private void runTask(TaskOperation operation, String statusMessage) {

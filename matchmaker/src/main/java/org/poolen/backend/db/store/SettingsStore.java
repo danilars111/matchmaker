@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.poolen.backend.db.constants.Settings.MatchmakerBonusSettings.*;
@@ -21,33 +22,35 @@ import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetti
 import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.*;
 import static org.poolen.backend.db.constants.Settings.PersistenceSettings.*;
 
-@Component
-@Lazy
 public class SettingsStore {
     private Map<ISettings, Setting<?>> settingsMap;
-    SettingService service;
+
+    private static final SettingsStore INSTANCE = new SettingsStore();
+
 
     // Private constructor to prevent additional instances and to enforce
     // singleton
-    @Autowired
-    private SettingsStore(SettingService service) {
+    private SettingsStore() {
         this.settingsMap = new HashMap<>();
-        this.service = service;
         setDefaultSettings();
     }
 
-    public void init() {
-        service.findAll().forEach(setting -> settingsMap.put(setting.getName(), setting));
+    protected static SettingsStore getInstance() {
+        return INSTANCE;
+    }
+
+        public void init(Set<Setting<?>> settings) {
+            settings.forEach(setting -> settingsMap.put(setting.getName(), setting));
     }
 
     public void saveAll() {
-        service.saveAll(settingsMap.values().stream().collect(Collectors.toCollection(HashSet::new)));
+        //service.saveAll(settingsMap.values().stream().collect(Collectors.toCollection(HashSet::new)));
     }
     public Setting getSetting(ISettings setting){
         return this.settingsMap.get(setting);
     }
-    public Map<ISettings, Setting<?>> getSettingsMap() {
-        return this.settingsMap;
+    public Set<Setting<?>> getSettings() {
+        return new HashSet<>(settingsMap.values());
     }
 
     public <T> void updateSetting(ISettings setting, T value) {

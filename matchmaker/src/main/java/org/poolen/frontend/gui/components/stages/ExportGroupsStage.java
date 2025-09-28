@@ -143,7 +143,7 @@ public class ExportGroupsStage extends Stage {
         updatePlayerLogs();
 
         runTask("Writing to Google Sheets...", () -> {
-            sheetsServiceManager.saveData(spreadsheetId);
+            //sheetsServiceManager.saveData(spreadsheetId);
             sheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
             return "Groups have been written to the sheet.";
         });

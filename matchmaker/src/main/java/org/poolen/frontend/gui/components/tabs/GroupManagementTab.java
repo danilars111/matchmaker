@@ -16,6 +16,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
+import org.poolen.backend.db.store.Store;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
@@ -80,13 +81,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
 
     @Autowired
-    private GroupManagementTab(SheetsServiceManager sheetsServiceManager, PlayerStore playerStore,
-                               Matchmaker matchmaker, SettingsStore settingsStore) {
+    private GroupManagementTab(Store store, SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker) {
         super("Group Management");
 
         this.sheetsServiceManager = sheetsServiceManager;
-        this.playerStore = playerStore;
-        this.settingsStore = settingsStore;
+        this.playerStore = store.getPlayerStore();
+        this.settingsStore = store.getSettingsStore();
         this.matchmaker = matchmaker;
     }
 

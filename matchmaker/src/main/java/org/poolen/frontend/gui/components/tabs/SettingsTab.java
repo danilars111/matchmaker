@@ -11,9 +11,11 @@ import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Setting;
 import org.poolen.backend.db.interfaces.ISettings;
 import org.poolen.backend.db.store.SettingsStore;
+import org.poolen.backend.db.store.Store;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.util.services.UiPersistenceService;
 import org.poolen.web.google.SheetsServiceManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -40,17 +42,17 @@ public class SettingsTab extends Tab {
     private final Map<ISettings, Node> settingControls = new HashMap<>();
     private final HBox buttonBox;
     private final BorderPane root;
-    private SheetsServiceManager sheetsServiceManager;
+    private UiPersistenceService uiPersistenceService;
 
     private static final List<ISettings> HIDDEN_SETTINGS = List.of(
             Settings.MatchmakerBonusSettings.BUDDY_BONUS
     );
 
     @Autowired
-    public SettingsTab(SheetsServiceManager sheetsServiceManager, SettingsStore settingsStore) {
+    public SettingsTab(UiPersistenceService uiPersistenceService, Store store) {
         super("Settings");
-        this.sheetsServiceManager = sheetsServiceManager;
-        this.settingsStore = settingsStore;
+        this.settingsStore = store.getSettingsStore();
+        this.uiPersistenceService = uiPersistenceService;
 
         // --- Main Layout ---
         root = new BorderPane();
@@ -206,7 +208,6 @@ public class SettingsTab extends Tab {
     }
 
     private void saveSettings() {
-        // --- Step 1: Update the in-memory store from the UI ---
         try {
             for (Map.Entry<ISettings, Node> entry : settingControls.entrySet()) {
                 ISettings settingEnum = entry.getKey();
@@ -234,38 +235,10 @@ public class SettingsTab extends Tab {
             return; // Stop if parsing failed
         }
 
-        // --- Step 2: Save the updated store to Google Sheets ---
-        String spreadsheetId = (String) settingsStore.getSetting(Settings.PersistenceSettings.SHEETS_ID).getSettingValue();
-        if (spreadsheetId == null || spreadsheetId.trim().isEmpty()) {
-            new ErrorDialog("The Sheets ID is empty, darling! I can't save without an address.", this.getTabPane()).showAndWait();
-            return;
-        }
-
         buttonBox.setDisable(true);
         root.setCursor(javafx.scene.Cursor.WAIT);
 
-        Task<Void> saveTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                sheetsServiceManager.saveData(spreadsheetId);
-                return null;
-            }
-
-            @Override
-            protected void succeeded() {
-                buttonBox.setDisable(false);
-                root.setCursor(javafx.scene.Cursor.DEFAULT);
-                new InfoDialog("Settings have been saved to Google Sheets successfully!", getTabPane()).showAndWait();
-            }
-
-            @Override
-            protected void failed() {
-                buttonBox.setDisable(false);
-                root.setCursor(javafx.scene.Cursor.DEFAULT);
-                new ErrorDialog("Could not save settings to Google Sheets.\nError: " + getException().getMessage(), getTabPane()).showAndWait();
-            }
-        };
-        new Thread(saveTask).start();
+        uiPersistenceService.saveSettings(getTabPane().getScene().getWindow());
     }
 
     private String formatEnumName(String enumName) {
