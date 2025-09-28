@@ -11,6 +11,7 @@ import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
 import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
+import org.poolen.frontend.util.services.UiPersistenceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -38,11 +39,14 @@ public class PlayerManagementTab extends Tab {
     private final PlayerStore playerStore;
     private final PlayerFactory playerFactory;
     private boolean isShowingBlacklist = false;
+    private final UiPersistenceService uiPersistenceService;
 
     @Autowired
-    private PlayerManagementTab(Store store, PlayerFactory playerFactory) {
+    private PlayerManagementTab(Store store, UiPersistenceService uiPersistenceService,
+                                PlayerFactory playerFactory) {
         super("Player Management");
 
+        this.uiPersistenceService = uiPersistenceService;
         this.playerStore = store.getPlayerStore();
         this.playerFactory = playerFactory;
         this.root = new SplitPane();
@@ -99,31 +103,33 @@ public class PlayerManagementTab extends Tab {
     }
 
     private void handlePlayerAction() {
-        Player playerToEdit = (Player) playerForm.getItemBeingEdited();
-        if (playerToEdit == null) {
+        Player player = (Player) playerForm.getItemBeingEdited();
+        if (player == null) {
             // Creating a new player using the factory
-            playerFactory.create(playerForm.getPlayerName(), playerForm.isDungeonMaster());
+            player = playerFactory.create(playerForm.getPlayerName(), playerForm.isDungeonMaster());
         } else {
             // Updating an existing player
-            playerToEdit.setName(playerForm.getPlayerName());
-            playerToEdit.setDungeonMaster(playerForm.isDungeonMaster());
-            playerStore.addPlayer(playerToEdit);
+            player.setName(playerForm.getPlayerName());
+            player.setDungeonMaster(playerForm.isDungeonMaster());
+            playerStore.addPlayer(player);
         }
+        uiPersistenceService.savePlayer(player, getTabPane().getScene().getWindow());
         onPlayerListChanged.run(); // Notify everyone!
         rosterView.updateRoster();
         playerForm.clearForm();
     }
 
     private void handleDelete() {
-        Player playerToDelete = (Player) playerForm.getItemBeingEdited();
-        if (playerToDelete != null) {
+        Player player = (Player) playerForm.getItemBeingEdited();
+        if (player != null) {
             ConfirmationDialog confirmation = new ConfirmationDialog(
-                    "Are you sure you want to delete " + playerToDelete.getName() + "? This cannot be undone.",
+                    "Are you sure you want to delete " + player.getName() + "? This cannot be undone.",
                     this.getTabPane()
             );
             Optional<ButtonType> response = confirmation.showAndWait();
             if (response.isPresent() && response.get() == ButtonType.YES) {
-                playerStore.removePlayer(playerToDelete);
+                playerStore.removePlayer(player);
+                uiPersistenceService.deletePlayer(player, getTabPane().getScene().getWindow());
                 onPlayerListChanged.run();
                 rosterView.updateRoster();
                 playerForm.clearForm();

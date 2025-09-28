@@ -15,6 +15,7 @@ import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
 import org.poolen.frontend.gui.components.views.tables.CharacterRosterTableView;
+import org.poolen.frontend.util.services.UiPersistenceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -35,13 +36,16 @@ public class CharacterManagementTab extends Tab {
     private final CharacterFactory characterFactory;
     private final CharacterStore characterStore;
     private final PlayerStore playerStore;
+    private final UiPersistenceService uiPersistenceService;
 
     @Autowired
-    public CharacterManagementTab(Store store, CharacterFactory characterFactory, CharacterRosterTableView rosterView) {
+    public CharacterManagementTab(Store store, UiPersistenceService uiPersistenceService,
+                                  CharacterFactory characterFactory, CharacterRosterTableView rosterView) {
         super("Character Management");
         this.characterFactory = characterFactory;
         this.characterStore = store.getCharacterStore();
         this.playerStore = store.getPlayerStore();
+        this.uiPersistenceService = uiPersistenceService;
 
         this.root = new SplitPane();
         this.characterForm = new CharacterFormView(playerStore);
@@ -110,16 +114,16 @@ public class CharacterManagementTab extends Tab {
 
 
     private void handleCharacterAction() {
-        Character characterToEdit = (Character) characterForm.getItemBeingEdited();
+        Character character = characterForm.getItemBeingEdited();
         if (characterForm.getSelectedPlayer() == null) {
-            new InfoDialog("A character must belong to a player, darling!", this.getTabPane()).showAndWait();
+            new InfoDialog("A character must belong to a player!", this.getTabPane()).showAndWait();
             return;
         }
 
         try {
-            if (characterToEdit == null) {
+            if (character == null) {
                 // Creating a new character
-                characterFactory.create(
+                character = characterFactory.create(
                         characterForm.getSelectedPlayer(),
                         characterForm.getCharacterName(),
                         characterForm.getSelectedHouse(),
@@ -128,10 +132,10 @@ public class CharacterManagementTab extends Tab {
             } else {
                 // Updating an existing character
                 boolean isBecomingMain = characterForm.isMainCharacter();
-                Player owner = characterToEdit.getPlayer();
+                Player owner = character.getPlayer();
                 Character currentMain = owner.getMainCharacter();
 
-                if (isBecomingMain && currentMain != null && !currentMain.equals(characterToEdit)) {
+                if (isBecomingMain && currentMain != null && !currentMain.equals(character)) {
                     ConfirmationDialog confirmation = new ConfirmationDialog(
                             owner.getName() + " already has a main character: " + currentMain.getName() + ".\n\n" +
                                     "Do you want to make " + characterForm.getCharacterName() + " their new main character?",
@@ -139,16 +143,17 @@ public class CharacterManagementTab extends Tab {
                     );
                     Optional<ButtonType> response = confirmation.showAndWait();
                     if (response.isEmpty() || response.get() != ButtonType.YES) {
-                        characterForm.populateForm(characterToEdit); // Revert the checkbox change visually
+                        characterForm.populateForm(character); // Revert the checkbox change visually
                         return; // Stop the action
                     }
                 }
-
-                characterToEdit.setName(characterForm.getCharacterName());
-                characterToEdit.setHouse(characterForm.getSelectedHouse());
-                characterToEdit.setMain(characterForm.isMainCharacter());
-                characterStore.addCharacter(characterToEdit);
+                character.setPlayer(characterForm.getSelectedPlayer());
+                character.setName(characterForm.getCharacterName());
+                character.setHouse(characterForm.getSelectedHouse());
+                character.setMain(characterForm.isMainCharacter());
+                characterStore.addCharacter(character);
             }
+            uiPersistenceService.saveCharacters(character.getPlayer(), getTabPane().getScene().getWindow());
             onListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
@@ -163,6 +168,7 @@ public class CharacterManagementTab extends Tab {
         if (character != null) {
             character.setRetired(true);
             characterStore.addCharacter(character);
+            uiPersistenceService.saveCharacters(character.getPlayer(), getTabPane().getScene().getWindow());
             onListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
@@ -175,6 +181,7 @@ public class CharacterManagementTab extends Tab {
         if (character != null) {
             character.setRetired(false);
             characterStore.addCharacter(character);
+            uiPersistenceService.saveCharacters(character.getPlayer(), getTabPane().getScene().getWindow());
             onListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
@@ -195,9 +202,10 @@ public class CharacterManagementTab extends Tab {
                 Player owner = characterToDelete.getPlayer();
                 if (owner != null) {
                     owner.removeCharacter(characterToDelete);
-                    playerStore.addPlayer(owner); // Persist the change to the player
+                    playerStore.addPlayer(owner);
                 }
                 characterStore.removeCharacter(characterToDelete);
+                uiPersistenceService.deleteCharacter(characterToDelete, getTabPane().getScene().getWindow());
                 onListChanged.run();
                 rosterView.updateRoster();
                 characterForm.clearForm();
