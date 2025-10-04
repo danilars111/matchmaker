@@ -15,10 +15,12 @@ import javafx.stage.Stage;
 import org.poolen.MatchmakerApplication;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
+import org.poolen.frontend.gui.components.stages.SetupStage;
 import org.poolen.frontend.util.services.UiGithubTaskService;
 import org.poolen.frontend.util.services.UiGoogleTaskService;
 import org.poolen.frontend.util.services.UiPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
+import org.poolen.util.PropertiesManager;
 import org.poolen.web.github.GitHubUpdateChecker;
 import org.poolen.web.google.GoogleAuthManager;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -70,16 +72,29 @@ public class LoginApplication extends Application {
 
     @Override
     public void init() {
-        springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
-        // Get the beans for our services after the context is initialized.
-        uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
-        uiPersistenceService = springContext.getBean(UiPersistenceService.class);
-        uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
-        uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
+        // We only initialize Spring if we have a properties file.
+        // If not, the setup stage will run first, and the user will restart.
+        if (PropertiesManager.propertiesFileExists()) {
+            springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
+            // Get the beans for our services after the context is initialized.
+            uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
+            uiPersistenceService = springContext.getBean(UiPersistenceService.class);
+            uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
+            uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
+        }
     }
 
     @Override
     public void start(Stage primaryStage) {
+        // --- FIRST-TIME SETUP CHECK ---
+        // If the properties file doesn't exist, we must run the setup.
+        if (!PropertiesManager.propertiesFileExists()) {
+            SetupStage setupStage = new SetupStage();
+            setupStage.show();
+            return; // Stop here and let the user set up the app.
+        }
+
+        // --- NORMAL STARTUP ---
         this.primaryStage = primaryStage;
         primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
         primaryStage.setResizable(false);
@@ -266,8 +281,9 @@ public class LoginApplication extends Application {
 
     @Override
     public void stop() {
-        springContext.close();
+        if (springContext != null) {
+            springContext.close();
+        }
         Platform.exit();
     }
 }
-

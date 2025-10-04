@@ -11,14 +11,14 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.SheetsScopes;
+import org.poolen.util.AppDataHandler; // <-- IMPORT OUR HELPER!
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
 import java.util.List;
@@ -29,9 +29,10 @@ import java.util.List;
  */
 public class GoogleAuthManager {
 
-    private static final String APPLICATION_NAME = "D&D Matchmaker Deluxe";
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-    private static final String TOKENS_DIRECTORY_PATH = "tokens";
+    // --- THIS IS THE MAGIC! ---
+    // We get the main app data directory and create a 'tokens' sub-directory inside it.
+    private static final Path TOKENS_DIRECTORY_PATH = AppDataHandler.getAppDataDirectory().resolve("tokens");
     private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
     private static final String CREDENTIALS_FILE_PATH = "/credentials/credentials.json";
     private static HttpTransport HTTP_TRANSPORT;
@@ -62,7 +63,8 @@ public class GoogleAuthManager {
 
         return new GoogleAuthorizationCodeFlow.Builder(
                 HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-                .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
+                // Use the new path, converting it to a File object for the factory.
+                .setDataStoreFactory(new FileDataStoreFactory(TOKENS_DIRECTORY_PATH.toFile()))
                 .setAccessType("offline")
                 .build();
     }
@@ -119,10 +121,9 @@ public class GoogleAuthManager {
      */
     public static void logout() {
         try {
-            File tokensDir = new File(TOKENS_DIRECTORY_PATH);
-            if (tokensDir.exists()) {
-                Files.deleteIfExists(Paths.get(TOKENS_DIRECTORY_PATH, "StoredCredential"));
-            }
+            // Use our new Path object to find and delete the credential file.
+            Path storedCredentialPath = TOKENS_DIRECTORY_PATH.resolve("StoredCredential");
+            Files.deleteIfExists(storedCredentialPath);
         } catch (IOException e) {
             System.err.println("Failed to delete tokens on logout: " + e.getMessage());
         }
