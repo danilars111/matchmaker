@@ -1,6 +1,5 @@
 package org.poolen.frontend.util.services;
 
-import javafx.stage.Window;
 import org.poolen.frontend.gui.LoginApplication;
 import org.poolen.web.github.GitHubUpdateChecker;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,60 +19,46 @@ import java.util.function.Consumer;
 @Service
 @Lazy
 public class UiGithubTaskService {
-    private final UiTaskExecutor uiTaskExecutor;
+    // This service no longer needs the UiTaskExecutor!
 
     @Autowired
-    public UiGithubTaskService(UiTaskExecutor uiTaskExecutor) {
-        this.uiTaskExecutor = uiTaskExecutor;
+    public UiGithubTaskService() {
+        // Constructor is now simpler.
     }
 
     /**
-     * Checks for a new version on GitHub and executes a callback with the result.
-     *
-     * @param owner    The owner window for the loading overlay.
-     * @param onResult A consumer for the UpdateInfo if the check succeeds.
-     * @param onError  A consumer for the exception if the check fails.
+     * A simple helper method that checks for a new version on GitHub.
+     * Designed to be called from within a UiTaskExecutor.
+     * @param progressUpdater The consumer to update the UI message.
+     * @return The update information.
+     * @throws Exception if the check fails.
      */
-    public void checkForUpdate(Window owner, Consumer<GitHubUpdateChecker.UpdateInfo> onResult, Consumer<Throwable> onError) {
-        uiTaskExecutor.execute(
-                owner,
-                "Checking for updates...",
-                (progressUpdater) ->  {
-                    progressUpdater.accept("Checking for updates...");
-                    return GitHubUpdateChecker.checkForUpdate();
-                },
-
-                onResult,
-                onError
-        );
+    public GitHubUpdateChecker.UpdateInfo checkForUpdate(Consumer<String> progressUpdater) throws Exception {
+        progressUpdater.accept("Checking GitHub for new releases...");
+        return GitHubUpdateChecker.checkForUpdate();
     }
 
     /**
-     * Downloads a new version from the provided URL.
-     *
-     * @param owner    The owner window for the loading overlay.
-     * @param info     The update information containing the download URL.
-     * @param onResult A consumer for the downloaded File if successful.
-     * @param onError  A consumer for the exception if the download fails.
+     * A simple helper method that downloads a new version from the provided URL.
+     * Designed to be called from within a UiTaskExecutor.
+     * @param info The update information containing the download URL.
+     * @param progressUpdater The consumer to update the UI message.
+     * @return The downloaded File.
+     * @throws IOException if the download fails.
      */
-    public void downloadUpdate(Window owner, GitHubUpdateChecker.UpdateInfo info, Consumer<File> onResult, Consumer<Throwable> onError) {
-        uiTaskExecutor.execute(
-                owner,
-                "Update found! Downloading version " + info.latestVersion() + "...",
-                (progressUpdater) -> {
-                    progressUpdater.accept("Update found! Downloading version ");
-                    URL downloadUrl = new URL(info.assetDownloadUrl());
-                    File tempFile = File.createTempFile("matchmaker-update-", ".jar");
-                    try (InputStream in = downloadUrl.openStream();
-                         ReadableByteChannel rbc = Channels.newChannel(in);
-                         FileOutputStream fos = new FileOutputStream(tempFile)) {
-                        fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
-                    }
-                    return tempFile;
-                },
-                onResult,
-                onError
-        );
+    public File downloadUpdate(GitHubUpdateChecker.UpdateInfo info, Consumer<String> progressUpdater) throws IOException {
+        progressUpdater.accept("Contacting download server...");
+        URL downloadUrl = new URL(info.assetDownloadUrl());
+        File tempFile = File.createTempFile("matchmaker-update-", ".jar");
+        try (InputStream in = downloadUrl.openStream();
+             ReadableByteChannel rbc = Channels.newChannel(in);
+             FileOutputStream fos = new FileOutputStream(tempFile)) {
+            // In a real-world scenario with large files, you'd calculate progress here!
+            // For now, a simple message will do.
+            progressUpdater.accept("Downloading version " + info.latestVersion() + "...");
+            fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+        }
+        return tempFile;
     }
 
     /**
@@ -141,3 +126,4 @@ public class UiGithubTaskService {
         System.exit(0);
     }
 }
+

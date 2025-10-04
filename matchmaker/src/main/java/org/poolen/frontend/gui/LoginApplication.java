@@ -23,6 +23,8 @@ import org.poolen.web.github.GitHubUpdateChecker;
 import org.poolen.web.google.GoogleAuthManager;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+
+import java.io.File;
 import java.net.BindException;
 
 /**
@@ -45,6 +47,26 @@ public class LoginApplication extends Application {
     private UiPersistenceService uiPersistenceService;
     private UiGoogleTaskService uiGoogleTaskService;
     private UiGithubTaskService uiGithubTaskService;
+
+    // A helper class to pass results from the background thread to the UI thread.
+    private static class StartupResult {
+        enum Status { UPDATE_READY, LOGIN_SUCCESSFUL, SHOW_LOGIN_UI }
+        private final Status status;
+        private final Object data;
+
+        public StartupResult(Status status, Object data) {
+            this.status = status;
+            this.data = data;
+        }
+
+        public StartupResult(Status status) {
+            this(status, null);
+        }
+
+        public Status getStatus() { return status; }
+        public Object getData() { return data; }
+    }
+
 
     @Override
     public void init() {
@@ -75,7 +97,7 @@ public class LoginApplication extends Application {
 
         signInButton = createGoogleSignInButton();
         signInButton.setVisible(false);
-        signInButton.setOnAction(e -> connectAndLoadData());
+        signInButton.setOnAction(e -> handleUserLogin());
 
         exitButton = new Button("Exit");
         exitButton.setStyle("-fx-font-size: 14px; -fx-background-color: #6c757d; -fx-text-fill: white;");
@@ -88,98 +110,124 @@ public class LoginApplication extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        checkForUpdates();
+        beginStartupSequence();
     }
 
-    private void checkForUpdates() {
-        uiGithubTaskService.checkForUpdate(
-                primaryStage,
-                (updateInfo) -> {
-                    if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
-                        downloadAndApplyUpdate(updateInfo);
-                    } else {
-                        initialCredentialCheck();
-                    }
-                },
-                (error) -> {
-                    System.err.println("Update check failed: " + error.getMessage());
-                    initialCredentialCheck();
-                }
-        );
-    }
-
-    private void downloadAndApplyUpdate(GitHubUpdateChecker.UpdateInfo info) {
-        uiGithubTaskService.downloadUpdate(
-                primaryStage,
-                info,
-                (newJarFile) -> {
-                    // On successful download, ask the service to apply the update.
-                    uiGithubTaskService.applyUpdateAndRestart(
-                            newJarFile,
-                            () -> {
-                                new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait();
-                                initialCredentialCheck();
-                            },
-                            (error) -> {
-                                new ErrorDialog("Update failed: " + error.getMessage(), root).showAndWait();
-                                initialCredentialCheck();
-                            }
-                    );
-                },
-                (error) -> { // This runs if the download fails
-                    new ErrorDialog("Failed to download update: " + error.getMessage(), root).showAndWait();
-                    initialCredentialCheck();
-                }
-        );
-    }
-
-    private void initialCredentialCheck() {
+    /**
+     * This is the main entry point for the application's automatic startup logic.
+     * It runs all startup tasks sequentially in a single background thread and
+     * shows a single success animation at the very end.
+     */
+    private void beginStartupSequence() {
         uiTaskExecutor.execute(
                 primaryStage,
-                "Checking for existing session...",
-                (progressUpdater) -> GoogleAuthManager.hasStoredCredentials(),
-                (hasCredentials) -> {
-                    if (hasCredentials) {
-                        connectAndLoadData();
+                "Starting application...",
+                "Ready!", // The final success message for the entire sequence!
+                (progressUpdater) -> {
+                    // --- 1. UPDATE CHECK ---
+                    try {
+                        progressUpdater.accept("Checking for updates...");
+                        GitHubUpdateChecker.UpdateInfo updateInfo = uiGithubTaskService.checkForUpdate(progressUpdater);
+                        if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
+                            progressUpdater.accept("Downloading new version...");
+                            File newJarFile = uiGithubTaskService.downloadUpdate(updateInfo, progressUpdater);
+                            // Return the downloaded file to the UI thread to handle the restart logic.
+                            return new StartupResult(StartupResult.Status.UPDATE_READY, newJarFile);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Update process failed, continuing startup: " + e.getMessage());
+                        // Don't stop, just log the error and continue to the next step.
+                    }
+
+                    // --- 2. CREDENTIAL CHECK & AUTO-LOGIN ---
+                    progressUpdater.accept("Checking for existing session...");
+                    if (GoogleAuthManager.hasStoredCredentials()) {
+                        uiGoogleTaskService.connectToGoogle(progressUpdater);
+                        uiPersistenceService.findAllWithProgress(progressUpdater);
+                        return new StartupResult(StartupResult.Status.LOGIN_SUCCESSFUL);
                     } else {
-                        showLoginUI("Please sign in to continue.");
+                        return new StartupResult(StartupResult.Status.SHOW_LOGIN_UI);
                     }
                 },
-                (error) -> {
-                    showLoginUI("An error occurred. Please try signing in.");
-                    new ErrorDialog("Failed to check for credentials: " + error.getMessage(), root).showAndWait();
-                }
+                (result) -> { // onSuccess on UI Thread
+                    switch (result.getStatus()) {
+                        case UPDATE_READY:
+                            // The background task is done, now we can interact with the UI to apply the update.
+                            applyUpdate((File) result.getData());
+                            break;
+                        case LOGIN_SUCCESSFUL:
+                            showManagementStage();
+                            break;
+                        case SHOW_LOGIN_UI:
+                            showLoginUI("Please sign in to continue.");
+                            break;
+                    }
+                },
+                this::handleStartupError // onError on UI Thread
         );
     }
 
-    private void connectAndLoadData() {
+    /**
+     * This is called when the user explicitly clicks the "Sign In" button.
+     * It skips the update and credential checks.
+     */
+    private void handleUserLogin() {
         uiTaskExecutor.execute(
                 primaryStage,
                 "Connecting...",
+                "Successfully connected!",
                 (progressUpdater) -> {
                     uiGoogleTaskService.connectToGoogle(progressUpdater);
                     uiPersistenceService.findAllWithProgress(progressUpdater);
-                    return "Successfully connected and loaded data!";
+                    return "LOGIN_SUCCESSFUL";
                 },
-                (successMessage) -> {
-                    System.out.println(successMessage);
-                    showManagementStage();
+                (result) -> {
+                    if ("LOGIN_SUCCESSFUL".equals(result)) {
+                        showManagementStage();
+                    }
+                },
+                this::handleStartupError
+        );
+    }
+
+    /**
+     * Attempts to apply a new update. If successful, the app restarts.
+     * If it fails for any reason, it proceeds to the next startup step.
+     */
+    private void applyUpdate(File newJarFile) {
+        // This call will either exit the app or call one of the lambdas below.
+        uiGithubTaskService.applyUpdateAndRestart(
+                newJarFile,
+                () -> {
+                    new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait();
+                    showLoginUI("Please sign in to continue.");
                 },
                 (error) -> {
-                    if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
-                        hasAttemptedBindExceptionRetry = true;
-                        Platform.runLater(() -> {
-                            GoogleAuthManager.logout();
-                            showLoginUI("Port is busy. Please try signing in again.");
-                        });
-                        return;
-                    }
-                    error.printStackTrace();
-                    new ErrorDialog("Failed to connect or load data: " + error.getMessage(), root).showAndWait();
+                    new ErrorDialog("Update failed: " + error.getMessage(), root).showAndWait();
                     showLoginUI("Please sign in to continue.");
                 }
         );
     }
+
+    /**
+     * A centralized error handler for any failure during the startup or login process.
+     */
+    private void handleStartupError(Throwable error) {
+        if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
+            hasAttemptedBindExceptionRetry = true;
+            Platform.runLater(() -> {
+                GoogleAuthManager.logout();
+                showLoginUI("A service is already running on the required port. Please close other instances and try signing in again.");
+            });
+            return;
+        }
+
+        GoogleAuthManager.logout();
+        new ErrorDialog("An error occurred: " + error.getMessage(), root).showAndWait();
+        error.printStackTrace();
+        showLoginUI("Something went wrong. Please try signing in again.");
+    }
+
 
     private void showLoginUI(String message) {
         statusLabel.setText(message);

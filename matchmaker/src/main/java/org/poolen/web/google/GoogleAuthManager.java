@@ -49,25 +49,32 @@ public class GoogleAuthManager {
     }
 
     /**
-     * Authorizes the installed application to access user's protected data.
-     *
-     * @return A credential object.
+     * A helper method to build the GoogleAuthorizationCodeFlow.
+     * @return A configured GoogleAuthorizationCodeFlow instance.
      * @throws IOException If the credentials file cannot be found or read.
-     * @throws GeneralSecurityException If there is a security-related issue.
      */
-    public static Credential getCredentials() throws IOException, GeneralSecurityException {
+    private static GoogleAuthorizationCodeFlow getFlow() throws IOException {
         InputStream in = GoogleAuthManager.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
         if (in == null) {
             throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
         }
         GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
 
-        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
+        return new GoogleAuthorizationCodeFlow.Builder(
                 HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
                 .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
                 .setAccessType("offline")
                 .build();
+    }
 
+    /**
+     * Authorizes the installed application to access user's protected data.
+     *
+     * @return A credential object.
+     * @throws IOException If the credentials file cannot be found or read.
+     */
+    public static Credential getCredentials() throws IOException {
+        GoogleAuthorizationCodeFlow flow = getFlow();
         // This is the part that starts the local server. We store it before using it.
         receiver = new LocalServerReceiver.Builder().setPort(8888).build();
         try {
@@ -80,11 +87,31 @@ public class GoogleAuthManager {
     }
 
     /**
-     * Checks if there are any stored credentials on disk without triggering a sign-in.
-     * @return True if a "StoredCredential" file exists, false otherwise.
+     * Checks if there are valid, refreshable credentials on disk without triggering a sign-in.
+     * @return True if valid credentials exist, false otherwise.
      */
     public static boolean hasStoredCredentials() {
-        return Files.exists(Paths.get(TOKENS_DIRECTORY_PATH, "StoredCredential"));
+        try {
+            Credential credential = getFlow().loadCredential("user");
+            if (credential != null) {
+                // A non-null credential means a token file exists. Now, let's see if it's valid.
+                // The refreshToken() method is the key. It returns true if it successfully refreshed.
+                // It returns false if no refresh was needed (i.e., the token is still valid).
+                // Most importantly, it throws an IOException (specifically TokenResponseException)
+                // if the token is expired or revoked. This is our validation check!
+                credential.refreshToken();
+                // If the line above doesn't throw an exception, the credential is valid.
+                return true;
+            }
+            // No credential file found.
+            return false;
+        } catch (IOException e) {
+            // This block will catch the TokenResponseException for an invalid_grant.
+            System.err.println("Could not validate stored credentials, likely expired or revoked: " + e.getMessage());
+            // Since the token is bad, let's be a good citizen and clean it up.
+            logout();
+            return false;
+        }
     }
 
     /**
@@ -133,4 +160,3 @@ public class GoogleAuthManager {
         return JSON_FACTORY;
     }
 }
-
