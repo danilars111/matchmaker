@@ -247,6 +247,9 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 for (Group group : groups) {
                     new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
                 }
+                matchmaker.setPlayers(attendingPlayers.values().stream().filter(
+                        player -> !dmingPlayers.containsKey(player.getUuid())).collect(Collectors.toList()));
+                matchmaker.setGroups(groups);
                 this.groups = matchmaker.match(); // The matchmaker returns the populated list.
                 cleanUp();
             }
