@@ -12,6 +12,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import org.poolen.ApplicationLauncher;
 import org.poolen.MatchmakerApplication;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
@@ -40,7 +41,7 @@ public class LoginApplication extends Application {
     private ProgressIndicator loadingIndicator;
 
     private boolean hasAttemptedBindExceptionRetry = false;
-    private Exception springStartupError = null; // Our new little helper!
+    private Exception springStartupError = null; // Our little helper for catching startup tantrums!
 
     // Services
     private UiTaskExecutor uiTaskExecutor;
@@ -62,17 +63,22 @@ public class LoginApplication extends Application {
 
     @Override
     public void init() {
-        if (PropertiesManager.propertiesFileExists()) {
+        boolean isH2Mode = getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
+
+        // We only try to start Spring if we have a properties file OR we're in H2 mode.
+        if (PropertiesManager.propertiesFileExists() || isH2Mode) {
             try {
-                // We'll try to start Spring...
-                springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
+                springContext = new SpringApplicationBuilder(MatchmakerApplication.class)
+                        .properties(ApplicationLauncher.getConfigLocation())
+                        .run(getParameters().getRaw().toArray(new String[0]));
+
                 uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
                 uiPersistenceService = springContext.getBean(UiPersistenceService.class);
                 uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
                 uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
                 scriptService = springContext.getBean(ApplicationScriptService.class);
             } catch (Exception e) {
-                // ... but if it throws a tantrum, we'll remember the error!
+                // If Spring throws a tantrum, we'll remember the error!
                 springStartupError = e;
             }
         }
@@ -80,24 +86,19 @@ public class LoginApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        boolean isH2Mode = getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
+
         // --- SETUP CHECKS ---
-        if (!PropertiesManager.propertiesFileExists()) {
-            ApplicationScriptService tempScriptService = new ApplicationScriptService();
-            SetupStage setupStage = new SetupStage(tempScriptService, null); // No error for first-time setup
+        if (!isH2Mode && !PropertiesManager.propertiesFileExists()) {
+            // First time run: show setup with no error.
+            SetupStage setupStage = new SetupStage(new ApplicationScriptService(), null);
             setupStage.show();
             return;
         } else if (springStartupError != null) {
-            // This is our new check! If Spring failed, we show the setup again.
-            ApplicationScriptService tempScriptService = new ApplicationScriptService();
-            // We'll find the real reason for the error to show the user.
-            Throwable rootCause = springStartupError;
-            while (rootCause.getCause() != null) {
-                rootCause = rootCause.getCause();
-            }
+            // Bad config run: show setup with the error message.
             String errorMessage = "The application couldn't start with the current settings.\n" +
-                    "Please check your database connection details.\n\n" +
-                    "Error: " + rootCause.getMessage();
-            SetupStage setupStage = new SetupStage(tempScriptService, errorMessage);
+                    "Please check your database connection details.";
+            SetupStage setupStage = new SetupStage(new ApplicationScriptService(), errorMessage);
             setupStage.show();
             return;
         }
@@ -129,7 +130,7 @@ public class LoginApplication extends Application {
 
         root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, exitButton);
 
-        Scene scene = new Scene(root, 400, 350); // Made it a little taller for potential error messages
+        Scene scene = new Scene(root, 400, 300);
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -259,7 +260,7 @@ public class LoginApplication extends Application {
     }
 
     private boolean isRootCauseBindException(Throwable throwable) {
-        if (throwable == null) return false;
+        if ( throwable == null ) return false;
         Throwable cause = throwable;
         while (cause.getCause() != null) {
             cause = cause.getCause();
