@@ -4,7 +4,7 @@ target/
 dependency-reduced-pom.xml
 
 ### Spring ###
-/src/main/resources/application.properties
+/src/main/resources/application-local.properties
 
 ### IntelliJ IDEA ###
 .idea/
@@ -25,5 +25,4 @@ dependency-reduced-pom.xml
 .DS_Store
 
 ### Appliation Specifics ###
-/tokens/
 /src/main/resources/credentials/credentials.json

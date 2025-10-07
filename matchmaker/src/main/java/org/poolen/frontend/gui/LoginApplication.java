@@ -16,6 +16,7 @@ import org.poolen.MatchmakerApplication;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
+import org.poolen.frontend.util.services.ApplicationScriptService;
 import org.poolen.frontend.util.services.UiGithubTaskService;
 import org.poolen.frontend.util.services.UiGoogleTaskService;
 import org.poolen.frontend.util.services.UiPersistenceService;
@@ -29,10 +30,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import java.io.File;
 import java.net.BindException;
 
-/**
- * The main entry point for the application. This class orchestrates the startup
- * sequence by delegating to various UI services for async operations.
- */
 public class LoginApplication extends Application {
     private ConfigurableApplicationContext springContext;
     private Stage primaryStage;
@@ -43,55 +40,66 @@ public class LoginApplication extends Application {
     private ProgressIndicator loadingIndicator;
 
     private boolean hasAttemptedBindExceptionRetry = false;
+    private Exception springStartupError = null; // Our new little helper!
 
-    // Our beautifully separated services!
+    // Services
     private UiTaskExecutor uiTaskExecutor;
     private UiPersistenceService uiPersistenceService;
     private UiGoogleTaskService uiGoogleTaskService;
     private UiGithubTaskService uiGithubTaskService;
+    private ApplicationScriptService scriptService;
 
-    // A helper class to pass results from the background thread to the UI thread.
     private static class StartupResult {
         enum Status { UPDATE_READY, LOGIN_SUCCESSFUL, SHOW_LOGIN_UI }
         private final Status status;
         private final Object data;
 
-        public StartupResult(Status status, Object data) {
-            this.status = status;
-            this.data = data;
-        }
-
-        public StartupResult(Status status) {
-            this(status, null);
-        }
-
+        public StartupResult(Status status, Object data) { this.status = status; this.data = data; }
+        public StartupResult(Status status) { this(status, null); }
         public Status getStatus() { return status; }
         public Object getData() { return data; }
     }
 
-
     @Override
     public void init() {
-        // We only initialize Spring if we have a properties file.
-        // If not, the setup stage will run first, and the user will restart.
         if (PropertiesManager.propertiesFileExists()) {
-            springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
-            // Get the beans for our services after the context is initialized.
-            uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
-            uiPersistenceService = springContext.getBean(UiPersistenceService.class);
-            uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
-            uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
+            try {
+                // We'll try to start Spring...
+                springContext = new SpringApplicationBuilder(MatchmakerApplication.class).run();
+                uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
+                uiPersistenceService = springContext.getBean(UiPersistenceService.class);
+                uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
+                uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
+                scriptService = springContext.getBean(ApplicationScriptService.class);
+            } catch (Exception e) {
+                // ... but if it throws a tantrum, we'll remember the error!
+                springStartupError = e;
+            }
         }
     }
 
     @Override
     public void start(Stage primaryStage) {
-        // --- FIRST-TIME SETUP CHECK ---
-        // If the properties file doesn't exist, we must run the setup.
+        // --- SETUP CHECKS ---
         if (!PropertiesManager.propertiesFileExists()) {
-            SetupStage setupStage = new SetupStage();
+            ApplicationScriptService tempScriptService = new ApplicationScriptService();
+            SetupStage setupStage = new SetupStage(tempScriptService, null); // No error for first-time setup
             setupStage.show();
-            return; // Stop here and let the user set up the app.
+            return;
+        } else if (springStartupError != null) {
+            // This is our new check! If Spring failed, we show the setup again.
+            ApplicationScriptService tempScriptService = new ApplicationScriptService();
+            // We'll find the real reason for the error to show the user.
+            Throwable rootCause = springStartupError;
+            while (rootCause.getCause() != null) {
+                rootCause = rootCause.getCause();
+            }
+            String errorMessage = "The application couldn't start with the current settings.\n" +
+                    "Please check your database connection details.\n\n" +
+                    "Error: " + rootCause.getMessage();
+            SetupStage setupStage = new SetupStage(tempScriptService, errorMessage);
+            setupStage.show();
+            return;
         }
 
         // --- NORMAL STARTUP ---
@@ -121,23 +129,18 @@ public class LoginApplication extends Application {
 
         root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, exitButton);
 
-        Scene scene = new Scene(root, 400, 300);
+        Scene scene = new Scene(root, 400, 350); // Made it a little taller for potential error messages
         primaryStage.setScene(scene);
         primaryStage.show();
 
         beginStartupSequence();
     }
 
-    /**
-     * This is the main entry point for the application's automatic startup logic.
-     * It runs all startup tasks sequentially in a single background thread and
-     * shows a single success animation at the very end.
-     */
     private void beginStartupSequence() {
         uiTaskExecutor.execute(
                 primaryStage,
                 "Starting application...",
-                "Ready!", // The final success message for the entire sequence!
+                "Ready!",
                 (progressUpdater) -> {
                     // --- 1. UPDATE CHECK ---
                     try {
@@ -146,12 +149,10 @@ public class LoginApplication extends Application {
                         if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
                             progressUpdater.accept("Downloading new version...");
                             File newJarFile = uiGithubTaskService.downloadUpdate(updateInfo, progressUpdater);
-                            // Return the downloaded file to the UI thread to handle the restart logic.
                             return new StartupResult(StartupResult.Status.UPDATE_READY, newJarFile);
                         }
                     } catch (Exception e) {
                         System.err.println("Update process failed, continuing startup: " + e.getMessage());
-                        // Don't stop, just log the error and continue to the next step.
                     }
 
                     // --- 2. CREDENTIAL CHECK & AUTO-LOGIN ---
@@ -164,10 +165,9 @@ public class LoginApplication extends Application {
                         return new StartupResult(StartupResult.Status.SHOW_LOGIN_UI);
                     }
                 },
-                (result) -> { // onSuccess on UI Thread
+                (result) -> {
                     switch (result.getStatus()) {
                         case UPDATE_READY:
-                            // The background task is done, now we can interact with the UI to apply the update.
                             applyUpdate((File) result.getData());
                             break;
                         case LOGIN_SUCCESSFUL:
@@ -178,14 +178,10 @@ public class LoginApplication extends Application {
                             break;
                     }
                 },
-                this::handleStartupError // onError on UI Thread
+                this::handleStartupError
         );
     }
 
-    /**
-     * This is called when the user explicitly clicks the "Sign In" button.
-     * It skips the update and credential checks.
-     */
     private void handleUserLogin() {
         uiTaskExecutor.execute(
                 primaryStage,
@@ -205,12 +201,7 @@ public class LoginApplication extends Application {
         );
     }
 
-    /**
-     * Attempts to apply a new update. If successful, the app restarts.
-     * If it fails for any reason, it proceeds to the next startup step.
-     */
     private void applyUpdate(File newJarFile) {
-        // This call will either exit the app or call one of the lambdas below.
         uiGithubTaskService.applyUpdateAndRestart(
                 newJarFile,
                 () -> {
@@ -224,9 +215,6 @@ public class LoginApplication extends Application {
         );
     }
 
-    /**
-     * A centralized error handler for any failure during the startup or login process.
-     */
     private void handleStartupError(Throwable error) {
         if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
             hasAttemptedBindExceptionRetry = true;
@@ -287,3 +275,4 @@ public class LoginApplication extends Application {
         Platform.exit();
     }
 }
+

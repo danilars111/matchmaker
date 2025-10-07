@@ -1,6 +1,6 @@
 package org.poolen.frontend.gui.components.stages;
 
-import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -8,84 +8,98 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
-import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.util.services.ApplicationScriptService;
 import org.poolen.util.PropertiesManager;
 
-/**
- * A dialog window for the initial setup of the database connection.
- * This window is shown on the first run when no properties file is found.
- */
 public class SetupStage extends Stage {
 
-    public SetupStage() {
+    private final ApplicationScriptService scriptService;
+
+    public SetupStage(ApplicationScriptService scriptService, String errorMessage) {
+        this.scriptService = scriptService;
+
+        initModality(Modality.APPLICATION_MODAL);
         setTitle("First-Time Setup");
-        setResizable(false);
 
-        VBox root = new VBox(20);
-        root.setAlignment(Pos.CENTER);
-        root.setStyle("-fx-padding: 30; -fx-background-color: #F0F8FF;");
+        VBox layout = new VBox(15); // A little less spacing
+        layout.setPadding(new Insets(25));
+        layout.setAlignment(Pos.CENTER);
 
-        Label titleLabel = new Label("Database Configuration");
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 18));
+        // --- NEW ERROR MESSAGE DISPLAY ---
+        if (errorMessage != null && !errorMessage.isEmpty()) {
+            Label errorLabel = new Label(errorMessage);
+            errorLabel.setStyle("-fx-text-fill: #D8000C; -fx-font-weight: bold; -fx-background-color: #FFD2D2; -fx-padding: 10; -fx-border-radius: 5; -fx-background-radius: 5;");
+            errorLabel.setWrapText(true);
+            errorLabel.setMaxWidth(350);
+            layout.getChildren().add(errorLabel);
+        }
 
-        Label infoLabel = new Label("Please enter your MySQL database connection details.");
-        infoLabel.setWrapText(true);
+        Label headerLabel = new Label("Database Configuration");
+        headerLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
 
-        // --- Form Fields ---
         GridPane grid = new GridPane();
-        grid.setHgap(10);
         grid.setVgap(10);
+        grid.setHgap(10);
         grid.setAlignment(Pos.CENTER);
 
-        grid.add(new Label("DB Address:"), 0, 0);
         TextField dbAddressField = new TextField();
-        dbAddressField.setPromptText("hostname:port/database?ssl-mode=REQUIRED");
+        dbAddressField.setPromptText("e.g., your-db-host.com:12345/dbname");
+        TextField userField = new TextField(); // Changed to TextField for easier editing
+        userField.setPromptText("Database Username");
+        PasswordField passField = new PasswordField();
+        passField.setPromptText("Database Password");
+
+        grid.add(new Label("DB Address:"), 0, 0);
         grid.add(dbAddressField, 1, 0);
-
         grid.add(new Label("Username:"), 0, 1);
-        TextField usernameField = new TextField();
-        grid.add(usernameField, 1, 1);
-
+        grid.add(userField, 1, 1);
         grid.add(new Label("Password:"), 0, 2);
-        PasswordField passwordField = new PasswordField();
-        grid.add(passwordField, 1, 2);
+        grid.add(passField, 1, 2);
 
+        Button saveButton = new Button("Save and Restart");
+        saveButton.setOnAction(e -> handleSave(
+                dbAddressField.getText(),
+                userField.getText(),
+                passField.getText()
+        ));
 
-        // --- Buttons ---
-        Button saveButton = new Button("Save and Exit");
-        saveButton.setOnAction(e -> {
-            String dbAddress = dbAddressField.getText();
-            String username = usernameField.getText();
-            String password = passwordField.getText();
+        Button h2Button = new Button("Use Temporary Test Database and Restart");
+        h2Button.setOnAction(e -> handleH2());
 
-            if (dbAddress.isBlank() || username.isBlank()) {
-                new ErrorDialog("Address and Username cannot be empty.", root).showAndWait();
-                return;
-            }
+        layout.getChildren().addAll(headerLabel, grid, saveButton, h2Button);
+        setScene(new Scene(layout));
+    }
 
-            PropertiesManager.saveDatabaseCredentials(dbAddress, username, password);
-            new InfoDialog("Configuration saved! Please restart the application to continue.", root).showAndWait();
-            Platform.exit();
-        });
+    private void handleSave(String dbAddress, String username, String password) {
+        if (dbAddress.isEmpty() || username.isEmpty()) {
+            new ErrorDialog("Address and Username cannot be empty.", getScene().getRoot()).showAndWait();
+            return;
+        }
+        PropertiesManager.saveDatabaseCredentials(dbAddress, username, password);
+        restartApplication();
+    }
 
-        Button h2Button = new Button("Use H2 (Test Mode)");
-        h2Button.setOnAction(e -> {
-            new InfoDialog("To use the in-memory test database, please restart the application with the --h2 flag.", root).showAndWait();
-            Platform.exit();
-        });
+    private void handleH2() {
+        // We don't need to save anything for H2, just restart with the flag.
+        restartApplicationWithH2();
+    }
 
-        HBox buttonBox = new HBox(15, h2Button, saveButton);
-        buttonBox.setAlignment(Pos.CENTER);
+    private void restartApplication() {
+        scriptService.restart(
+                () -> new ErrorDialog("Cannot restart from IDE.", getScene().getRoot()).showAndWait(),
+                (err) -> new ErrorDialog("Restart failed: " + err.getMessage(), getScene().getRoot()).showAndWait()
+        );
+    }
 
-        root.getChildren().addAll(titleLabel, infoLabel, grid, buttonBox);
-
-        Scene scene = new Scene(root, 450, 350);
-        setScene(scene);
+    private void restartApplicationWithH2() {
+        scriptService.restartWithH2(
+                () -> new ErrorDialog("Cannot restart from IDE.", getScene().getRoot()).showAndWait(),
+                (err) -> new ErrorDialog("Restart failed: " + err.getMessage(), getScene().getRoot()).showAndWait()
+        );
     }
 }
+

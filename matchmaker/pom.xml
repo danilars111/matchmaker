@@ -155,7 +155,10 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
-        <!-- THIS IS THE FIX! We tell Spring Boot not to repackage the JAR -->
+        <configuration>
+          <mainClass>org.poolen.ApplicationLauncher</mainClass>
+          <layout>JAR</layout>
+        </configuration>
         <executions>
           <execution>
             <id>repackage</id>
