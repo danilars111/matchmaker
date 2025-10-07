@@ -1,20 +1,18 @@
 package org.poolen.frontend.util.interfaces;
 
-import java.util.function.Consumer;
-
 /**
- * A functional interface for a task that can be executed asynchronously
- * and can report progress updates as string messages.
+ * A functional interface for a long-running task that is aware of the UI
+ * and can provide progress updates.
  *
- * @param <T> The return type of the task.
+ * @param <T> The result type of the task.
  */
 @FunctionalInterface
 public interface ProgressAwareTask<T> {
     /**
-     * Executes the task.
-     * @param progressUpdater A consumer that can be called to update the UI with a status message.
-     * @return The result of the task.
-     * @throws Exception if the task fails.
+     * Executes the long-running operation.
+     * @param updater An object that can be used to update the UI overlay.
+     * @return The result of the operation.
+     * @throws Exception if the operation fails.
      */
-    T execute(Consumer<String> progressUpdater) throws Exception;
+    T execute(UiUpdater updater) throws Exception;
 }

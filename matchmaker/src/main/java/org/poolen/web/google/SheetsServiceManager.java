@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,8 +38,8 @@ public class SheetsServiceManager {
         this.settingsStore = store.getSettingsStore();
     }
 
-    public void connect() throws GeneralSecurityException, IOException {
-        Credential credential = GoogleAuthManager.getCredentials();
+    public void connect(Consumer<String> urlDisplayer) throws GeneralSecurityException, IOException {
+        Credential credential = GoogleAuthManager.getCredentials(urlDisplayer);
         sheetsService = new Sheets.Builder(
                 GoogleAuthManager.getHttpTransport(),
                 GoogleAuthManager.getJsonFactory(),

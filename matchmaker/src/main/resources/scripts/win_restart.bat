@@ -3,5 +3,5 @@ rem This script is designed to be run from the Java application to restart it on
 rem It runs silently in the background.
 
 timeout /t 2 /nobreak > NUL
-start "" javaw -jar "{JAR_PATH}"
+javaw -jar "{JAR_PATH}" {ARGS}
 

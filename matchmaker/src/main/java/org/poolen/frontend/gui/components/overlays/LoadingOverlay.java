@@ -5,8 +5,12 @@ import javafx.beans.property.StringProperty;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TextArea;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -27,6 +31,12 @@ public class LoadingOverlay {
     private final Path checkMark;
     private Parent originalRoot;
 
+    // Our fabulous and now much more flexible home for details!
+    private final VBox detailsBox;
+    private final Label detailsLabel; // It now has its own field!
+    private final TextArea detailsText;
+    private final Button copyButton;
+
     public LoadingOverlay() {
         // --- Create the visual components ---
         statusLabel = new Label();
@@ -37,21 +47,36 @@ public class LoadingOverlay {
         progressIndicator = new ProgressIndicator();
         progressIndicator.setPrefSize(50, 50);
 
-        // A gorgeous little checkmark for our success state!
         checkMark = new Path();
         checkMark.getElements().addAll(new MoveTo(10, 25), new LineTo(20, 35), new LineTo(40, 15));
         checkMark.setStroke(Color.web("#34A853"));
         checkMark.setStrokeWidth(5);
-        checkMark.setVisible(false); // Initially hidden
+        checkMark.setVisible(false);
 
-        // A StackPane to hold either the progress indicator or the checkmark
         StackPane iconPane = new StackPane(progressIndicator, checkMark);
         iconPane.setPrefSize(50, 50);
         iconPane.setAlignment(Pos.CENTER);
 
-        VBox loadingBox = new VBox(20, statusLabel, iconPane);
+        // --- Our Beautiful and Flexible New Details Box ---
+        detailsBox = new VBox(5);
+        detailsBox.setAlignment(Pos.CENTER);
+        detailsLabel = new Label(); // The label is now created without a hardcoded message!
+        detailsLabel.setStyle("-fx-font-size: 12px;");
+        detailsText = new TextArea();
+        detailsText.setEditable(false);
+        detailsText.setWrapText(true);
+        detailsText.setPrefHeight(80);
+        copyButton = new Button("Copy to Clipboard");
+        copyButton.setOnAction(e -> {
+            Clipboard.getSystemClipboard().setContent(new ClipboardContent(){{putString(detailsText.getText());}});
+            copyButton.setText("Copied!");
+        });
+        detailsBox.getChildren().addAll(detailsLabel, detailsText, copyButton);
+        detailsBox.setVisible(false);
+
+        VBox loadingBox = new VBox(20, statusLabel, iconPane, detailsBox);
         loadingBox.setAlignment(Pos.CENTER);
-        loadingBox.setPrefSize(300, 200);
+        loadingBox.setPrefSize(350, 300);
         loadingBox.setMaxSize(VBox.USE_PREF_SIZE, VBox.USE_PREF_SIZE);
         loadingBox.setStyle("-fx-background-color: #F2F3F4; -fx-padding: 30; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 10, 0.5, 0.0, 0.0);");
 
@@ -63,9 +88,10 @@ public class LoadingOverlay {
     public void show(Scene scene, String initialMessage) {
         if (scene == null) return;
 
-        // Reset the state every time it's shown
         progressIndicator.setVisible(true);
         checkMark.setVisible(false);
+        detailsBox.setVisible(false);
+        copyButton.setText("Copy to Clipboard");
         statusLabel.setText(initialMessage);
 
         this.originalRoot = scene.getRoot();
@@ -85,21 +111,28 @@ public class LoadingOverlay {
         }
     }
 
-    /**
-     * Shows a success state for a brief moment and then hides the overlay.
-     * @param scene The scene to hide from.
-     * @param successMessage The final message to display.
-     */
     public void showSuccessAndThenHide(Scene scene, String successMessage) {
         if (scene == null) return;
 
         statusLabel.setText(successMessage);
         progressIndicator.setVisible(false);
+        detailsBox.setVisible(false);
         checkMark.setVisible(true);
 
         PauseTransition delay = new PauseTransition(Duration.millis(500));
         delay.setOnFinished(event -> hide(scene));
         delay.play();
+    }
+
+    /**
+     * A lovely new method to show our details box with a custom label!
+     * @param label The text for the label above the text area.
+     * @param details The text to display in the main text area.
+     */
+    public void showDetails(String label, String details) {
+        detailsLabel.setText(label);
+        detailsText.setText(details);
+        detailsBox.setVisible(true);
     }
 
     public StringProperty statusProperty() {

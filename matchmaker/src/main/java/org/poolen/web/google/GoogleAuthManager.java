@@ -1,7 +1,7 @@
 package org.poolen.web.google;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
+import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
@@ -11,7 +11,7 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.SheetsScopes;
-import org.poolen.util.AppDataHandler; // <-- IMPORT OUR HELPER!
+import org.poolen.util.AppDataHandler;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -22,25 +22,22 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
-/**
- * Manages the OAuth 2.0 authentication flow with Google.
- * This includes handling user credentials, tokens, and the authorization process.
- */
 public class GoogleAuthManager {
 
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-    // --- THIS IS THE MAGIC! ---
-    // We get the main app data directory and create a 'tokens' sub-directory inside it.
-    private static final Path TOKENS_DIRECTORY_PATH = AppDataHandler.getAppDataDirectory().resolve("tokens");
     private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
     private static final String CREDENTIALS_FILE_PATH = "/credentials/credentials.json";
     private static HttpTransport HTTP_TRANSPORT;
 
-    // We keep a reference to the receiver so we can stop it if the user cancels.
     private static volatile LocalServerReceiver receiver;
 
     static {
+        // This is our lovely little instruction to the JVM!
+        // It tells it to never run in "headless" mode, ensuring it's always ready for GUI tasks.
+        // Not hacky at all, shut up!
+        System.setProperty("java.awt.headless", "false");
         try {
             HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
         } catch (GeneralSecurityException | IOException e) {
@@ -49,11 +46,6 @@ public class GoogleAuthManager {
         }
     }
 
-    /**
-     * A helper method to build the GoogleAuthorizationCodeFlow.
-     * @return A configured GoogleAuthorizationCodeFlow instance.
-     * @throws IOException If the credentials file cannot be found or read.
-     */
     private static GoogleAuthorizationCodeFlow getFlow() throws IOException {
         InputStream in = GoogleAuthManager.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
         if (in == null) {
@@ -61,78 +53,73 @@ public class GoogleAuthManager {
         }
         GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
 
+        Path tokensPath = AppDataHandler.getAppDataDirectory().resolve("tokens");
+
         return new GoogleAuthorizationCodeFlow.Builder(
                 HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-                // Use the new path, converting it to a File object for the factory.
-                .setDataStoreFactory(new FileDataStoreFactory(TOKENS_DIRECTORY_PATH.toFile()))
+                .setDataStoreFactory(new FileDataStoreFactory(tokensPath.toFile()))
                 .setAccessType("offline")
                 .build();
     }
 
-    /**
-     * Authorizes the installed application to access user's protected data.
-     *
-     * @return A credential object.
-     * @throws IOException If the credentials file cannot be found or read.
-     */
-    public static Credential getCredentials() throws IOException {
+    public static Credential getCredentials(Consumer<String> urlDisplayer) throws IOException {
         GoogleAuthorizationCodeFlow flow = getFlow();
-        // This is the part that starts the local server. We store it before using it.
-        receiver = new LocalServerReceiver.Builder().setPort(8888).build();
+        // We set the port to 0 to tell it to find any available port, just like a clever little social butterfly!
+        receiver = new LocalServerReceiver.Builder().setPort(0).build();
         try {
-            // This is the blocking call that will open the browser.
-            return new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
+            String redirectUri = receiver.getRedirectUri();
+            String url = flow.newAuthorizationUrl().setRedirectUri(redirectUri).build();
+
+            // Here's the magic! We give the URL to our little helper.
+            urlDisplayer.accept(url);
+
+            // Then we try to be a good girl and open the browser automatically.
+            try {
+                java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
+            } catch (Exception e) {
+                System.err.println("Automatic browser opening failed. Please use the provided link. Error: " + e);
+            }
+
+            // Now we wait for the user to do their thing.
+            String code = receiver.waitForCode();
+            TokenResponse response = flow.newTokenRequest(code).setRedirectUri(redirectUri).execute();
+            return flow.createAndStoreCredential(response, "user");
         } finally {
-            // Once authorize() returns (either by success or exception), the receiver's job is done for this attempt.
-            receiver = null;
+            if (receiver != null) {
+                receiver.stop();
+                receiver = null;
+            }
         }
     }
 
-    /**
-     * Checks if there are valid, refreshable credentials on disk without triggering a sign-in.
-     * @return True if valid credentials exist, false otherwise.
-     */
+    // --- The rest of the class remains the same ---
+
     public static boolean hasStoredCredentials() {
         try {
             Credential credential = getFlow().loadCredential("user");
             if (credential != null) {
-                // A non-null credential means a token file exists. Now, let's see if it's valid.
-                // The refreshToken() method is the key. It returns true if it successfully refreshed.
-                // It returns false if no refresh was needed (i.e., the token is still valid).
-                // Most importantly, it throws an IOException (specifically TokenResponseException)
-                // if the token is expired or revoked. This is our validation check!
                 credential.refreshToken();
-                // If the line above doesn't throw an exception, the credential is valid.
                 return true;
             }
-            // No credential file found.
             return false;
         } catch (IOException e) {
-            // This block will catch the TokenResponseException for an invalid_grant.
             System.err.println("Could not validate stored credentials, likely expired or revoked: " + e.getMessage());
-            // Since the token is bad, let's be a good citizen and clean it up.
             logout();
             return false;
         }
     }
 
-    /**
-     * Deletes the stored tokens, effectively logging the user out.
-     */
     public static void logout() {
         try {
-            // Use our new Path object to find and delete the credential file.
-            Path storedCredentialPath = TOKENS_DIRECTORY_PATH.resolve("StoredCredential");
-            Files.deleteIfExists(storedCredentialPath);
+            Path tokensDir = AppDataHandler.getAppDataDirectory().resolve("tokens");
+            if (Files.exists(tokensDir)) {
+                Files.deleteIfExists(tokensDir.resolve("StoredCredential"));
+            }
         } catch (IOException e) {
             System.err.println("Failed to delete tokens on logout: " + e.getMessage());
         }
     }
 
-    /**
-     * Stops the local server used for the OAuth flow. This should be called
-     * if the user cancels the sign-in process.
-     */
     public static void abortAuthorization() {
         LocalServerReceiver tempReceiver = receiver;
         if (tempReceiver != null) {
@@ -145,19 +132,12 @@ public class GoogleAuthManager {
         }
     }
 
-    /**
-     * Gets the shared HTTP transport.
-     * @return The HttpTransport instance.
-     */
     public static HttpTransport getHttpTransport() {
         return HTTP_TRANSPORT;
     }
 
-    /**
-     * Gets the shared JSON factory.
-     * @return The JsonFactory instance.
-     */
     public static JsonFactory getJsonFactory() {
         return JSON_FACTORY;
     }
 }
+

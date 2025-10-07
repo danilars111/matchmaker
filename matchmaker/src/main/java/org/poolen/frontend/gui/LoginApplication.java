@@ -41,9 +41,8 @@ public class LoginApplication extends Application {
     private ProgressIndicator loadingIndicator;
 
     private boolean hasAttemptedBindExceptionRetry = false;
-    private Exception springStartupError = null; // Our little helper for catching startup tantrums!
+    private Exception springStartupError = null;
 
-    // Services
     private UiTaskExecutor uiTaskExecutor;
     private UiPersistenceService uiPersistenceService;
     private UiGoogleTaskService uiGoogleTaskService;
@@ -52,33 +51,26 @@ public class LoginApplication extends Application {
 
     private static class StartupResult {
         enum Status { UPDATE_READY, LOGIN_SUCCESSFUL, SHOW_LOGIN_UI }
-        private final Status status;
-        private final Object data;
-
+        final Status status;
+        final Object data;
         public StartupResult(Status status, Object data) { this.status = status; this.data = data; }
         public StartupResult(Status status) { this(status, null); }
-        public Status getStatus() { return status; }
-        public Object getData() { return data; }
     }
 
     @Override
     public void init() {
         boolean isH2Mode = getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
-
-        // We only try to start Spring if we have a properties file OR we're in H2 mode.
         if (PropertiesManager.propertiesFileExists() || isH2Mode) {
             try {
                 springContext = new SpringApplicationBuilder(MatchmakerApplication.class)
                         .properties(ApplicationLauncher.getConfigLocation())
                         .run(getParameters().getRaw().toArray(new String[0]));
-
                 uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
                 uiPersistenceService = springContext.getBean(UiPersistenceService.class);
                 uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
                 uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
                 scriptService = springContext.getBean(ApplicationScriptService.class);
             } catch (Exception e) {
-                // If Spring throws a tantrum, we'll remember the error!
                 springStartupError = e;
             }
         }
@@ -87,15 +79,11 @@ public class LoginApplication extends Application {
     @Override
     public void start(Stage primaryStage) {
         boolean isH2Mode = getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
-
-        // --- SETUP CHECKS ---
         if (!isH2Mode && !PropertiesManager.propertiesFileExists()) {
-            // First time run: show setup with no error.
             SetupStage setupStage = new SetupStage(new ApplicationScriptService(), null);
             setupStage.show();
             return;
         } else if (springStartupError != null) {
-            // Bad config run: show setup with the error message.
             String errorMessage = "The application couldn't start with the current settings.\n" +
                     "Please check your database connection details.";
             SetupStage setupStage = new SetupStage(new ApplicationScriptService(), errorMessage);
@@ -103,7 +91,6 @@ public class LoginApplication extends Application {
             return;
         }
 
-        // --- NORMAL STARTUP ---
         this.primaryStage = primaryStage;
         primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
         primaryStage.setResizable(false);
@@ -130,7 +117,7 @@ public class LoginApplication extends Application {
 
         root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, exitButton);
 
-        Scene scene = new Scene(root, 400, 300);
+        Scene scene = new Scene(root, 450, 300);
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -142,41 +129,31 @@ public class LoginApplication extends Application {
                 primaryStage,
                 "Starting application...",
                 "Ready!",
-                (progressUpdater) -> {
-                    // --- 1. UPDATE CHECK ---
+                (updater) -> {
                     try {
-                        progressUpdater.accept("Checking for updates...");
-                        GitHubUpdateChecker.UpdateInfo updateInfo = uiGithubTaskService.checkForUpdate(progressUpdater);
+                        GitHubUpdateChecker.UpdateInfo updateInfo = uiGithubTaskService.checkForUpdate(updater);
                         if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
-                            progressUpdater.accept("Downloading new version...");
-                            File newJarFile = uiGithubTaskService.downloadUpdate(updateInfo, progressUpdater);
+                            File newJarFile = uiGithubTaskService.downloadUpdate(updateInfo, updater);
                             return new StartupResult(StartupResult.Status.UPDATE_READY, newJarFile);
                         }
                     } catch (Exception e) {
                         System.err.println("Update process failed, continuing startup: " + e.getMessage());
                     }
 
-                    // --- 2. CREDENTIAL CHECK & AUTO-LOGIN ---
-                    progressUpdater.accept("Checking for existing session...");
+                    updater.updateStatus("Checking for existing session...");
                     if (GoogleAuthManager.hasStoredCredentials()) {
-                        uiGoogleTaskService.connectToGoogle(progressUpdater);
-                        uiPersistenceService.findAllWithProgress(progressUpdater);
+                        uiGoogleTaskService.connectToGoogle(updater);
+                        uiPersistenceService.findAllWithProgress(updater);
                         return new StartupResult(StartupResult.Status.LOGIN_SUCCESSFUL);
                     } else {
                         return new StartupResult(StartupResult.Status.SHOW_LOGIN_UI);
                     }
                 },
                 (result) -> {
-                    switch (result.getStatus()) {
-                        case UPDATE_READY:
-                            applyUpdate((File) result.getData());
-                            break;
-                        case LOGIN_SUCCESSFUL:
-                            showManagementStage();
-                            break;
-                        case SHOW_LOGIN_UI:
-                            showLoginUI("Please sign in to continue.");
-                            break;
+                    switch (result.status) {
+                        case UPDATE_READY -> applyUpdate((File) result.data);
+                        case LOGIN_SUCCESSFUL -> showManagementStage();
+                        case SHOW_LOGIN_UI -> showLoginUI("Please sign in to continue.");
                     }
                 },
                 this::handleStartupError
@@ -184,13 +161,12 @@ public class LoginApplication extends Application {
     }
 
     private void handleUserLogin() {
+        // We no longer need to manage the overlay directly from here!
         uiTaskExecutor.execute(
-                primaryStage,
-                "Connecting...",
-                "Successfully connected!",
-                (progressUpdater) -> {
-                    uiGoogleTaskService.connectToGoogle(progressUpdater);
-                    uiPersistenceService.findAllWithProgress(progressUpdater);
+                primaryStage, "Connecting...", "Successfully connected!",
+                (updater) -> { // Our beautiful new updater!
+                    uiGoogleTaskService.connectToGoogle(updater);
+                    uiPersistenceService.findAllWithProgress(updater);
                     return "LOGIN_SUCCESSFUL";
                 },
                 (result) -> {
@@ -260,12 +236,15 @@ public class LoginApplication extends Application {
     }
 
     private boolean isRootCauseBindException(Throwable throwable) {
-        if ( throwable == null ) return false;
+        if (throwable == null) return false;
         Throwable cause = throwable;
-        while (cause.getCause() != null) {
+        while (cause != null) {
+            if (cause instanceof BindException) {
+                return true;
+            }
             cause = cause.getCause();
         }
-        return cause instanceof BindException;
+        return false;
     }
 
     @Override
