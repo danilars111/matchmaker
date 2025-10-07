@@ -4,9 +4,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
@@ -17,11 +15,8 @@ import org.poolen.MatchmakerApplication;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
-import org.poolen.frontend.util.services.ApplicationScriptService;
-import org.poolen.frontend.util.services.UiGithubTaskService;
-import org.poolen.frontend.util.services.UiGoogleTaskService;
-import org.poolen.frontend.util.services.UiPersistenceService;
-import org.poolen.frontend.util.services.UiTaskExecutor;
+import org.poolen.frontend.util.services.*;
+import org.poolen.frontend.util.services.TestDataGenerator;
 import org.poolen.util.PropertiesManager;
 import org.poolen.web.github.GitHubUpdateChecker;
 import org.poolen.web.google.GoogleAuthManager;
@@ -42,12 +37,15 @@ public class LoginApplication extends Application {
 
     private boolean hasAttemptedBindExceptionRetry = false;
     private Exception springStartupError = null;
+    private int testDataPlayerCount = 0;
 
+    // --- Services ---
     private UiTaskExecutor uiTaskExecutor;
     private UiPersistenceService uiPersistenceService;
     private UiGoogleTaskService uiGoogleTaskService;
     private UiGithubTaskService uiGithubTaskService;
     private ApplicationScriptService scriptService;
+    private TestDataGenerator testDataGenerator;
 
     private static class StartupResult {
         enum Status { UPDATE_READY, LOGIN_SUCCESSFUL, SHOW_LOGIN_UI }
@@ -65,11 +63,15 @@ public class LoginApplication extends Application {
                 springContext = new SpringApplicationBuilder(MatchmakerApplication.class)
                         .properties(ApplicationLauncher.getConfigLocation())
                         .run(getParameters().getRaw().toArray(new String[0]));
+                // Get all our beautiful beans
                 uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
                 uiPersistenceService = springContext.getBean(UiPersistenceService.class);
                 uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
                 uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
                 scriptService = springContext.getBean(ApplicationScriptService.class);
+                if (isH2Mode) {
+                    testDataGenerator = springContext.getBean(TestDataGenerator.class);
+                }
             } catch (Exception e) {
                 springStartupError = e;
             }
@@ -79,6 +81,32 @@ public class LoginApplication extends Application {
     @Override
     public void start(Stage primaryStage) {
         boolean isH2Mode = getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
+
+        if (isH2Mode) {
+            Alert confirmDialog = new Alert(Alert.AlertType.CONFIRMATION, "Would you like to populate the database with dummy data?", ButtonType.YES, ButtonType.NO);
+            confirmDialog.setTitle("Test Data");
+            confirmDialog.setHeaderText("H2 Test Mode Detected");
+            confirmDialog.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.YES) {
+                    TextInputDialog countDialog = new TextInputDialog("20");
+                    countDialog.setTitle("Generate Test Data");
+                    countDialog.setHeaderText("How many players should we create?");
+                    countDialog.setContentText("Enter a number:");
+                    countDialog.showAndWait().ifPresent(countStr -> {
+                        try {
+                            int count = Integer.parseInt(countStr);
+                            if (count > 0) {
+                                this.testDataPlayerCount = count;
+                            }
+                        } catch (NumberFormatException e) {
+                            // Ignore if the user enters non-numeric input
+                        }
+                    });
+                }
+            });
+        }
+
+        // --- The rest of our setup checks ---
         if (!isH2Mode && !PropertiesManager.propertiesFileExists()) {
             SetupStage setupStage = new SetupStage(new ApplicationScriptService(), null);
             setupStage.show();
@@ -91,6 +119,7 @@ public class LoginApplication extends Application {
             return;
         }
 
+        // --- NORMAL STARTUP ---
         this.primaryStage = primaryStage;
         primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
         primaryStage.setResizable(false);
@@ -130,6 +159,14 @@ public class LoginApplication extends Application {
                 "Starting application...",
                 "Ready!",
                 (updater) -> {
+                    // --- Generate Test Data if requested ---
+                    if (testDataPlayerCount > 0) {
+                        updater.updateStatus("Generating " + testDataPlayerCount + " players...");
+                        testDataGenerator.generate(testDataPlayerCount);
+                        uiPersistenceService.saveAllWithProgress(updater);
+                    }
+
+                    // --- The rest of the sequence ---
                     try {
                         GitHubUpdateChecker.UpdateInfo updateInfo = uiGithubTaskService.checkForUpdate(updater);
                         if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
@@ -160,11 +197,11 @@ public class LoginApplication extends Application {
         );
     }
 
+    // ... the rest of the class remains the same ...
     private void handleUserLogin() {
-        // We no longer need to manage the overlay directly from here!
         uiTaskExecutor.execute(
                 primaryStage, "Connecting...", "Successfully connected!",
-                (updater) -> { // Our beautiful new updater!
+                (updater) -> {
                     uiGoogleTaskService.connectToGoogle(updater);
                     uiPersistenceService.findAllWithProgress(updater);
                     return "LOGIN_SUCCESSFUL";
@@ -181,14 +218,8 @@ public class LoginApplication extends Application {
     private void applyUpdate(File newJarFile) {
         uiGithubTaskService.applyUpdateAndRestart(
                 newJarFile,
-                () -> {
-                    new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait();
-                    showLoginUI("Please sign in to continue.");
-                },
-                (error) -> {
-                    new ErrorDialog("Update failed: " + error.getMessage(), root).showAndWait();
-                    showLoginUI("Please sign in to continue.");
-                }
+                () -> new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait(),
+                (error) -> new ErrorDialog("Update failed: " + error.getMessage(), root).showAndWait()
         );
     }
 
@@ -207,7 +238,6 @@ public class LoginApplication extends Application {
         error.printStackTrace();
         showLoginUI("Something went wrong. Please try signing in again.");
     }
-
 
     private void showLoginUI(String message) {
         statusLabel.setText(message);

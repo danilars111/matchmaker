@@ -35,6 +35,15 @@ public class UiPersistenceService {
         storePersistenceService.findSettings();
     }
 
+    public void saveAllWithProgress(UiUpdater updater) {
+        updater.updateStatus("Saving player data...");
+        storePersistenceService.saveAllPlayers();
+        updater.updateStatus("Saving character data...");
+        storePersistenceService.saveAllCharacters();
+        updater.updateStatus("Saving settings...");
+        storePersistenceService.saveAllSettings();
+    }
+
     public void saveAll(Window owner, Runnable onDataChanged) {
         uiTaskExecutor.execute(
                 owner,

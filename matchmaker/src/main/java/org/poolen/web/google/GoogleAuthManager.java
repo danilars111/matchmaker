@@ -91,9 +91,6 @@ public class GoogleAuthManager {
             }
         }
     }
-
-    // --- The rest of the class remains the same ---
-
     public static boolean hasStoredCredentials() {
         try {
             Credential credential = getFlow().loadCredential("user");
