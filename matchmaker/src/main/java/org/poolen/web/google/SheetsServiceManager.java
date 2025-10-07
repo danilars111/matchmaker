@@ -38,8 +38,30 @@ public class SheetsServiceManager {
         this.settingsStore = store.getSettingsStore();
     }
 
-    public void connect(Consumer<String> urlDisplayer) throws GeneralSecurityException, IOException {
+    /**
+     * Connects to Google Sheets by initiating a full user authentication flow.
+     * @param urlDisplayer A callback to provide the authentication URL to the UI.
+     * @throws IOException if credentials cannot be read or stored.
+     */
+    public void connect(Consumer<String> urlDisplayer) throws IOException {
         Credential credential = GoogleAuthManager.getCredentials(urlDisplayer);
+        buildSheetsService(credential);
+    }
+
+    /**
+     * Connects to Google Sheets using already stored credentials.
+     * @throws IOException if stored credentials cannot be loaded.
+     */
+    public void connectWithStoredCredentials() throws IOException {
+        Credential credential = GoogleAuthManager.loadStoredCredential();
+        buildSheetsService(credential);
+    }
+
+    /**
+     * A private helper to build the Sheets service once we have credentials.
+     * @param credential The authenticated user credential.
+     */
+    private void buildSheetsService(Credential credential) {
         sheetsService = new Sheets.Builder(
                 GoogleAuthManager.getHttpTransport(),
                 GoogleAuthManager.getJsonFactory(),

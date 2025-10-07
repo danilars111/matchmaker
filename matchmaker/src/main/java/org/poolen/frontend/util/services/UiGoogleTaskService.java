@@ -42,6 +42,14 @@ public class UiGoogleTaskService {
     }
 
     /**
+     * Our fabulous new express path for auto-login!
+     */
+    public void connectWithStoredCredentials(UiUpdater updater) throws Exception {
+        updater.updateStatus("Logging in with stored session...");
+        sheetsServiceManager.connectWithStoredCredentials();
+    }
+
+    /**
      * A high-level method that wraps the connection logic in a UiTaskExecutor.
      * This provides a simple way to trigger the full sign-in process from the UI
      * with its own loading overlay.

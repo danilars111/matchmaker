@@ -34,9 +34,6 @@ public class GoogleAuthManager {
     private static volatile LocalServerReceiver receiver;
 
     static {
-        // This is our lovely little instruction to the JVM!
-        // It tells it to never run in "headless" mode, ensuring it's always ready for GUI tasks.
-        // Not hacky at all, shut up!
         System.setProperty("java.awt.headless", "false");
         try {
             HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
@@ -62,25 +59,23 @@ public class GoogleAuthManager {
                 .build();
     }
 
+    /**
+     * This is for a brand new login, darling! It starts the whole party.
+     */
     public static Credential getCredentials(Consumer<String> urlDisplayer) throws IOException {
         GoogleAuthorizationCodeFlow flow = getFlow();
-        // We set the port to 0 to tell it to find any available port, just like a clever little social butterfly!
         receiver = new LocalServerReceiver.Builder().setPort(0).build();
         try {
             String redirectUri = receiver.getRedirectUri();
             String url = flow.newAuthorizationUrl().setRedirectUri(redirectUri).build();
-
-            // Here's the magic! We give the URL to our little helper.
             urlDisplayer.accept(url);
 
-            // Then we try to be a good girl and open the browser automatically.
             try {
                 java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
             } catch (Exception e) {
                 System.err.println("Automatic browser opening failed. Please use the provided link. Error: " + e);
             }
 
-            // Now we wait for the user to do their thing.
             String code = receiver.waitForCode();
             TokenResponse response = flow.newTokenRequest(code).setRedirectUri(redirectUri).execute();
             return flow.createAndStoreCredential(response, "user");
@@ -91,6 +86,14 @@ public class GoogleAuthManager {
             }
         }
     }
+
+    /**
+     * Our beautiful new helper just for loading what's already there!
+     */
+    public static Credential loadStoredCredential() throws IOException {
+        return getFlow().loadCredential("user");
+    }
+
     public static boolean hasStoredCredentials() {
         try {
             Credential credential = getFlow().loadCredential("user");
