@@ -2,17 +2,15 @@ package org.poolen.frontend.gui.components.views.tables.rosters;
 
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.scene.control.*;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
 import javafx.scene.control.cell.PropertyValueFactory;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.interfaces.store.CharacterStoreProvider;
 import org.poolen.backend.db.store.CharacterStore;
-import org.poolen.backend.db.store.Store;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 /**
  * A reusable table view for displaying and filtering Characters, inheriting from BaseRosterTableView.

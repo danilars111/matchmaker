@@ -12,8 +12,6 @@ import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
-import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
-import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
 import org.poolen.frontend.gui.components.views.tables.rosters.CharacterRosterTableView;

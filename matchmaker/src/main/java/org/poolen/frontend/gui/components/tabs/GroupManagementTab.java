@@ -1,6 +1,8 @@
 package org.poolen.frontend.gui.components.tabs;
 
-import javafx.scene.control.*;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
@@ -10,8 +12,6 @@ import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
-import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
-import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.stages.ExportGroupsStage;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;

@@ -1,6 +1,5 @@
 package org.poolen.frontend.gui.components.tabs;
 
-import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;

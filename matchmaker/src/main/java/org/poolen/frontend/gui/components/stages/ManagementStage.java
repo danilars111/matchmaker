@@ -15,7 +15,6 @@ import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.LoginApplication;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
-import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PersistenceTab;
