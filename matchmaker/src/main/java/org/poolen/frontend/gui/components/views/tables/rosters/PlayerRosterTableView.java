@@ -2,8 +2,9 @@ package org.poolen.frontend.gui.components.views.tables.rosters;
 
 import javafx.scene.control.TableRow;
 import org.poolen.backend.db.entities.Player;
-import org.poolen.frontend.gui.components.views.tables.rosters.BaseRosterTableView;
-import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
+
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * The new abstract base class for our player tables.
@@ -11,10 +12,19 @@ import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
  * implementation details (like columns, filters, and styling) to its children.
  */
 public abstract class PlayerRosterTableView extends BaseRosterTableView<Player>{
+    protected Map<UUID, Player> attendingPlayers;
+    protected Map<UUID, Player> dmingPlayers;
+    protected Runnable onPlayerListChanged;
 
     public PlayerRosterTableView() {
         super();
         this.searchField.setPromptText("Search by name or UUID...");
+    }
+    public void init(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
+        this.attendingPlayers = attendingPlayers;
+        this.dmingPlayers = dmingPlayers;
+        this.onPlayerListChanged = onPlayerListChanged;
+
     }
 
     /**

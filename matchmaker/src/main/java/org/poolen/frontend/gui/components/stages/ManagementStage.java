@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.LoginApplication;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
@@ -21,10 +22,9 @@ import org.poolen.frontend.gui.components.tabs.PersistenceTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
+import org.poolen.frontend.util.interfaces.providers.TabProvider;
 import org.poolen.web.google.GoogleAuthManager;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,8 +36,6 @@ import java.util.stream.Collectors;
 /**
  * A dedicated pop-up window for all management tasks, organized into detachable tabs.
  */
-@Component
-@Lazy
 public class ManagementStage extends Stage {
 
     private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
@@ -45,31 +43,33 @@ public class ManagementStage extends Stage {
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
 
-    @Autowired
-    public ManagementStage(PlayerManagementTab playerTab, CharacterManagementTab characterTab, GroupManagementTab groupTab, SettingsTab settingsTab, PersistenceTab persistenceTab) {
+    public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider) {
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
         this.dmingPlayers = new HashMap<>();
         this.attendingPlayers = new HashMap<>();
 
-        TabPane tabPane = new TabPane();
-        playerTab.setAttendingPlayers(attendingPlayers);
-        playerTab.setDmingPlayers(dmingPlayers);
-        playerTab.setOnPlayerListChanged(this::notifyPlayerUpdateListeners);
-        playerTab.start();
+        PlayerManagementTab playerTab = tabProvider.getPlayerManagementTab();
+        playerTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
 
-        groupTab.setAttendingPlayers(attendingPlayers);
-        groupTab.setDmingPlayers(dmingPlayers);
-        groupTab.setOnPlayerListChanged(this::notifyPlayerUpdateListeners);
+        CharacterManagementTab characterTab = tabProvider.getCharacterManagementTab();
+        characterTab.init(this::notifyPlayerUpdateListeners);
+
+        GroupManagementTab groupTab = tabProvider.getGroupManagementTab();
+        groupTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
+
+        PersistenceTab persistenceTab = tabProvider.getPersistenceTab();
+        persistenceTab.init(this::notifyPlayerUpdateListeners);
+
+        SettingsTab settingsTab = tabProvider.getSettingsTab();
+
+        TabPane tabPane = new TabPane();
+        playerTab.start();
         groupTab.start();
 
         addPlayerUpdateListener(groupTab);
         addPlayerUpdateListener(playerTab);
-
-        characterTab.setOnListChanged(this::notifyPlayerUpdateListeners);
-        persistenceTab.setOnLogoutRequestHandler(this::notifyPlayerUpdateListeners);
-        persistenceTab.setOnDataChanged(this::notifyPlayerUpdateListeners);
 
 
         makeTabDetachable(playerTab);
@@ -133,7 +133,7 @@ public class ManagementStage extends Stage {
                 loginApp.start(loginStage);
 
             } catch (Exception e) {
-                new ErrorDialog("Failed to logout: " + e.getMessage(), tabPane).showAndWait();
+                coreProvider.createDialog(DialogType.ERROR,"Failed to logout: " + e.getMessage(), tabPane).showAndWait();
             }
         });
 

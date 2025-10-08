@@ -5,17 +5,16 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.PlayerFactory;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.backend.db.store.Store;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
-import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
 import org.poolen.frontend.gui.components.views.tables.rosters.PlayerManagementRosterTableView;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
+import org.poolen.frontend.util.interfaces.providers.ViewProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Optional;
@@ -25,8 +24,6 @@ import java.util.function.Consumer;
 /**
  * A dedicated tab for creating, viewing, and managing players.
  */
-@Component
-@Lazy
 public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
 
     private final PlayerFormView playerForm;
@@ -39,21 +36,31 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
     private final PlayerFactory playerFactory;
     private boolean isShowingBlacklist = false;
     private final UiPersistenceService uiPersistenceService;
+    private final CoreProvider coreProvider;
 
-    @Autowired
-    private PlayerManagementTab(Store store, UiPersistenceService uiPersistenceService,
-                                PlayerFactory playerFactory) {
+    public PlayerManagementTab(CoreProvider coreProvider, PlayerStoreProvider storeProvider, ViewProvider viewProvider,
+                               UiPersistenceService uiPersistenceService, PlayerFactory playerFactory) {
         super("Player Management");
 
         this.uiPersistenceService = uiPersistenceService;
-        this.playerStore = store.getPlayerStore();
+        this.playerStore = storeProvider.getPlayerStore();
         this.playerFactory = playerFactory;
+        this.coreProvider = coreProvider;
         this.root = new SplitPane();
-        this.playerForm = new PlayerFormView();
+        this.playerForm = viewProvider.getPlayerFormView();
+        this.rosterView = viewProvider.getPlayerManagementRosterTableView();
+    }
+    public void init(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
+        this.attendingPlayers = attendingPlayers;
+        this.dmingPlayers = dmingPlayers;
+        this.onPlayerListChanged = onPlayerListChanged;
+        this.rosterView.init(attendingPlayers, dmingPlayers, onPlayerListChanged);
     }
 
     public void start() {
-        this.rosterView = new PlayerManagementRosterTableView(attendingPlayers, dmingPlayers, playerStore, onPlayerListChanged);
+        if(attendingPlayers == null || dmingPlayers == null || onPlayerListChanged == null) {
+            throw new IllegalStateException("%s has not been initialized".formatted(this.getClass().getSimpleName()));
+        }
 
         // --- Layout ---
         root.getItems().addAll(playerForm, rosterView);
@@ -119,9 +126,9 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
     }
 
     private void handleDelete() {
-        Player player = (Player) playerForm.getItemBeingEdited();
+        Player player = playerForm.getItemBeingEdited();
         if (player != null) {
-            ConfirmationDialog confirmation = new ConfirmationDialog(
+            ConfirmationDialog confirmation = (ConfirmationDialog) coreProvider.createDialog(DialogType.CONFIRMATION,
                     "Are you sure you want to delete " + player.getName() + "? This cannot be undone.",
                     this.getTabPane()
             );
@@ -154,12 +161,12 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         Player selectedPlayer = rosterView.getSelectedItem();
 
         if (editingPlayer == null || selectedPlayer == null) {
-            new InfoDialog("Please select a player from the roster to blacklist.", this.getTabPane()).showAndWait();
+            coreProvider.createDialog(DialogType.INFO, "Please select a player from the roster to blacklist.", this.getTabPane()).showAndWait();
             return;
         }
 
         if (editingPlayer.equals(selectedPlayer)) {
-            new InfoDialog("You cannot blacklist yourself, you silly goose!", this.getTabPane()).showAndWait();
+            coreProvider.createDialog(DialogType.INFO, "You cannot blacklist yourself, you silly goose!", this.getTabPane()).showAndWait();
             return;
         }
 
@@ -196,16 +203,8 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         return attendingPlayers;
     }
 
-    public void setAttendingPlayers(Map<UUID, Player> attendingPlayers) {
-        this.attendingPlayers = attendingPlayers;
-    }
-
     public Map<UUID, Player> getDmingPlayers() {
         return dmingPlayers;
-    }
-
-    public void setDmingPlayers(Map<UUID, Player> dmingPlayers) {
-        this.dmingPlayers = dmingPlayers;
     }
 }
 

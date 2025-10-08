@@ -7,6 +7,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.CharacterStoreProvider;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.Store;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,7 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     private CheckBox mainsFilterCheckBox;
     private Player selectedPlayer; // Can be null to show all characters
 
-    public CharacterRosterTableView(Store store) {
+    public CharacterRosterTableView(CharacterStoreProvider store) {
         super();
         this.characterStore = store.getCharacterStore();
         this.searchField.setPromptText("Search by character or player name...");

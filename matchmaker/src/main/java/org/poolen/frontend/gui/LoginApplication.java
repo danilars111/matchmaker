@@ -14,9 +14,10 @@ import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import org.poolen.ApplicationLauncher;
 import org.poolen.MatchmakerApplication;
-import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.*;
 import org.poolen.frontend.util.services.TestDataGenerator;
 import org.poolen.util.PropertiesManager;
@@ -48,8 +49,8 @@ public class LoginApplication extends Application {
     private UiPersistenceService uiPersistenceService;
     private UiGoogleTaskService uiGoogleTaskService;
     private UiGithubTaskService uiGithubTaskService;
-    private ApplicationScriptService scriptService;
     private TestDataGenerator testDataGenerator;
+    private CoreProvider coreProvider;
 
     // --- UI Components ---
     private Stage primaryStage;
@@ -191,7 +192,7 @@ public class LoginApplication extends Application {
      */
     private void showManagementStage() {
         primaryStage.close();
-        ManagementStage managementStage = springContext.getBean(ManagementStage.class);
+        ManagementStage managementStage = springContext.getBean(ComponentFactoryService.class).getManagementStage();
         managementStage.show();
     }
 
@@ -243,7 +244,7 @@ public class LoginApplication extends Application {
         uiPersistenceService = springContext.getBean(UiPersistenceService.class);
         uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
         uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
-        scriptService = springContext.getBean(ApplicationScriptService.class);
+        coreProvider = springContext.getBean(ComponentFactoryService.class);
         if (isH2Mode()) {
             testDataGenerator = springContext.getBean(TestDataGenerator.class);
         }
@@ -343,7 +344,7 @@ public class LoginApplication extends Application {
 
         // Generic error handling
         GoogleAuthManager.logout();
-        new ErrorDialog("An error occurred: " + error.getMessage(), root).showAndWait();
+        coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), root).showAndWait();
         error.printStackTrace();
         showLoginUI("Something went wrong. Please try signing in again.");
     }
@@ -394,8 +395,8 @@ public class LoginApplication extends Application {
     private void applyUpdate(File newJarFile) {
         uiGithubTaskService.applyUpdateAndRestart(
                 newJarFile,
-                () -> new ErrorDialog("Cannot update while running in an IDE, darling!", root).showAndWait(),
-                (error) -> new ErrorDialog("Update failed: " + error.getMessage(), root).showAndWait()
+                () -> coreProvider.createDialog(DialogType.ERROR, "Cannot update while running in an IDE, darling!", root).showAndWait(),
+                (error) -> coreProvider.createDialog(DialogType.ERROR, "Update failed: " + error.getMessage(), root).showAndWait()
         );
     }
 

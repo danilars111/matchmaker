@@ -25,10 +25,6 @@ import java.util.stream.Collectors;
  * filtering logic, which is now neatly contained in its own class!
  */
 public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
-
-    private final Map<UUID, Player> attendingPlayers;
-    private final Map<UUID, Player> dmingPlayers;
-
     private Group currentGroup;
     private Map<UUID, Player> partyForNewGroup;
     private Player dmForNewGroup;
@@ -40,10 +36,8 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
     private CheckBox selectedFilterCheckbox;
     private CheckBox availableOnlyCheckbox;
 
-    public GroupAssignmentRosterTableView(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers) {
+    public GroupAssignmentRosterTableView() {
         super();
-        this.attendingPlayers = attendingPlayers;
-        this.dmingPlayers = dmingPlayers;
         setupTableColumns();
         setupFilters();
         updateRoster();
@@ -123,8 +117,10 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
 
     @Override
     public void updateRoster() {
-        sourceItems.setAll(attendingPlayers.values());
-        applyFilter();
+        if(attendingPlayers != null) {
+            sourceItems.setAll(attendingPlayers.values());
+            applyFilter();
+        }
     }
 
     // --- Column Creation ---

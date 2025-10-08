@@ -6,50 +6,50 @@ import javafx.scene.control.Tab;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.CharacterFactory;
+import org.poolen.backend.db.interfaces.store.CharacterStoreProvider;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
-import org.poolen.backend.db.store.Store;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
 import org.poolen.frontend.gui.components.views.tables.rosters.CharacterRosterTableView;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
+import org.poolen.frontend.util.interfaces.providers.ViewProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 /**
  * A dedicated tab for creating, viewing, and managing characters.
  */
-@Component
-@Lazy
 public class CharacterManagementTab extends Tab {
 
     private final CharacterFormView characterForm;
     private final CharacterRosterTableView rosterView;
     private final SplitPane root;
-    private Runnable onListChanged;
+    private Runnable onPlayerListChanged;
     private final CharacterFactory characterFactory;
     private final CharacterStore characterStore;
     private final PlayerStore playerStore;
     private final UiPersistenceService uiPersistenceService;
-
-    @Autowired
-    public CharacterManagementTab(Store store, UiPersistenceService uiPersistenceService,
+    private final CoreProvider coreProvider;
+    public CharacterManagementTab(CoreProvider coreProvider, CharacterStoreProvider characterStoreProvider, PlayerStoreProvider playerStoreProvider,
+                                  ViewProvider viewProvider, UiPersistenceService uiPersistenceService,
                                   CharacterFactory characterFactory) {
         super("Character Management");
         this.characterFactory = characterFactory;
-        this.characterStore = store.getCharacterStore();
-        this.playerStore = store.getPlayerStore();
+        this.characterStore = characterStoreProvider.getCharacterStore();
+        this.playerStore = playerStoreProvider.getPlayerStore();
         this.uiPersistenceService = uiPersistenceService;
+        this.coreProvider = coreProvider;
 
         this.root = new SplitPane();
-        this.characterForm = new CharacterFormView(playerStore);
-        this.rosterView = new CharacterRosterTableView(store);
+        this.characterForm = viewProvider.getCharacterFormView();
+        this.rosterView = viewProvider.getCharacterRosterTableView();
 
         // --- Layout ---
         root.getItems().addAll(characterForm, rosterView);
@@ -77,6 +77,9 @@ public class CharacterManagementTab extends Tab {
 
         this.setContent(root);
     }
+    public void init(Runnable onPlayerListChanged) {
+        this.onPlayerListChanged = onPlayerListChanged;
+    }
 
     public CharacterFormView getCharacterForm() {
         return this.characterForm;
@@ -92,7 +95,7 @@ public class CharacterManagementTab extends Tab {
 
     private void handleCreateSecondCharacter(Player player) {
         if (characterForm.hasUnsavedChanges()) {
-            UnsavedChangesDialog dialog = new UnsavedChangesDialog(
+            UnsavedChangesDialog dialog = (UnsavedChangesDialog) coreProvider.createDialog(DialogType.CONFIRMATION,
                     "You have unsaved changes to the current character. How would you like to proceed?",
                     this.getTabPane()
             );
@@ -116,7 +119,7 @@ public class CharacterManagementTab extends Tab {
     private void handleCharacterAction() {
         Character character = characterForm.getItemBeingEdited();
         if (characterForm.getSelectedPlayer() == null) {
-            new InfoDialog("A character must belong to a player!", this.getTabPane()).showAndWait();
+            coreProvider.createDialog(DialogType.INFO, "A character must belong to a player!", this.getTabPane()).showAndWait();
             return;
         }
 
@@ -136,14 +139,14 @@ public class CharacterManagementTab extends Tab {
                 Character currentMain = owner.getMainCharacter();
 
                 if (isBecomingMain && currentMain != null && !currentMain.equals(character)) {
-                    ConfirmationDialog confirmation = new ConfirmationDialog(
+                    ConfirmationDialog confirmation = (ConfirmationDialog) coreProvider.createDialog(DialogType.CONFIRMATION,
                             owner.getName() + " already has a main character: " + currentMain.getName() + ".\n\n" +
                                     "Do you want to make " + characterForm.getCharacterName() + " their new main character?",
                             this.getTabPane()
                     );
                     Optional<ButtonType> response = confirmation.showAndWait();
                     if (response.isEmpty() || response.get() != ButtonType.YES) {
-                        characterForm.populateForm(character); // Revert the checkbox change visually
+                        characterForm.populateForm(character);
                         return; // Stop the action
                     }
                 }
@@ -154,22 +157,22 @@ public class CharacterManagementTab extends Tab {
                 characterStore.addCharacter(character);
             }
             uiPersistenceService.saveCharacters(character.getPlayer(), getTabPane().getScene().getWindow());
-            onListChanged.run();
+            onPlayerListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
             rosterView.filterByPlayer(null); // Also clear filter after a successful action
         } catch (IllegalArgumentException e) {
-            new ErrorDialog(e.getMessage(), this.getTabPane()).showAndWait();
+            coreProvider.createDialog(DialogType.ERROR,e.getMessage(), this.getTabPane()).showAndWait();
         }
     }
 
     private void handleRetire() {
-        Character character = (Character) characterForm.getItemBeingEdited();
+        Character character = characterForm.getItemBeingEdited();
         if (character != null) {
             character.setRetired(true);
             characterStore.addCharacter(character);
             uiPersistenceService.saveCharacters(character.getPlayer(), getTabPane().getScene().getWindow());
-            onListChanged.run();
+            onPlayerListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
             rosterView.filterByPlayer(null);
@@ -177,12 +180,12 @@ public class CharacterManagementTab extends Tab {
     }
 
     private void handleUnretire() {
-        Character character = (Character) characterForm.getItemBeingEdited();
+        Character character = characterForm.getItemBeingEdited();
         if (character != null) {
             character.setRetired(false);
             characterStore.addCharacter(character);
             uiPersistenceService.saveCharacters(character.getPlayer(), getTabPane().getScene().getWindow());
-            onListChanged.run();
+            onPlayerListChanged.run();
             rosterView.updateRoster();
             characterForm.clearForm();
             rosterView.filterByPlayer(null);
@@ -190,9 +193,9 @@ public class CharacterManagementTab extends Tab {
     }
 
     private void handleDelete() {
-        Character characterToDelete = (Character) characterForm.getItemBeingEdited();
+        Character characterToDelete = characterForm.getItemBeingEdited();
         if (characterToDelete != null) {
-            ConfirmationDialog confirmation = new ConfirmationDialog(
+            ConfirmationDialog confirmation = (ConfirmationDialog) coreProvider.createDialog(DialogType.CONFIRMATION,
                     "Are you sure you want to permanently delete " + characterToDelete.getName() + "? This cannot be undone.",
                     this.getTabPane()
             );
@@ -206,7 +209,7 @@ public class CharacterManagementTab extends Tab {
                 }
                 characterStore.removeCharacter(characterToDelete);
                 uiPersistenceService.deleteCharacter(characterToDelete, getTabPane().getScene().getWindow());
-                onListChanged.run();
+                onPlayerListChanged.run();
                 rosterView.updateRoster();
                 characterForm.clearForm();
                 rosterView.filterByPlayer(null);
@@ -214,8 +217,8 @@ public class CharacterManagementTab extends Tab {
         }
     }
 
-    public void setOnListChanged(Runnable onListChanged) {
-        this.onListChanged = onListChanged;
+    public void setOnPlayerListChanged(Runnable onPlayerListChanged) {
+        this.onPlayerListChanged = onPlayerListChanged;
     }
 }
 

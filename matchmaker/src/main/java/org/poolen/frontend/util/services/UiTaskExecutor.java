@@ -20,7 +20,6 @@ import java.util.function.Consumer;
  */
 @Service
 public class UiTaskExecutor {
-
     /**
      * The primary execution logic.
      */

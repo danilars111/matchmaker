@@ -17,17 +17,17 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
-import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Group;
-import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.SettingStoreProvider;
 import org.poolen.backend.db.store.SettingsStore;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.web.discord.DiscordWebhookManager;
-import org.poolen.web.google.SheetDataMapper;
 import org.poolen.web.google.SheetsServiceManager;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
+
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -44,18 +44,29 @@ import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEET
 public class ExportGroupsStage extends Stage {
 
     private final SettingsStore settingsStore;
-    private final List<Group> groups;
-    private final VBox loadingBox;
-    private final Button writeToSheetButton;
-    private final Button postToDiscordButton;
-    private final Button closeButton;
-    private final TextArea markdownArea;
+    private List<Group> groups;
+    private VBox loadingBox;
+    private Button writeToSheetButton;
+    private Button postToDiscordButton;
+    private Button closeButton;
+    private TextArea markdownArea;
     private final SheetsServiceManager sheetsServiceManager;
+    private Window owner;
+    private final CoreProvider coreProvider;
 
-    public ExportGroupsStage(List<Group> groups, Window owner, SheetsServiceManager sheetsServiceManager, SettingsStore settingsStore) {
-        this.settingsStore = settingsStore;
-        this.groups = groups;
+    public ExportGroupsStage(CoreProvider coreProvider, SheetsServiceManager sheetsServiceManager, SettingStoreProvider storeProvider) {
+        this.settingsStore = storeProvider.getSettingsStore();
         this.sheetsServiceManager = sheetsServiceManager;
+        this.coreProvider = coreProvider;
+    }
+    public void init(List<Group> groups, Window owner) {
+        this.groups = groups;
+        this.owner = owner;
+    }
+    public void start() {
+        if(groups == null || owner == null) {
+            throw new IllegalStateException("%s has not been initialized".formatted(this.getClass().getSimpleName()));
+        }
 
         initModality(Modality.WINDOW_MODAL);
         initOwner(owner);
@@ -124,7 +135,7 @@ public class ExportGroupsStage extends Stage {
     private void handlePostToDiscord() {
         String webhookUrl = (String) settingsStore.getSetting(DISCORD_WEB_HOOK).getSettingValue();
         if (webhookUrl == null || webhookUrl.isBlank()) {
-            new ErrorDialog("Please set a Discord Webhook URL in the Settings tab first, darling.", getScene().getRoot()).showAndWait();
+            coreProvider.createDialog(DialogType.ERROR,"Please set a Discord Webhook URL in the Settings tab first, darling.", getScene().getRoot()).showAndWait();
             return;
         }
 
@@ -166,13 +177,13 @@ public class ExportGroupsStage extends Stage {
 
             @Override
             protected void succeeded() {
-                new InfoDialog(getValue(), getScene().getRoot()).showAndWait();
+                coreProvider.createDialog(DialogType.INFO, getValue(), getScene().getRoot()).showAndWait();
                 restoreOriginalView();
             }
 
             @Override
             protected void failed() {
-                new ErrorDialog("Operation failed: " + getException().getMessage(), getScene().getRoot()).showAndWait();
+                coreProvider.createDialog(DialogType.ERROR,"Operation failed: " + getException().getMessage(), getScene().getRoot()).showAndWait();
                 getException().printStackTrace();
                 restoreOriginalView();
             }

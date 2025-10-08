@@ -10,6 +10,12 @@ import javafx.stage.Window;
  * It handles the logic for finding the correct owner window from any UI Node.
  */
 public abstract class BaseDialog extends Alert {
+    public enum DialogType {
+        CONFIRMATION,
+        ERROR,
+        INFO,
+        UNSAVED_CHANGES,
+    }
 
     /**
      * Protected constructor for subclasses to use.

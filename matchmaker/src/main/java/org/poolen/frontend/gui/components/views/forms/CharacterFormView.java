@@ -10,6 +10,7 @@ import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.store.PlayerStore;
 
 import java.util.Comparator;
@@ -37,9 +38,9 @@ public class CharacterFormView extends BaseFormView<Character> {
     private Consumer<Player> onCreateSecondCharacterRequestHandler;
     private final PlayerStore playerStore;
 
-    public CharacterFormView(PlayerStore playerStore) {
+    public CharacterFormView(PlayerStoreProvider store) {
         super();
-        this.playerStore = playerStore;
+        this.playerStore = store.getPlayerStore();
         setupFormControls();
         clearForm(); // Set initial state
     }

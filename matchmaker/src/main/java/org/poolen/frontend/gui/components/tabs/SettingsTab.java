@@ -10,16 +10,11 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Setting;
 import org.poolen.backend.db.interfaces.ISettings;
+import org.poolen.backend.db.interfaces.store.SettingStoreProvider;
 import org.poolen.backend.db.store.SettingsStore;
-import org.poolen.backend.db.store.Store;
-import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
-import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
-import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
-import org.poolen.web.google.SheetsServiceManager;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,8 +28,6 @@ import java.util.stream.Collectors;
  * A dedicated tab for viewing and editing application settings, built to dynamically
  * handle the new SettingsStore architecture.
  */
-@Component
-@Lazy
 public class SettingsTab extends Tab {
 
     private final SettingsStore settingsStore;
@@ -42,17 +35,18 @@ public class SettingsTab extends Tab {
     private final Map<ISettings, Node> settingControls = new HashMap<>();
     private final HBox buttonBox;
     private final BorderPane root;
-    private UiPersistenceService uiPersistenceService;
+    private final UiPersistenceService uiPersistenceService;
+    private  final CoreProvider coreProvider;
 
     private static final List<ISettings> HIDDEN_SETTINGS = List.of(
             Settings.MatchmakerBonusSettings.BUDDY_BONUS
     );
 
-    @Autowired
-    public SettingsTab(UiPersistenceService uiPersistenceService, Store store) {
+    public SettingsTab(CoreProvider coreProvider, UiPersistenceService uiPersistenceService, SettingStoreProvider store) {
         super("Settings");
         this.settingsStore = store.getSettingsStore();
         this.uiPersistenceService = uiPersistenceService;
+        this.coreProvider = coreProvider;
 
         // --- Main Layout ---
         root = new BorderPane();
@@ -80,13 +74,13 @@ public class SettingsTab extends Tab {
         saveButton.setOnAction(e -> saveSettings());
         cancelButton.setOnAction(e -> populateSettingsAccordion());
         defaultsButton.setOnAction(e -> {
-            new ConfirmationDialog("Are you sure you want to restore all settings to their default values?", this.getTabPane())
+            coreProvider.createDialog(DialogType.CONFIRMATION,"Are you sure you want to restore all settings to their default values?", this.getTabPane())
                     .showAndWait()
                     .ifPresent(response -> {
                         if (response == ButtonType.YES) {
                             settingsStore.setDefaultSettings();
                             populateSettingsAccordion();
-                            new InfoDialog("All settings have been restored to their defaults.", this.getTabPane()).showAndWait();
+                            coreProvider.createDialog(DialogType.INFO, "All settings have been restored to their defaults.", this.getTabPane()).showAndWait();
                         }
                     });
         });
@@ -231,7 +225,7 @@ public class SettingsTab extends Tab {
                 }
             }
         } catch (Exception e) {
-            new ErrorDialog("Could not save settings. Please check your values.\nError: " + e.getMessage(), this.getTabPane()).showAndWait();
+            coreProvider.createDialog(DialogType.ERROR,"Could not save settings. Please check your values.\nError: " + e.getMessage(), this.getTabPane()).showAndWait();
             return; // Stop if parsing failed
         }
 

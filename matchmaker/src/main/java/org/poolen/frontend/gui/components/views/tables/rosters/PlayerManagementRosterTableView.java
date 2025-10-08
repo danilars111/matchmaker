@@ -9,10 +9,8 @@ import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.store.PlayerStore;
-
-import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -23,8 +21,6 @@ import java.util.stream.Collectors;
 public class PlayerManagementRosterTableView extends PlayerRosterTableView{
 
     private final PlayerStore playerStore;
-    private final Map<UUID, Player> attendingPlayers;
-    private final Map<UUID, Player> dmingPlayers;
 
     // --- Filter Controls ---
     private CheckBox dmFilterCheckBox;
@@ -35,14 +31,9 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
     private TableColumn<Player, Boolean> attendingColumn;
     private TableColumn<Player, Boolean> dmingColumn;
 
-    private Runnable onPlayerListChanged;
-
-    public PlayerManagementRosterTableView(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, PlayerStore playerStore, Runnable onPlayerListChanged) {
+    public PlayerManagementRosterTableView(PlayerStoreProvider storeProvider) {
         super();
-        this.attendingPlayers = attendingPlayers;
-        this.dmingPlayers = dmingPlayers;
-        this.playerStore = playerStore;
-        this.onPlayerListChanged = onPlayerListChanged;
+        this.playerStore = storeProvider.getPlayerStore();
         setupTableColumns();
         setupFilters();
         updateRoster();

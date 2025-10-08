@@ -13,22 +13,14 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import org.poolen.backend.db.constants.Settings;
-import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
-import org.poolen.frontend.gui.components.dialogs.InfoDialog;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
+import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
-import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.web.google.GoogleAuthManager;
-import org.poolen.web.google.SheetsServiceManager;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
 
 /**
  * A tab dedicated to handling data persistence via Google Sheets.
  */
-@Component
-@Lazy
 public class PersistenceTab extends Tab {
 
     private Button signInButton;
@@ -41,12 +33,13 @@ public class PersistenceTab extends Tab {
     private Runnable onDataChanged;
     private Runnable onLogoutRequestHandler;
     private final UiPersistenceService uiPersistenceService;
+    private final CoreProvider coreProvider;
 
-    @Autowired
-    public PersistenceTab(UiPersistenceService uiPersistenceService) {
+    public PersistenceTab(CoreProvider coreProvider, UiPersistenceService uiPersistenceService) {
         super("Persistence");
 
         this.uiPersistenceService = uiPersistenceService;
+        this.coreProvider = coreProvider;
 
         // --- UI Components ---
         signInButton = createGoogleSignInButton();
@@ -92,6 +85,9 @@ public class PersistenceTab extends Tab {
 
         // Initial check when the tab is first created.
         updateUiState();
+    }
+    public void init(Runnable onPlayerListChanged) {
+        setOnDataChanged(onPlayerListChanged);
     }
 
     /**
@@ -174,7 +170,7 @@ public class PersistenceTab extends Tab {
 
             @Override
             protected void succeeded() {
-                new InfoDialog(getValue(), PersistenceTab.this.getTabPane()).showAndWait();
+                coreProvider.createDialog(DialogType.INFO, getValue(), PersistenceTab.this.getTabPane()).showAndWait();
                 onDataChanged.run(); // Notify the app of potential changes
                 updateUiState(); // Re-check and update the button visibility
                 buttonContainer.setDisable(false);
@@ -183,7 +179,7 @@ public class PersistenceTab extends Tab {
             @Override
             protected void failed() {
                 Throwable error = getException();
-                new ErrorDialog("Operation failed: " + error.getMessage(), PersistenceTab.this.getTabPane()).showAndWait();
+                coreProvider.createDialog(DialogType.ERROR, "Operation failed: " + error.getMessage(), PersistenceTab.this.getTabPane()).showAndWait();
                 error.printStackTrace();
                 updateUiState(); // Still update UI on failure
                 buttonContainer.setDisable(false);
@@ -219,7 +215,7 @@ public class PersistenceTab extends Tab {
         return onLogoutRequestHandler;
     }
 
-    public void setOnDataChanged(Runnable onDataChanged) {
+    private void setOnDataChanged(Runnable onDataChanged) {
         this.onDataChanged = onDataChanged;
     }
 }
