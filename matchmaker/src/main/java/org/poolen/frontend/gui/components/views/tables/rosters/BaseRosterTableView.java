@@ -1,4 +1,4 @@
-package org.poolen.frontend.gui.components.views.tables;
+package org.poolen.frontend.gui.components.views.tables.rosters;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -12,6 +12,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
 import org.poolen.backend.db.constants.House;
+import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -33,6 +34,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
     protected final FilteredList<T> filteredData;
 
     private int rowsPerPage = 15;
+    private Consumer<T> onItemDoubleClickHandler;
 
     public BaseRosterTableView() {
         super(10);
@@ -62,7 +64,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
     }
 
     private void setupCommonUI() {
-        table.setEditable(true); // The magic word!
+        table.setEditable(true);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         searchField.setPromptText("Search...");
         VBox.setVgrow(pagination, Priority.ALWAYS);
@@ -82,6 +84,9 @@ public abstract class BaseRosterTableView<T> extends VBox {
             }
         });
         table.getColumns().add(rowNumCol);
+
+        // --- Row Factory for Styling and Double-Click ---
+        table.setRowFactory(createRowFactory());
 
 
         VBox filterContainer = new VBox(10);
@@ -109,18 +114,20 @@ public abstract class BaseRosterTableView<T> extends VBox {
     public abstract void applyFilter();
     public abstract void updateRoster();
 
+    /**
+     * An empty hook for subclasses to provide their own row styling.
+     * @param row The table row being styled.
+     * @param item The item in the row.
+     * @param empty Whether the row is empty.
+     */
+    protected void styleRow(TableRow<T> row, T item, boolean empty) {
+        // Default implementation does nothing.
+    }
+
 
     // --- Common Functionality ---
     public void setOnItemDoubleClick(Consumer<T> onItemDoubleClick) {
-        table.setRowFactory(tv -> {
-            TableRow<T> row = new TableRow<>();
-            row.setOnMouseClicked(event -> {
-                if (event.getClickCount() == 2 && (!row.isEmpty())) {
-                    onItemDoubleClick.accept(row.getItem());
-                }
-            });
-            return row;
-        });
+        this.onItemDoubleClickHandler = onItemDoubleClick;
     }
 
     public T getSelectedItem() {
@@ -133,12 +140,39 @@ public abstract class BaseRosterTableView<T> extends VBox {
         }
     }
 
+    /**
+     * Creates our universal row factory. This clever little thing handles both
+     * the double-click logic and calls our new `styleRow` method, which lets
+     * subclasses like PlayerRosterTableView do their own pretty styling!
+     */
+    private Callback<TableView<T>, TableRow<T>> createRowFactory() {
+        return tv -> {
+            TableRow<T> row = new TableRow<>() {
+                @Override
+                protected void updateItem(T item, boolean empty) {
+                    super.updateItem(item, empty);
+                    // This is our new hook for the children to do their styling!
+                    styleRow(this, item, empty);
+                }
+            };
+
+            // This part handles the double-click for everyone.
+            row.setOnMouseClicked(event -> {
+                if (onItemDoubleClickHandler != null && event.getClickCount() == 2 && (!row.isEmpty()) && row.getItem() != null) {
+                    onItemDoubleClickHandler.accept(row.getItem());
+                }
+            });
+
+            return row;
+        };
+    }
+
     private Callback<Integer, Node> createPageFactory(List<T> data) {
         return pageIndex -> {
             int fromIndex = pageIndex * rowsPerPage;
             int toIndex = Math.min(fromIndex + rowsPerPage, data.size());
             table.setItems(FXCollections.observableArrayList(data.subList(fromIndex, toIndex)));
-            table.refresh(); // This helps ensure visual updates
+            table.refresh();
             return table;
         };
     }
@@ -170,4 +204,3 @@ public abstract class BaseRosterTableView<T> extends VBox {
         }
     }
 }
-

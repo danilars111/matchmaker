@@ -10,7 +10,8 @@ import org.poolen.backend.db.store.Store;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.views.forms.PlayerFormView;
-import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
+import org.poolen.frontend.gui.components.views.tables.rosters.PlayerManagementRosterTableView;
+import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.services.UiPersistenceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -21,17 +22,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import static org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView.RosterMode.PLAYER_MANAGEMENT;
-
 /**
  * A dedicated tab for creating, viewing, and managing players.
  */
 @Component
 @Lazy
-public class PlayerManagementTab extends Tab {
+public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
 
     private final PlayerFormView playerForm;
-    private PlayerRosterTableView rosterView;
+    private PlayerManagementRosterTableView rosterView;
     private final SplitPane root;
     private Runnable onPlayerListChanged;
     private Map<UUID, Player> attendingPlayers;
@@ -54,7 +53,7 @@ public class PlayerManagementTab extends Tab {
     }
 
     public void start() {
-        this.rosterView = new PlayerRosterTableView(PLAYER_MANAGEMENT, attendingPlayers, dmingPlayers, playerStore);
+        this.rosterView = new PlayerManagementRosterTableView(attendingPlayers, dmingPlayers, playerStore, onPlayerListChanged);
 
         // --- Layout ---
         root.getItems().addAll(playerForm, rosterView);
@@ -98,7 +97,7 @@ public class PlayerManagementTab extends Tab {
      * This is our new helper method so the ManagementStage can find our roster view.
      * @return The PlayerRosterTableView instance used by this tab.
      */
-    public PlayerRosterTableView getRosterView() {
+    public PlayerManagementRosterTableView getRosterView() {
         return rosterView;
     }
 
@@ -131,14 +130,13 @@ public class PlayerManagementTab extends Tab {
                 playerStore.removePlayer(player);
                 uiPersistenceService.deletePlayer(player, getTabPane().getScene().getWindow());
                 onPlayerListChanged.run();
-                rosterView.updateRoster();
                 playerForm.clearForm();
             }
         }
     }
 
     private void handleShowBlacklist() {
-        Player editingPlayer = (Player) playerForm.getItemBeingEdited();
+        Player editingPlayer =  playerForm.getItemBeingEdited();
         if (editingPlayer == null) return;
 
         isShowingBlacklist = !isShowingBlacklist;
@@ -152,7 +150,7 @@ public class PlayerManagementTab extends Tab {
     }
 
     private void handleBlacklistAction() {
-        Player editingPlayer = (Player) playerForm.getItemBeingEdited();
+        Player editingPlayer = playerForm.getItemBeingEdited();
         Player selectedPlayer = rosterView.getSelectedItem();
 
         if (editingPlayer == null || selectedPlayer == null) {
@@ -178,6 +176,12 @@ public class PlayerManagementTab extends Tab {
         } else {
             rosterView.updateRoster();
         }
+    }
+
+    @Override
+    public void onPlayerUpdate() {
+        System.out.println("PlayerManagement Tab heard a player update! Refreshing DM list and roster...");
+        rosterView.updateRoster();
     }
 
     public Runnable getOnPlayerListChanged() {

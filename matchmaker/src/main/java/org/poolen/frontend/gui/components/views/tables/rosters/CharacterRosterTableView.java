@@ -1,4 +1,4 @@
-package org.poolen.frontend.gui.components.views.tables;
+package org.poolen.frontend.gui.components.views.tables.rosters;
 
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -13,13 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
-import java.util.function.Consumer;
-
 /**
  * A reusable table view for displaying and filtering Characters, inheriting from BaseRosterTableView.
  */
-@Component
-@Lazy
 public class CharacterRosterTableView extends BaseRosterTableView<Character> {
 
     private final CharacterStore characterStore;
@@ -27,14 +23,13 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     private CheckBox mainsFilterCheckBox;
     private Player selectedPlayer; // Can be null to show all characters
 
-    @Autowired
     public CharacterRosterTableView(Store store) {
         super();
         this.characterStore = store.getCharacterStore();
         this.searchField.setPromptText("Search by character or player name...");
         setupTableColumns();
         setupFilters();
-        updateRoster(); // Initial data load
+        updateRoster();
     }
 
     @Override

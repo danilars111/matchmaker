@@ -65,7 +65,7 @@ public class ManagementStage extends Stage {
         groupTab.start();
 
         addPlayerUpdateListener(groupTab);
-        addPlayerUpdateListener(playerTab.getRosterView());
+        addPlayerUpdateListener(playerTab);
 
         characterTab.setOnListChanged(this::notifyPlayerUpdateListeners);
         persistenceTab.setOnLogoutRequestHandler(this::notifyPlayerUpdateListeners);

@@ -1,15 +1,6 @@
 package org.poolen.frontend.gui.components.tabs;
 
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
@@ -25,7 +16,8 @@ import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.stages.ExportGroupsStage;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
 import org.poolen.frontend.gui.components.views.forms.GroupFormView;
-import org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView;
+import org.poolen.frontend.gui.components.views.tables.rosters.GroupAssignmentRosterTableView;
+import org.poolen.frontend.gui.components.views.tables.rosters.PlayerRosterTableView;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.web.google.SheetsServiceManager;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,10 +26,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,8 +36,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
-import static org.poolen.frontend.gui.components.views.tables.PlayerRosterTableView.RosterMode.GROUP_ASSIGNMENT;
 
 /**
  * A dedicated tab for creating, viewing, and managing groups that listens for player updates.
@@ -60,7 +48,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private static final GroupFactory groupFactory = GroupFactory.getInstance();
     private GroupFormView groupForm;
     private SplitPane root;
-    private PlayerRosterTableView rosterView;
+    private GroupAssignmentRosterTableView rosterView;
     private boolean isPlayerRosterVisible = false;
 
     private Map<UUID, Player> newPartyMap;
@@ -99,7 +87,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         // Default the event date to the nearest upcoming Friday.
         this.eventDate = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
 
-        this.rosterView = new PlayerRosterTableView(GROUP_ASSIGNMENT, attendingPlayers, dmingPlayers, playerStore);
+        this.rosterView = new GroupAssignmentRosterTableView(attendingPlayers, dmingPlayers);
 
         cleanUp();
 
@@ -488,7 +476,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     @Override
     public void onPlayerUpdate() {
-        System.out.println("Heard a player update! Refreshing DM list and roster...");
+        System.out.println("GroupManagement Tab heard a player update! Refreshing DM list and roster...");
         updateDmList();
         rosterView.updateRoster();
     }

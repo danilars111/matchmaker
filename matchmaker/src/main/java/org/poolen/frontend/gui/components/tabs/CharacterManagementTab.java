@@ -14,7 +14,7 @@ import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.views.forms.CharacterFormView;
-import org.poolen.frontend.gui.components.views.tables.CharacterRosterTableView;
+import org.poolen.frontend.gui.components.views.tables.rosters.CharacterRosterTableView;
 import org.poolen.frontend.util.services.UiPersistenceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -40,7 +40,7 @@ public class CharacterManagementTab extends Tab {
 
     @Autowired
     public CharacterManagementTab(Store store, UiPersistenceService uiPersistenceService,
-                                  CharacterFactory characterFactory, CharacterRosterTableView rosterView) {
+                                  CharacterFactory characterFactory) {
         super("Character Management");
         this.characterFactory = characterFactory;
         this.characterStore = store.getCharacterStore();
@@ -49,7 +49,7 @@ public class CharacterManagementTab extends Tab {
 
         this.root = new SplitPane();
         this.characterForm = new CharacterFormView(playerStore);
-        this.rosterView = rosterView;
+        this.rosterView = new CharacterRosterTableView(store);
 
         // --- Layout ---
         root.getItems().addAll(characterForm, rosterView);
