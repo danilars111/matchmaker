@@ -19,11 +19,15 @@ import javafx.scene.shape.MoveTo;
 import javafx.scene.shape.Path;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A reusable UI component that displays a loading overlay on top of a given scene.
  */
 public class LoadingOverlay {
+
+    private static final Logger logger = LoggerFactory.getLogger(LoadingOverlay.class);
 
     private final StackPane overlayPane;
     private final Label statusLabel;
@@ -68,6 +72,7 @@ public class LoadingOverlay {
         detailsText.setPrefHeight(80);
         copyButton = new Button("Copy to Clipboard");
         copyButton.setOnAction(e -> {
+            logger.info("User copied details to clipboard.");
             Clipboard.getSystemClipboard().setContent(new ClipboardContent(){{putString(detailsText.getText());}});
             copyButton.setText("Copied!");
         });
@@ -86,7 +91,11 @@ public class LoadingOverlay {
     }
 
     public void show(Scene scene, String initialMessage) {
-        if (scene == null) return;
+        if (scene == null) {
+            logger.warn("Attempted to show loading overlay on a null scene. Aborting.");
+            return;
+        }
+        logger.info("Displaying loading overlay with message: '{}'", initialMessage);
 
         progressIndicator.setVisible(true);
         checkMark.setVisible(false);
@@ -97,22 +106,35 @@ public class LoadingOverlay {
         this.originalRoot = scene.getRoot();
         StackPane newRoot = new StackPane(originalRoot, overlayPane);
         scene.setRoot(newRoot);
+        logger.debug("Overlay is now visible and has replaced the original scene root.");
     }
 
     public void hide(Scene scene) {
-        if (scene == null || originalRoot == null) return;
+        if (scene == null || originalRoot == null) {
+            logger.warn("Attempted to hide loading overlay, but scene or originalRoot was null. Cannot restore original scene root.");
+            return;
+        }
 
         if (scene.getRoot() instanceof StackPane) {
             StackPane currentRoot = (StackPane) scene.getRoot();
             if (currentRoot.getChildren().contains(originalRoot)) {
                 currentRoot.getChildren().clear();
                 scene.setRoot(originalRoot);
+                logger.info("Loading overlay has been hidden and the original scene root restored.");
+            } else {
+                logger.warn("Attempted to hide overlay, but the current root did not contain the original root. This may indicate an unexpected UI state.");
             }
+        } else {
+            logger.warn("Attempted to hide overlay, but the current scene root is not the expected StackPane. Cannot restore original scene root.");
         }
     }
 
     public void showSuccessAndThenHide(Scene scene, String successMessage) {
-        if (scene == null) return;
+        if (scene == null) {
+            logger.warn("Attempted to show success message on a null scene. Aborting.");
+            return;
+        }
+        logger.info("Displaying success message: '{}', overlay will hide shortly.", successMessage);
 
         statusLabel.setText(successMessage);
         progressIndicator.setVisible(false);
@@ -130,6 +152,7 @@ public class LoadingOverlay {
      * @param details The text to display in the main text area.
      */
     public void showDetails(String label, String details) {
+        logger.info("Displaying details box with label: '{}'", label);
         detailsLabel.setText(label);
         detailsText.setText(details);
         detailsBox.setVisible(true);
@@ -139,4 +162,3 @@ public class LoadingOverlay {
         return statusLabel.textProperty();
     }
 }
-

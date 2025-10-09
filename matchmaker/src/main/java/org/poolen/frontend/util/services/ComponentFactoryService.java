@@ -35,11 +35,14 @@ import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
 import org.poolen.frontend.util.interfaces.providers.ViewProvider;
 import org.poolen.web.google.SheetsServiceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ComponentFactoryService implements CoreProvider, StageProvider, TabProvider, ViewProvider {
+    private static final Logger logger = LoggerFactory.getLogger(ComponentFactoryService.class);
     // Beans
     private final Store store;
     private final UiPersistenceService uiPersistenceService;
@@ -47,6 +50,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final PlayerFactory playerFactory;
     private final SheetsServiceManager sheetsServiceManager;
     private final Matchmaker matchmaker;
+    private final ApplicationScriptService applicationScriptService;
 
     // Singleton components
     private ManagementStage managementStage;
@@ -66,25 +70,34 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private GroupDisplayView groupDisplayView;
 
     @Autowired
-    public ComponentFactoryService(Store store, UiPersistenceService uiPersistenceService, CharacterFactory characterFactory, PlayerFactory playerFactory, SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker) {
+    public ComponentFactoryService(Store store, UiPersistenceService uiPersistenceService, CharacterFactory characterFactory, PlayerFactory playerFactory, SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker, ApplicationScriptService applicationScriptService) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
         this.characterFactory = characterFactory;
         this.playerFactory = playerFactory;
         this.sheetsServiceManager = sheetsServiceManager;
         this.matchmaker = matchmaker;
+        this.applicationScriptService = applicationScriptService;
+        logger.info("ComponentFactoryService initialised with all required beans.");
     }
 
     /*******************************************************************************************
-     **                                 Multi-ton Creators                                    **
+     ** Multi-ton Creators                                    **
      *******************************************************************************************/
-    public LoadingOverlay createLoadingOverlay() {
-        return new LoadingOverlay();
-    }
     public SetupStage createSetupStage() {
+        logger.debug("Creating new SetupStage instance.");
         return new SetupStage(null, null);
     }
+    public LoadingOverlay createLoadingOverlay() {
+        logger.debug("Creating new LoadingOverlay instance.");
+        return new LoadingOverlay();
+    }
+    public SetupStage createSetupStage(String errorMessage) {
+        logger.debug("Creating new SetupStage instance.");
+        return new SetupStage(applicationScriptService, errorMessage);
+    }
     public BaseDialog createDialog(DialogType type, String content, Node owner) {
+        logger.debug("Creating new dialog of type: {}", type);
         switch (type) {
             case CONFIRMATION:
                 return new ConfirmationDialog(content, owner);
@@ -95,25 +108,28 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
             case UNSAVED_CHANGES:
                 return new UnsavedChangesDialog(content, owner);
             default:
-                throw new IllegalArgumentException();
+                logger.error("Attempted to create a dialog with an unknown type: {}", type);
+                throw new IllegalArgumentException("Unknown DialogType: " + type);
         }
     }
 
 
     /*******************************************************************************************
-    **                                 Singleton Getters                                      **
-    ********************************************************************************************/
+     ** Singleton Getters                                      **
+     ********************************************************************************************/
     /************
      ** Stages **
      ************/
     public ManagementStage getManagementStage() {
         if (this.managementStage == null) {
+            logger.info("Creating singleton instance of ManagementStage.");
             this.managementStage = new ManagementStage(this,this);
         }
         return this.managementStage;
     }
     public ExportGroupsStage getExportGroupsStage() {
         if(this.exportGroupsStage == null) {
+            logger.info("Creating singleton instance of ExportGroupsStage.");
             this.exportGroupsStage = new ExportGroupsStage(this, sheetsServiceManager, store);
         }
         return this.exportGroupsStage;
@@ -123,6 +139,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
      **********/
     public CharacterManagementTab getCharacterManagementTab() {
         if (this.characterManagementTab == null) {
+            logger.info("Creating singleton instance of CharacterManagementTab.");
             this.characterManagementTab = new CharacterManagementTab(this, store, store, this,
                     uiPersistenceService, characterFactory);
         }
@@ -130,24 +147,28 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     }
     public GroupManagementTab getGroupManagementTab() {
         if (this.groupManagementTab == null) {
+            logger.info("Creating singleton instance of GroupManagementTab.");
             this.groupManagementTab = new GroupManagementTab(this,this, this, sheetsServiceManager, matchmaker);
         }
         return this.groupManagementTab;
     }
     public PersistenceTab getPersistenceTab() {
         if (this.persistenceTab == null) {
+            logger.info("Creating singleton instance of PersistenceTab.");
             this.persistenceTab = new PersistenceTab(this, uiPersistenceService);
         }
         return this.persistenceTab;
     }
     public PlayerManagementTab getPlayerManagementTab() {
         if (this.playerManagementTab == null) {
+            logger.info("Creating singleton instance of PlayerManagementTab.");
             this.playerManagementTab = new PlayerManagementTab(this, store, this, uiPersistenceService, playerFactory);
         }
         return this.playerManagementTab;
     }
     public SettingsTab getSettingsTab() {
         if (this.settingsTab == null) {
+            logger.info("Creating singleton instance of SettingsTab.");
             this.settingsTab = new SettingsTab(this, uiPersistenceService, store);
         }
         return this.settingsTab;
@@ -157,48 +178,56 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
      ***********/
     public CharacterFormView getCharacterFormView() {
         if (this.characterFormView == null) {
+            logger.info("Creating singleton instance of CharacterFormView.");
             this.characterFormView = new CharacterFormView(store);
         }
         return this.characterFormView;
     }
     public GroupFormView getGroupFormView() {
         if (this.groupFormView == null) {
+            logger.info("Creating singleton instance of GroupFormView.");
             this.groupFormView = new GroupFormView();
         }
         return this.groupFormView;
     }
     public PlayerFormView getPlayerFormView() {
         if (this.playerFormView == null) {
+            logger.info("Creating singleton instance of PlayerFormView.");
             this.playerFormView = new PlayerFormView();
         }
         return this.playerFormView;
     }
     public CharacterRosterTableView getCharacterRosterTableView() {
         if (this.characterRosterTableView == null) {
+            logger.info("Creating singleton instance of CharacterRosterTableView.");
             this.characterRosterTableView = new CharacterRosterTableView(store);
         }
         return this.characterRosterTableView;
     }
     public GroupAssignmentRosterTableView getGroupAssignmentRosterTableView() {
         if (this.groupAssignmentRosterTableView == null) {
+            logger.info("Creating singleton instance of GroupAssignmentRosterTableView.");
             this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView();
         }
         return this.groupAssignmentRosterTableView;
     }
     public PlayerManagementRosterTableView getPlayerManagementRosterTableView() {
         if (this.playerManagementRosterTableView == null) {
+            logger.info("Creating singleton instance of PlayerManagementRosterTableView.");
             this.playerManagementRosterTableView = new PlayerManagementRosterTableView(store);
         }
         return this.playerManagementRosterTableView;
     }
     public GroupTableView getGroupTableView() {
         if (groupTableView == null) {
+            logger.info("Creating singleton instance of GroupTableView.");
             this.groupTableView = new GroupTableView();
         }
         return groupTableView;
     }
     public GroupDisplayView getGroupDisplayView() {
         if (this.groupDisplayView == null) {
+            logger.info("Creating singleton instance of GroupDisplayView.");
             this.groupDisplayView = new GroupDisplayView();
         }
         return this.groupDisplayView;

@@ -13,6 +13,8 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
 
@@ -21,6 +23,8 @@ import java.util.UUID;
  * @param <T> The type of the entity the form will be editing (e.g., Player, Character).
  */
 public abstract class BaseFormView<T> extends GridPane {
+
+    private static final Logger logger = LoggerFactory.getLogger(BaseFormView.class);
 
     protected final TextField uuidField;
     protected final Button actionButton;
@@ -52,6 +56,7 @@ public abstract class BaseFormView<T> extends GridPane {
             ClipboardContent content = new ClipboardContent();
             content.putString(uuidField.getText());
             clipboard.setContent(content);
+            logger.debug("UUID '{}' copied to clipboard.", uuidField.getText());
         });
 
         HBox uuidBox = new HBox(5, uuidField, copyButton);
@@ -68,6 +73,7 @@ public abstract class BaseFormView<T> extends GridPane {
 
         mainActionsBox = new HBox(10, cancelButton, actionButton);
         mainActionsBox.setAlignment(Pos.CENTER_RIGHT);
+        logger.trace("BaseFormView initialised for subclass {}.", this.getClass().getSimpleName());
     }
 
     // --- Abstract Methods for Subclasses ---
@@ -76,10 +82,18 @@ public abstract class BaseFormView<T> extends GridPane {
 
     public void populateForm(T item) {
         this.itemBeingEdited = item;
-        uuidField.setText(getUuidFromItem(item).toString());
+        UUID uuid = getUuidFromItem(item);
+        uuidField.setText(uuid.toString());
+        logger.info("Form populated to edit item of type '{}' with UUID '{}'.", item.getClass().getSimpleName(), uuid);
     }
 
     public void clearForm() {
+        if (itemBeingEdited != null) {
+            logger.info("Clearing form. Was editing item of type '{}' with UUID '{}'.",
+                    itemBeingEdited.getClass().getSimpleName(), getUuidFromItem(itemBeingEdited));
+        } else {
+            logger.debug("Clearing form. No item was being edited.");
+        }
         this.itemBeingEdited = null;
         uuidField.clear();
     }
@@ -98,4 +112,3 @@ public abstract class BaseFormView<T> extends GridPane {
         Platform.runLater(control::requestFocus);
     }
 }
-

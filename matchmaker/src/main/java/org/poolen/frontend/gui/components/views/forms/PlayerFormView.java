@@ -9,6 +9,8 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import org.poolen.backend.db.entities.Player;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -17,6 +19,8 @@ import java.util.function.Consumer;
  * A reusable JavaFX component for creating or updating a player, inheriting from BaseFormView.
  */
 public class PlayerFormView extends BaseFormView<Player> {
+
+    private static final Logger logger = LoggerFactory.getLogger(PlayerFormView.class);
 
     private TextField nameField;
     private CheckBox dmCheckBox;
@@ -33,10 +37,12 @@ public class PlayerFormView extends BaseFormView<Player> {
         super();
         setupFormControls();
         clearForm(); // Set initial state
+        logger.info("PlayerFormView initialised.");
     }
 
     @Override
     protected void setupFormControls() {
+        logger.debug("Setting up form controls for PlayerFormView.");
         nameField = new TextField();
         dmCheckBox = new CheckBox("Dungeon Master");
 
@@ -82,13 +88,19 @@ public class PlayerFormView extends BaseFormView<Player> {
         // --- Event Wiring ---
         showCharactersButton.setOnAction(e -> {
             if (onShowCharactersRequestHandler != null && itemBeingEdited != null) {
+                logger.debug("Show Characters button clicked for player '{}'. Invoking handler.", itemBeingEdited.getName());
                 onShowCharactersRequestHandler.accept(itemBeingEdited);
+            } else {
+                logger.warn("Show Characters button clicked, but handler or player being edited was null.");
             }
         });
 
         createCharacterButton.setOnAction(e -> {
             if (onCreateCharacterRequestHandler != null && itemBeingEdited != null) {
+                logger.debug("Create Character button clicked for player '{}'. Invoking handler.", itemBeingEdited.getName());
                 onCreateCharacterRequestHandler.accept(itemBeingEdited);
+            } else {
+                logger.warn("Create Character button clicked, but handler or player being edited was null.");
             }
         });
     }
@@ -101,6 +113,7 @@ public class PlayerFormView extends BaseFormView<Player> {
     @Override
     public void populateForm(Player player) {
         super.populateForm(player);
+        logger.debug("Populating player-specific fields for '{}'.", player.getName());
         nameField.setText(player.getName());
         dmCheckBox.setSelected(player.isDungeonMaster());
         actionButton.setText("Update");
@@ -119,6 +132,7 @@ public class PlayerFormView extends BaseFormView<Player> {
     @Override
     public void clearForm() {
         super.clearForm();
+        logger.debug("Clearing player-specific fields.");
         nameField.clear();
         dmCheckBox.setSelected(false);
         actionButton.setText("Create");
@@ -164,6 +178,7 @@ public class PlayerFormView extends BaseFormView<Player> {
     }
 
     public void setBlacklistMode(boolean isShowingBlacklist) {
+        logger.info("Setting blacklist mode to: {}", isShowingBlacklist);
         if (isShowingBlacklist) {
             showBlacklistButton.setText("Hide Blacklist");
             blacklistButton.setText("Remove from Blacklist");

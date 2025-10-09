@@ -27,6 +27,8 @@ import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.web.discord.DiscordWebhookManager;
 import org.poolen.web.google.SheetsServiceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 import java.time.LocalDate;
@@ -42,6 +44,8 @@ import static org.poolen.backend.db.constants.Settings.PersistenceSettings.SHEET
  * or by writing them directly to a Google Sheet.
  */
 public class ExportGroupsStage extends Stage {
+
+    private static final Logger logger = LoggerFactory.getLogger(ExportGroupsStage.class);
 
     private final SettingsStore settingsStore;
     private List<Group> groups;
@@ -65,8 +69,11 @@ public class ExportGroupsStage extends Stage {
     }
     public void start() {
         if(groups == null || owner == null) {
-            throw new IllegalStateException("%s has not been initialized".formatted(this.getClass().getSimpleName()));
+            String errorMsg = String.format("%s has not been initialized correctly.", this.getClass().getSimpleName());
+            logger.error(errorMsg);
+            throw new IllegalStateException(errorMsg);
         }
+        logger.info("Initialising and showing ExportGroupsStage for {} groups.", groups.size());
 
         initModality(Modality.WINDOW_MODAL);
         initOwner(owner);
@@ -108,9 +115,11 @@ public class ExportGroupsStage extends Stage {
                 clipboard.setContent(content);
                 copyStatusLabel.setText("Copied!");
                 copyStatusLabel.setStyle("-fx-text-fill: green;");
+                logger.info("User copied generated markdown to clipboard.");
             } catch (Exception ex) {
                 copyStatusLabel.setText("Failed to copy.");
                 copyStatusLabel.setStyle("-fx-text-fill: red;");
+                logger.error("Failed to copy markdown to clipboard.", ex);
             }
             PauseTransition pause = new PauseTransition(Duration.seconds(2));
             pause.setOnFinished(event -> copyStatusLabel.setText(""));
@@ -130,17 +139,20 @@ public class ExportGroupsStage extends Stage {
 
         Scene scene = new Scene(root, 700, 450);
         setScene(scene);
+        logger.debug("ExportGroupsStage UI constructed and scene is set.");
     }
 
     private void handlePostToDiscord() {
+        logger.info("User initiated 'Post to Discord' action.");
         String webhookUrl = (String) settingsStore.getSetting(DISCORD_WEB_HOOK).getSettingValue();
         if (webhookUrl == null || webhookUrl.isBlank()) {
+            logger.warn("Discord post aborted: Webhook URL is not configured in settings.");
             coreProvider.createDialog(DialogType.ERROR,"Please set a Discord Webhook URL in the Settings tab first, darling.", getScene().getRoot()).showAndWait();
             return;
         }
 
         String markdown = markdownArea.getText();
-
+        logger.debug("Webhook URL is present. Starting background task to post markdown.");
         runTask("Posting to Discord...", () -> {
             DiscordWebhookManager.sendAnnouncement(webhookUrl, markdown);
             return "Announcement successfully posted to Discord!";
@@ -149,10 +161,17 @@ public class ExportGroupsStage extends Stage {
 
 
     private void handleWriteToSheet() {
+        logger.info("User initiated 'Write to Sheets' action.");
         String spreadsheetId = (String) settingsStore.getSetting(SHEETS_ID).getSettingValue();
+        if (spreadsheetId == null || spreadsheetId.isBlank()) {
+            logger.warn("Write to Sheets aborted: Spreadsheet ID is not configured in settings.");
+            coreProvider.createDialog(DialogType.ERROR, "Please set a Google Sheets ID in the Settings tab first.", getScene().getRoot()).showAndWait();
+            return;
+        }
 
         updatePlayerLogs();
 
+        logger.debug("Spreadsheet ID is present. Starting background task to write groups.");
         runTask("Writing to Google Sheets...", () -> {
             //sheetsServiceManager.saveData(spreadsheetId);
             sheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
@@ -161,6 +180,7 @@ public class ExportGroupsStage extends Stage {
     }
 
     private void runTask(String loadingMessage, TaskOperation operation) {
+        logger.info("Starting background task: '{}'", loadingMessage);
         BorderPane rootPane = (BorderPane) getScene().getRoot();
         // The loadingBox now needs a Label.
         Label loadingLabel = new Label(loadingMessage);
@@ -172,19 +192,22 @@ public class ExportGroupsStage extends Stage {
         Task<String> exportTask = new Task<>() {
             @Override
             protected String call() throws Exception {
+                logger.debug("Executing background operation on thread: {}", Thread.currentThread().getName());
                 return operation.execute();
             }
 
             @Override
             protected void succeeded() {
+                logger.info("Background task succeeded. Result: '{}'", getValue());
                 coreProvider.createDialog(DialogType.INFO, getValue(), getScene().getRoot()).showAndWait();
                 restoreOriginalView();
             }
 
             @Override
             protected void failed() {
-                coreProvider.createDialog(DialogType.ERROR,"Operation failed: " + getException().getMessage(), getScene().getRoot()).showAndWait();
-                getException().printStackTrace();
+                Throwable ex = getException();
+                logger.error("Background task failed with an exception.", ex);
+                coreProvider.createDialog(DialogType.ERROR,"Operation failed: " + ex.getMessage(), getScene().getRoot()).showAndWait();
                 restoreOriginalView();
             }
         };
@@ -192,6 +215,7 @@ public class ExportGroupsStage extends Stage {
     }
 
     private void restoreOriginalView() {
+        logger.debug("Restoring original view after task completion.");
         BorderPane rootPane = (BorderPane) getScene().getRoot();
         rootPane.setCenter(markdownArea);
         loadingBox.setVisible(false);
@@ -205,17 +229,21 @@ public class ExportGroupsStage extends Stage {
     }
 
     private void updatePlayerLogs() {
+        logger.info("Updating player logs for {} groups before export.", groups.size());
         groups.forEach(group ->
                 group.getParty().values().forEach(player ->
                         player.updatePlayerLog(group)
                 )
         );
+        logger.debug("Player log updates complete.");
     }
 
     private String generateMarkdown(List<Group> groups) {
         if (groups == null || groups.isEmpty()) {
+            logger.warn("generateMarkdown called with no groups. Returning placeholder text.");
             return "No groups to export.";
         }
+        logger.debug("Generating markdown for {} groups.", groups.size());
 
         StringBuilder markdownBuilder = new StringBuilder();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d MMMM, yyyy");
@@ -229,6 +257,7 @@ public class ExportGroupsStage extends Stage {
         for (Group group : sortedGroups) {
             markdownBuilder.append(group.toMarkdown()).append("\n\n");
         }
+        logger.debug("Markdown generation complete.");
         return markdownBuilder.toString();
     }
 
@@ -237,4 +266,3 @@ public class ExportGroupsStage extends Stage {
         String execute() throws Exception;
     }
 }
-

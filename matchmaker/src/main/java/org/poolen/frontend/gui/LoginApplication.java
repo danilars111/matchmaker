@@ -29,8 +29,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import java.io.File;
 import java.net.BindException;
 import java.util.Optional;
-
-// Import our lovely new service and its result class!
 import org.poolen.frontend.util.services.StartupService.StartupResult;
 
 

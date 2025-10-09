@@ -16,11 +16,15 @@ import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
 import org.poolen.web.google.GoogleAuthManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A tab dedicated to handling data persistence via Google Sheets.
  */
 public class PersistenceTab extends Tab {
+
+    private static final Logger logger = LoggerFactory.getLogger(PersistenceTab.class);
 
     private Button signInButton;
     private Button saveButton;
@@ -69,7 +73,10 @@ public class PersistenceTab extends Tab {
         loadButton.setOnAction(e -> handleLoad());
         logoutButton.setOnAction(e -> {
             if (onLogoutRequestHandler != null) {
+                logger.info("Logout button clicked. Invoking onLogoutRequestHandler.");
                 onLogoutRequestHandler.run();
+            } else {
+                logger.warn("Logout button clicked, but no onLogoutRequestHandler was set.");
             }
         });
 
@@ -78,12 +85,14 @@ public class PersistenceTab extends Tab {
         // it re-checks the login status in case it has changed.
         this.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
             if (isNowSelected) {
+                logger.trace("PersistenceTab selected. Updating UI state.");
                 updateUiState();
             }
         });
 
         // Initial check when the tab is first created.
         updateUiState();
+        logger.info("PersistenceTab initialised.");
     }
     public void init(Runnable onPlayerListChanged) {
         setOnDataChanged(onPlayerListChanged);
@@ -111,18 +120,21 @@ public class PersistenceTab extends Tab {
      * Checks the Google sign-in status and updates the UI accordingly.
      */
     private void updateUiState() {
+        logger.debug("Updating UI state based on sign-in status.");
         progressIndicator.setVisible(true);
         statusLabel.setText("Checking sign-in status...");
 
         Task<Boolean> checkTask = new Task<>() {
             @Override
             protected Boolean call() throws Exception {
+                logger.trace("Background task started to check for stored credentials.");
                 return GoogleAuthManager.hasStoredCredentials();
             }
 
             @Override
             protected void succeeded() {
                 boolean isSignedIn = getValue();
+                logger.debug("Credential check successful. Signed in: {}", isSignedIn);
                 statusLabel.setText(isSignedIn ? "Status: Signed In" : "Status: Signed Out");
                 signInButton.setVisible(!isSignedIn);
                 buttonContainer.getChildren().get(1).setVisible(isSignedIn); // Show the action button box
@@ -131,6 +143,7 @@ public class PersistenceTab extends Tab {
 
             @Override
             protected void failed() {
+                logger.error("Failed to check for stored credentials.", getException());
                 statusLabel.setText("Status: Error checking credentials.");
                 signInButton.setVisible(true);
                 buttonContainer.getChildren().get(1).setVisible(false);
@@ -142,21 +155,30 @@ public class PersistenceTab extends Tab {
 
 
     private void handleSignIn() {
+        logger.info("User initiated Google Sign-In.");
         runTask(() -> {
-            //SheetsServiceManager.connect();
+            // The actual connection logic is handled by the login flow, this is more of a placeholder
+            // In a real scenario, this might trigger a browser pop-up.
+            // For now, we assume success for the purpose of the UI flow after login.
+            // SheetsServiceManager.connect();
             return "Successfully signed in to Google!";
         }, "Signing in...");
     }
 
     private void handleSave() {
+        logger.info("User initiated Save All action.");
         uiPersistenceService.saveAll(getTabPane().getScene().getWindow(), onDataChanged);
     }
 
+
+
     private void handleLoad() {
+        logger.info("User initiated Load All action.");
         uiPersistenceService.findAll(getTabPane().getScene().getWindow(), onDataChanged);
     }
 
     private void runTask(TaskOperation operation, String statusMessage) {
+        logger.debug("Running background task with message: '{}'", statusMessage);
         progressIndicator.setVisible(true);
         statusLabel.setText(statusMessage);
         buttonContainer.setDisable(true);
@@ -169,6 +191,7 @@ public class PersistenceTab extends Tab {
 
             @Override
             protected void succeeded() {
+                logger.info("Background task completed successfully. Result: {}", getValue());
                 coreProvider.createDialog(DialogType.INFO, getValue(), PersistenceTab.this.getTabPane()).showAndWait();
                 onDataChanged.run(); // Notify the app of potential changes
                 updateUiState(); // Re-check and update the button visibility
@@ -178,8 +201,8 @@ public class PersistenceTab extends Tab {
             @Override
             protected void failed() {
                 Throwable error = getException();
+                logger.error("Background task failed.", error);
                 coreProvider.createDialog(DialogType.ERROR, "Operation failed: " + error.getMessage(), PersistenceTab.this.getTabPane()).showAndWait();
-                error.printStackTrace();
                 updateUiState(); // Still update UI on failure
                 buttonContainer.setDisable(false);
             }
@@ -189,6 +212,7 @@ public class PersistenceTab extends Tab {
     }
 
     private Button createGoogleSignInButton() {
+        logger.trace("Creating Google Sign-In button.");
         Image signInImage = new Image(getClass().getResourceAsStream("/images/google_sign_in_button.png"));
         ImageView signInImageView = new ImageView(signInImage);
         signInImageView.setFitHeight(40);
@@ -218,4 +242,3 @@ public class PersistenceTab extends Tab {
         this.onDataChanged = onDataChanged;
     }
 }
-

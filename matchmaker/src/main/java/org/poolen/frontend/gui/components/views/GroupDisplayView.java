@@ -21,6 +21,8 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.views.tables.GroupTableView;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -35,6 +37,8 @@ import java.util.function.Consumer;
  * A reusable view component that displays multiple groups or a suggestion prompt.
  */
 public class GroupDisplayView extends BorderPane {
+
+    private static final Logger logger = LoggerFactory.getLogger(GroupDisplayView.class);
 
     private final GridPane groupGrid;
     private final StackPane contentPane;
@@ -78,6 +82,7 @@ public class GroupDisplayView extends BorderPane {
         suggestButton = new Button("Suggest Groups");
         suggestButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         suggestButton.setOnAction(e -> {
+            logger.info("Suggest Groups button clicked.");
             if (onSuggestionRequestHandler != null) onSuggestionRequestHandler.run();
         });
 
@@ -86,7 +91,10 @@ public class GroupDisplayView extends BorderPane {
         createSuggestedButton.setVisible(false);
         createSuggestedButton.setOnAction(e -> {
             if (onSuggestedGroupsCreateHandler != null && !currentSuggestions.isEmpty()) {
+                logger.info("Create Suggested Groups button clicked with {} suggestions.", currentSuggestions.size());
                 onSuggestedGroupsCreateHandler.accept(currentSuggestions);
+            } else {
+                logger.warn("Create Suggested Groups button clicked, but handler was null or no suggestions were present.");
             }
         });
 
@@ -103,13 +111,20 @@ public class GroupDisplayView extends BorderPane {
         datePicker.getEditor().setOpacity(1.0);
         datePicker.valueProperty().addListener((obs, oldDate, newDate) -> {
             if (onDateSelectedHandler != null && newDate != null) {
+                logger.info("Date selected in DatePicker: {}", newDate);
                 onDateSelectedHandler.accept(newDate);
             }
         });
         expandAllButton = new Button("Expand All");
-        expandAllButton.setOnAction(e -> setAllCardsExpanded(true));
+        expandAllButton.setOnAction(e -> {
+            logger.info("Expand All button clicked.");
+            setAllCardsExpanded(true);
+        });
         collapseAllButton = new Button("Collapse All");
-        collapseAllButton.setOnAction(e -> setAllCardsExpanded(false));
+        collapseAllButton.setOnAction(e -> {
+            logger.info("Collapse All button clicked.");
+            setAllCardsExpanded(false);
+        });
 
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
@@ -122,11 +137,13 @@ public class GroupDisplayView extends BorderPane {
         autoPopulateButton = new Button("Auto-Populate Groups");
         autoPopulateButton.setStyle("-fx-font-size: 14px; -fx-background-color: #f44336; -fx-text-fill: white;");
         autoPopulateButton.setOnAction(e -> {
+            logger.info("Auto-Populate Groups button clicked.");
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
         exportButton = new Button("Export");
         exportButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         exportButton.setOnAction(e -> {
+            logger.info("Export button clicked.");
             if (onExportRequestHandler != null) onExportRequestHandler.run();
         });
         Region footerSpacer = new Region();
@@ -151,15 +168,18 @@ public class GroupDisplayView extends BorderPane {
         this.widthProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal.doubleValue() > 0) updateGridLayout(newVal.doubleValue());
         });
+        logger.info("GroupDisplayView initialised.");
     }
 
     public void updateGroups(List<Group> groups, Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms, LocalDate eventDate) {
+        logger.info("Updating group display. Number of groups: {}. Event date: {}", groups.size(), eventDate);
         this.currentGroups = groups;
         this.dmingPlayers = dmingPlayers;
         this.allAssignedDms = allAssignedDms;
         this.datePicker.setValue(eventDate);
 
         if (groups.isEmpty()) {
+            logger.debug("No groups to display. Showing suggestion container.");
             header.setVisible(false);
             footer.setVisible(false);
             gridScrollPane.setVisible(false);
@@ -168,6 +188,7 @@ public class GroupDisplayView extends BorderPane {
             suggestionDisplayBox.getChildren().clear();
             createSuggestedButton.setVisible(false);
         } else {
+            logger.debug("Displaying {} groups. Showing group grid.", groups.size());
             header.setVisible(true);
             footer.setVisible(true);
             gridScrollPane.setVisible(true);
@@ -179,12 +200,15 @@ public class GroupDisplayView extends BorderPane {
     }
 
     public void displaySuggestions(List<House> suggestedThemes) {
+        logger.info("Displaying {} group theme suggestions.", suggestedThemes.size());
         this.currentSuggestions = suggestedThemes;
         suggestionDisplayBox.getChildren().clear();
         if (suggestedThemes.isEmpty()) {
+            logger.debug("No suggestions to display.");
             suggestionDisplayBox.getChildren().add(new Label("Not enough players or DMs to make suggestions."));
             createSuggestedButton.setVisible(false);
         } else {
+            logger.debug("Populating suggestion display box with themes.");
             Label title = new Label("Suggested Group Themes:");
             title.setStyle("-fx-font-weight: bold; -fx-underline: true;");
             suggestionDisplayBox.getChildren().add(title);
@@ -206,6 +230,7 @@ public class GroupDisplayView extends BorderPane {
             newMaxCols = Math.min(newMaxCols, currentGroups.size());
         }
         if (newMaxCols == lastColumnCount) return;
+        logger.debug("Updating grid layout. Current width: {}. New column count: {}.", currentWidth, newMaxCols);
         this.lastColumnCount = newMaxCols;
 
         groupCards.clear();
@@ -245,6 +270,7 @@ public class GroupDisplayView extends BorderPane {
     }
 
     private void setAllCardsExpanded(boolean expanded) {
+        logger.debug("Setting all group cards to expanded: {}.", expanded);
         groupCards.forEach(card -> card.setExpanded(expanded));
     }
 
@@ -259,6 +285,7 @@ public class GroupDisplayView extends BorderPane {
 
         boolean anyExpanded = groupCards.stream().anyMatch(TitledPane::isExpanded);
         collapseAllButton.setDisable(!anyExpanded);
+        logger.trace("Expand/Collapse buttons updated. Any collapsed: {}. Any expanded: {}.", anyCollapsed, anyExpanded);
     }
 
     public void setOnGroupEdit(Consumer<Group> handler) {
@@ -297,4 +324,3 @@ public class GroupDisplayView extends BorderPane {
         this.onExportRequestHandler = handler;
     }
 }
-

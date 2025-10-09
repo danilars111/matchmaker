@@ -15,6 +15,8 @@ import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.ViewProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +27,8 @@ import java.util.function.Consumer;
  * A dedicated tab for creating, viewing, and managing players.
  */
 public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
+
+    private static final Logger logger = LoggerFactory.getLogger(PlayerManagementTab.class);
 
     private final PlayerFormView playerForm;
     private PlayerManagementRosterTableView rosterView;
@@ -59,8 +63,10 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
 
     public void start() {
         if(attendingPlayers == null || dmingPlayers == null || onPlayerListChanged == null) {
+            logger.error("PlayerManagementTab.start() called before init(). Tab cannot be initialised.");
             throw new IllegalStateException("%s has not been initialized".formatted(this.getClass().getSimpleName()));
         }
+        logger.info("Starting PlayerManagementTab.");
 
         // --- Layout ---
         root.getItems().addAll(playerForm, rosterView);
@@ -71,6 +77,7 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         // --- Event Wiring ---
         rosterView.setOnItemDoubleClick(playerForm::populateForm);
         playerForm.getCancelButton().setOnAction(e -> {
+            logger.debug("Cancel button clicked. Clearing form.");
             playerForm.clearForm();
             if (isShowingBlacklist) {
                 handleShowBlacklist(); // This will toggle it off and reset the view
@@ -83,10 +90,12 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
 
 
         this.setContent(root);
+        logger.info("PlayerManagementTab initialised successfully.");
     }
 
     public void editPlayer(Player player) {
         if (player != null) {
+            logger.info("Request received to edit player: {}", player.getName());
             playerForm.populateForm(player);
             rosterView.selectItem(player);
         }
@@ -111,9 +120,11 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
     private void handlePlayerAction() {
         Player player = (Player) playerForm.getItemBeingEdited();
         if (player == null) {
+            logger.info("Creating a new player with name '{}'.", playerForm.getPlayerName());
             // Creating a new player using the factory
             player = playerFactory.create(playerForm.getPlayerName(), playerForm.isDungeonMaster());
         } else {
+            logger.info("Updating existing player '{}' (UUID: {}).", player.getName(), player.getUuid());
             // Updating an existing player
             player.setName(playerForm.getPlayerName());
             player.setDungeonMaster(playerForm.isDungeonMaster());
@@ -123,30 +134,41 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         onPlayerListChanged.run(); // Notify everyone!
         rosterView.updateRoster();
         playerForm.clearForm();
+        logger.info("Player '{}' saved successfully.", player.getName());
     }
 
     private void handleDelete() {
         Player player = playerForm.getItemBeingEdited();
         if (player != null) {
+            logger.debug("User initiated deletion for player '{}'. Showing confirmation dialog.", player.getName());
             ConfirmationDialog confirmation = (ConfirmationDialog) coreProvider.createDialog(DialogType.CONFIRMATION,
                     "Are you sure you want to delete " + player.getName() + "? This cannot be undone.",
                     this.getTabPane()
             );
             Optional<ButtonType> response = confirmation.showAndWait();
             if (response.isPresent() && response.get() == ButtonType.YES) {
+                logger.info("User confirmed deletion of player '{}'.", player.getName());
                 playerStore.removePlayer(player);
                 uiPersistenceService.deletePlayer(player, getTabPane().getScene().getWindow());
                 onPlayerListChanged.run();
                 playerForm.clearForm();
+            } else {
+                logger.info("User cancelled deletion of player '{}'.", player.getName());
             }
+        } else {
+            logger.warn("Delete action called but no player was being edited.");
         }
     }
 
     private void handleShowBlacklist() {
         Player editingPlayer =  playerForm.getItemBeingEdited();
-        if (editingPlayer == null) return;
+        if (editingPlayer == null) {
+            logger.warn("Attempted to show blacklist, but no player is being edited.");
+            return;
+        }
 
         isShowingBlacklist = !isShowingBlacklist;
+        logger.info("Toggling blacklist view for player '{}'. New state: {}", editingPlayer.getName(), isShowingBlacklist ? "ON" : "OFF");
         playerForm.setBlacklistMode(isShowingBlacklist);
 
         if (isShowingBlacklist) {
@@ -161,18 +183,22 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         Player selectedPlayer = rosterView.getSelectedItem();
 
         if (editingPlayer == null || selectedPlayer == null) {
+            logger.warn("Blacklist action failed: editingPlayer or selectedPlayer is null.");
             coreProvider.createDialog(DialogType.INFO, "Please select a player from the roster to blacklist.", this.getTabPane()).showAndWait();
             return;
         }
 
         if (editingPlayer.equals(selectedPlayer)) {
+            logger.warn("User '{}' attempted to blacklist themselves.", editingPlayer.getName());
             coreProvider.createDialog(DialogType.INFO, "You cannot blacklist yourself, you silly goose!", this.getTabPane()).showAndWait();
             return;
         }
 
         if (isShowingBlacklist) { // In "remove from blacklist" mode
+            logger.info("Removing player '{}' from '{}'s blacklist.", selectedPlayer.getName(), editingPlayer.getName());
             editingPlayer.unblacklist(selectedPlayer);
         } else { // In "add to blacklist" mode
+            logger.info("Adding player '{}' to '{}'s blacklist.", selectedPlayer.getName(), editingPlayer.getName());
             editingPlayer.blacklist(selectedPlayer);
         }
         playerStore.addPlayer(editingPlayer);
@@ -187,7 +213,7 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
 
     @Override
     public void onPlayerUpdate() {
-        System.out.println("PlayerManagement Tab heard a player update! Refreshing DM list and roster...");
+        logger.info("Received player update notification. Refreshing roster view.");
         rosterView.updateRoster();
     }
 
@@ -207,4 +233,3 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         return dmingPlayers;
     }
 }
-

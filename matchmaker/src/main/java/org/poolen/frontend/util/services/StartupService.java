@@ -1,8 +1,11 @@
 package org.poolen.frontend.util.services;
 
+import jakarta.annotation.PostConstruct;
 import org.poolen.frontend.util.interfaces.UiUpdater;
 import org.poolen.web.github.GitHubUpdateChecker;
 import org.poolen.web.google.GoogleAuthManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -14,6 +17,8 @@ import java.io.File;
  */
 @Service
 public class StartupService {
+
+    private static final Logger logger = LoggerFactory.getLogger(StartupService.class);
 
     // --- Services (Dependencies) ---
     private final org.poolen.frontend.util.services.TestDataGenerator testDataGenerator;
@@ -37,6 +42,7 @@ public class StartupService {
         this.uiPersistenceService = uiPersistenceService;
         this.uiGithubTaskService = uiGithubTaskService;
         this.uiGoogleTaskService = uiGoogleTaskService;
+        logger.info("StartupService initialised.");
     }
 
     /**
@@ -61,35 +67,46 @@ public class StartupService {
      * @return A {@link StartupResult} indicating the outcome.
      */
     public StartupResult performStartupSequence(int testDataPlayerCount, UiUpdater updater) throws Exception {
+        logger.info("Performing startup sequence...");
         // 1. Generate Test Data if requested
         // This is only for our special H2 mode, of course.
         if (testDataPlayerCount > 0) {
+            logger.info("Test data generation requested for {} players.", testDataPlayerCount);
             updater.updateStatus("Generating " + testDataPlayerCount + " players...");
             testDataGenerator.generate(testDataPlayerCount);
             uiPersistenceService.saveAllWithProgress(updater);
+            logger.info("Test data generation complete.");
         }
 
         // 2. Check for updates, because we always want the latest and greatest!
         try {
+            logger.info("Checking for application updates...");
             GitHubUpdateChecker.UpdateInfo updateInfo = uiGithubTaskService.checkForUpdate(updater);
             if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
+                logger.info("New version available: {}. Downloading update.", updateInfo.latestVersion());
                 File newJarFile = uiGithubTaskService.downloadUpdate(updateInfo, updater);
+                logger.info("Update downloaded successfully. Returning UPDATE_READY status.");
                 return new StartupResult(StartupResult.Status.UPDATE_READY, newJarFile);
             }
+            logger.info("Application is up to date.");
         } catch (Exception e) {
-            System.err.println("Update process failed, continuing startup: " + e.getMessage());
+            logger.warn("Update check process failed, continuing startup.", e);
             // An update check failing shouldn't stop the whole show.
         }
 
         // 3. Check for an existing session to welcome the user back.
         updater.updateStatus("Checking for existing session...");
+        logger.info("Checking for stored Google credentials...");
         if (GoogleAuthManager.hasStoredCredentials()) {
+            logger.info("Stored credentials found. Attempting to connect.");
             uiGoogleTaskService.connectWithStoredCredentials(updater);
             uiPersistenceService.findAllWithProgress(updater);
+            logger.info("Successfully connected with stored credentials. Returning LOGIN_SUCCESSFUL status.");
             return new StartupResult(StartupResult.Status.LOGIN_SUCCESSFUL);
         }
 
         // 4. If nothing else, it's time to show the login screen.
+        logger.info("No stored credentials found. Returning SHOW_LOGIN_UI status.");
         return new StartupResult(StartupResult.Status.SHOW_LOGIN_UI);
     }
 }

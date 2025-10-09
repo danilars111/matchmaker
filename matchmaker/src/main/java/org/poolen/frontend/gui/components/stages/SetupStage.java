@@ -15,11 +15,15 @@ import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.util.services.ApplicationScriptService;
 import org.poolen.util.LoggingManager;
 import org.poolen.util.PropertiesManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class SetupStage extends Stage {
+
+    private static final Logger logger = LoggerFactory.getLogger(SetupStage.class);
 
     private final ApplicationScriptService scriptService;
     private final Map<LoggingManager.LogbackLogger, ComboBox<LoggingManager.LogLevel>> loggerComboBoxMap = new HashMap<>();
@@ -31,6 +35,11 @@ public class SetupStage extends Stage {
 
     public SetupStage(ApplicationScriptService scriptService, String errorMessage) {
         this.scriptService = scriptService;
+
+        logger.info("Initialising SetupStage.");
+        if (errorMessage != null && !errorMessage.isEmpty()) {
+            logger.warn("SetupStage opened with an error message: {}", errorMessage);
+        }
 
         initModality(Modality.APPLICATION_MODAL);
         setTitle("First-Time Setup");
@@ -62,6 +71,7 @@ public class SetupStage extends Stage {
         mainLayout.setStyle("-fx-background-color: #F4F4F4;"); // A soft background colour
 
         setScene(new Scene(mainLayout, 300 , 300));
+        logger.debug("SetupStage UI constructed and scene set.");
     }
 
     private Node createDatabasePane(String errorMessage) {
@@ -116,9 +126,9 @@ public class SetupStage extends Stage {
         grid.setAlignment(Pos.CENTER);
 
         int rowIndex = 0;
-        for (LoggingManager.LogbackLogger logger : LoggingManager.LogbackLogger.values()) {
+        for (LoggingManager.LogbackLogger loggerEnum : LoggingManager.LogbackLogger.values()) {
             // A helper to make the enum name look much prettier for our UI
-            String loggerDisplayName = capitalize(logger.name());
+            String loggerDisplayName = capitalize(loggerEnum.name());
             Label loggerLabel = new Label(loggerDisplayName + " Level:");
 
             ComboBox<LoggingManager.LogLevel> levelComboBox = new ComboBox<>();
@@ -126,7 +136,7 @@ public class SetupStage extends Stage {
             levelComboBox.setMinWidth(120);
 
             // Here's the clever bit! We ask the LoggingManager what the current setting is.
-            LoggingManager.getLoggerLevel(logger)
+            LoggingManager.getLoggerLevel(loggerEnum)
                     .ifPresentOrElse(
                             levelComboBox::setValue,
                             // If it's not set, we'll just default to INFO, which is very sensible.
@@ -135,7 +145,7 @@ public class SetupStage extends Stage {
 
             grid.add(loggerLabel, 0, rowIndex);
             grid.add(levelComboBox, 1, rowIndex);
-            loggerComboBoxMap.put(logger, levelComboBox);
+            loggerComboBoxMap.put(loggerEnum, levelComboBox);
             rowIndex++;
         }
 
@@ -151,21 +161,26 @@ public class SetupStage extends Stage {
     }
 
     private void handleSave() {
+        logger.info("User clicked 'Save and Restart'.");
         String dbAddress = dbAddressField.getText();
         String username = userField.getText();
         String password = passField.getText();
 
         if (dbAddress.isEmpty() || username.isEmpty()) {
+            logger.warn("Save validation failed: DB Address or Username is empty.");
             new ErrorDialog("Address and Username cannot be empty.", getScene().getRoot()).showAndWait();
             return;
         }
+        logger.info("Saving new database credentials to properties file.");
         PropertiesManager.saveDatabaseCredentials(dbAddress, username, password);
 
         // Now for our new trick! We save all the logging levels.
-        loggerComboBoxMap.forEach((logger, comboBox) -> {
+        logger.info("Saving updated logging levels.");
+        loggerComboBoxMap.forEach((logbackLogger, comboBox) -> {
             LoggingManager.LogLevel selectedLevel = comboBox.getValue();
             if (selectedLevel != null) {
-                LoggingManager.setLoggerLevel(logger, selectedLevel);
+                logger.debug("Setting logger '{}' to level '{}'", logbackLogger.name(), selectedLevel);
+                LoggingManager.setLoggerLevel(logbackLogger, selectedLevel);
             }
         });
 
@@ -173,22 +188,36 @@ public class SetupStage extends Stage {
     }
 
     private void handleH2() {
+        logger.info("User selected 'H2 Test Mode'. Application will restart with H2 flag.");
         // We don't need to save anything for H2, just restart with the flag.
         restartApplicationWithH2();
     }
 
     private void restartApplication() {
+        logger.info("Attempting to restart the application.");
         scriptService.restart(
-                () -> new ErrorDialog("Cannot restart from IDE.", getScene().getRoot()).showAndWait(),
-                (err) -> new ErrorDialog("Restart failed: " + err.getMessage(), getScene().getRoot()).showAndWait()
+                () -> {
+                    logger.warn("Application restart cannot be performed from an IDE environment.");
+                    new ErrorDialog("Cannot restart from IDE.", getScene().getRoot()).showAndWait();
+                },
+                (err) -> {
+                    logger.error("Application restart failed.", err);
+                    new ErrorDialog("Restart failed: " + err.getMessage(), getScene().getRoot()).showAndWait();
+                }
         );
     }
 
     private void restartApplicationWithH2() {
+        logger.info("Attempting to restart the application in H2 mode.");
         scriptService.restartWithH2(
-                () -> new ErrorDialog("Cannot restart from IDE.", getScene().getRoot()).showAndWait(),
-                (err) -> new ErrorDialog("Restart failed: " + err.getMessage(), getScene().getRoot()).showAndWait()
+                () -> {
+                    logger.warn("Application restart (with H2) cannot be performed from an IDE environment.");
+                    new ErrorDialog("Cannot restart from IDE.", getScene().getRoot()).showAndWait();
+                },
+                (err) -> {
+                    logger.error("Application restart (with H2) failed.", err);
+                    new ErrorDialog("Restart failed: " + err.getMessage(), getScene().getRoot()).showAndWait();
+                }
         );
     }
 }
-

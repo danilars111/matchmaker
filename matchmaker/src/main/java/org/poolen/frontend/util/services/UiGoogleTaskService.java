@@ -3,6 +3,8 @@ package org.poolen.frontend.util.services;
 import javafx.stage.Window;
 import org.poolen.frontend.util.interfaces.UiUpdater;
 import org.poolen.web.google.SheetsServiceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,8 @@ import java.util.function.Consumer;
 @Service
 public class UiGoogleTaskService {
 
+    private static final Logger logger = LoggerFactory.getLogger(UiGoogleTaskService.class);
+
     private final SheetsServiceManager sheetsServiceManager;
     private final UiTaskExecutor uiTaskExecutor;
 
@@ -22,6 +26,7 @@ public class UiGoogleTaskService {
     public UiGoogleTaskService(SheetsServiceManager sheetsServiceManager, UiTaskExecutor uiTaskExecutor) {
         this.sheetsServiceManager = sheetsServiceManager;
         this.uiTaskExecutor = uiTaskExecutor;
+        logger.info("UiGoogleTaskService initialised.");
     }
 
     /**
@@ -31,22 +36,27 @@ public class UiGoogleTaskService {
      * @throws Exception if the connection fails.
      */
     public void connectToGoogle(UiUpdater updater) throws Exception {
+        logger.info("Starting Google connection process...");
         updater.updateStatus("Attempting to connect...\nPlease check your browser to sign in.");
 
         // We pass a lovely little lambda to the connect method. This is the callback
         // that will be executed when the auth URL is ready.
         // It uses our updater to show the details in the overlay.
-        sheetsServiceManager.connect(url ->
-                updater.showDetails("If your browser doesn't open, please use this link:", url)
-        );
+        sheetsServiceManager.connect(url -> {
+            logger.debug("Received authorization URL. Displaying to user.");
+            updater.showDetails("If your browser doesn't open, please use this link:", url);
+        });
+        logger.info("Connection process complete.");
     }
 
     /**
      * Our fabulous new express path for auto-login!
      */
     public void connectWithStoredCredentials(UiUpdater updater) throws Exception {
+        logger.info("Attempting to connect with stored credentials...");
         updater.updateStatus("Logging in with stored session...");
         sheetsServiceManager.connectWithStoredCredentials();
+        logger.info("Successfully connected with stored credentials.");
     }
 
     /**
@@ -58,11 +68,13 @@ public class UiGoogleTaskService {
      * @param onError A callback to run if the connection fails.
      */
     public void connect(Window owner, Consumer<String> onSuccess, Consumer<Throwable> onError) {
+        logger.info("Executing Google connect task via UiTaskExecutor.");
         uiTaskExecutor.execute(
                 owner,
                 "Connecting to Google...",
                 "Successfully connected!",
                 (updater) -> { // This is our ProgressAwareTask
+                    logger.debug("Executing connectToGoogle task within executor.");
                     connectToGoogle(updater);
                     return "LOGIN_SUCCESSFUL";
                 },
@@ -71,4 +83,3 @@ public class UiGoogleTaskService {
         );
     }
 }
-

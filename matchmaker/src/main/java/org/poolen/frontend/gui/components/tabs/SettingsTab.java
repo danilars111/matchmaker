@@ -28,6 +28,8 @@ import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +44,8 @@ import java.util.stream.Collectors;
  * handle the new SettingsStore architecture.
  */
 public class SettingsTab extends Tab {
+
+    private static final Logger logger = LoggerFactory.getLogger(SettingsTab.class);
 
     private final SettingsStore settingsStore;
     private final Accordion accordion = new Accordion();
@@ -85,23 +89,32 @@ public class SettingsTab extends Tab {
 
         // --- Event Handlers ---
         saveButton.setOnAction(e -> saveSettings());
-        cancelButton.setOnAction(e -> populateSettingsAccordion());
+        cancelButton.setOnAction(e -> {
+            logger.debug("Discard changes button clicked. Repopulating settings accordion.");
+            populateSettingsAccordion();
+        });
         defaultsButton.setOnAction(e -> {
+            logger.debug("Restore defaults button clicked. Showing confirmation dialog.");
             coreProvider.createDialog(DialogType.CONFIRMATION,"Are you sure you want to restore all settings to their default values?", this.getTabPane())
                     .showAndWait()
                     .ifPresent(response -> {
                         if (response == ButtonType.YES) {
+                            logger.info("User confirmed restoring default settings.");
                             settingsStore.setDefaultSettings();
                             populateSettingsAccordion();
                             coreProvider.createDialog(DialogType.INFO, "All settings have been restored to their defaults.", this.getTabPane()).showAndWait();
+                        } else {
+                            logger.info("User cancelled restoring default settings.");
                         }
                     });
         });
 
         this.setContent(root);
+        logger.info("SettingsTab initialised.");
     }
 
     private void populateSettingsAccordion() {
+        logger.debug("Populating settings accordion from the settings store.");
         settingControls.clear();
         accordion.getPanes().clear();
 
@@ -120,7 +133,10 @@ public class SettingsTab extends Tab {
                 if (HIDDEN_SETTINGS.contains(settingEnum)) continue;
 
                 Setting<?> setting = settingsStore.getSetting(settingEnum);
-                if (setting == null) continue;
+                if (setting == null) {
+                    logger.warn("No setting found in store for enum: {}", settingEnum);
+                    continue;
+                }
 
                 Label nameLabel = new Label(formatEnumName(setting.getName().toString()));
                 nameLabel.setTooltip(new Tooltip(setting.getDescription()));
@@ -132,18 +148,22 @@ public class SettingsTab extends Tab {
                 grid.add(valueControl, 1, rowIndex++);
             }
 
-            String categoryName = categoryClass.getSimpleName().replace("Settings", "").replace("Setting", "");
-            TitledPane titledPane = new TitledPane(categoryName, grid);
-            accordion.getPanes().add(titledPane);
+            if (grid.getRowCount() > 0) {
+                String categoryName = categoryClass.getSimpleName().replace("Settings", "").replace("Setting", "");
+                TitledPane titledPane = new TitledPane(categoryName, grid);
+                accordion.getPanes().add(titledPane);
+            }
         }
 
         if (!accordion.getPanes().isEmpty()) {
             accordion.setExpandedPane(accordion.getPanes().get(0));
         }
+        logger.debug("Finished populating settings accordion with {} categories.", accordion.getPanes().size());
     }
 
     private Node createControlForSetting(Setting<?> setting) {
         Object value = setting.getSettingValue();
+        logger.trace("Creating control for setting '{}' of type '{}'.", setting.getName(), value != null ? value.getClass().getSimpleName() : "null");
 
         if (setting.getName() instanceof Settings.MatchmakerPrioritySettings) {
             return createPriorityEditor((List<House>) value);
@@ -157,6 +177,7 @@ public class SettingsTab extends Tab {
             return cb;
         }
 
+        logger.warn("Unsupported setting type for control creation: {}", (value != null ? value.getClass().getSimpleName() : "null"));
         return new Label("Unsupported setting type: " + (value != null ? value.getClass().getSimpleName() : "null"));
     }
 
@@ -196,10 +217,12 @@ public class SettingsTab extends Tab {
 
             final int index = i;
             upButton.setOnAction(e -> {
+                logger.trace("Moving priority '{}' up from index {}.", priorities.get(index), index);
                 Collections.swap(priorities, index, index - 1);
                 rebuildPriorityEditorUI(container);
             });
             downButton.setOnAction(e -> {
+                logger.trace("Moving priority '{}' down from index {}.", priorities.get(index), index);
                 Collections.swap(priorities, index, index + 1);
                 rebuildPriorityEditorUI(container);
             });
@@ -215,6 +238,7 @@ public class SettingsTab extends Tab {
     }
 
     private void saveSettings() {
+        logger.info("Save changes button clicked. Attempting to update and save settings.");
         try {
             for (Map.Entry<ISettings, Node> entry : settingControls.entrySet()) {
                 ISettings settingEnum = entry.getKey();
@@ -234,10 +258,12 @@ public class SettingsTab extends Tab {
                 }
 
                 if (newValue != null) {
+                    logger.trace("Updating setting '{}' to new value: {}", settingEnum, newValue);
                     settingsStore.updateSetting(settingEnum, newValue);
                 }
             }
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
+            logger.error("Could not save settings due to a number format error.", e);
             coreProvider.createDialog(DialogType.ERROR,"Could not save settings. Please check your values.\nError: " + e.getMessage(), this.getTabPane()).showAndWait();
             return; // Stop if parsing failed
         }
@@ -245,6 +271,8 @@ public class SettingsTab extends Tab {
         buttonBox.setDisable(true);
         root.setCursor(javafx.scene.Cursor.WAIT);
 
+        logger.info("Settings updated in memory. Calling persistence service to save.");
+        // Note: The UiPersistenceService should handle the UI feedback (enabling buttons, changing cursor) on completion.
         uiPersistenceService.saveSettings(getTabPane().getScene().getWindow());
     }
 
@@ -267,4 +295,3 @@ public class SettingsTab extends Tab {
         return grid;
     }
 }
-

@@ -24,6 +24,8 @@ import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
 import org.poolen.web.google.GoogleAuthManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,12 +39,15 @@ import java.util.stream.Collectors;
  */
 public class ManagementStage extends Stage {
 
+    private static final Logger logger = LoggerFactory.getLogger(ManagementStage.class);
+
     private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
 
     public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider) {
+        logger.info("Initialising ManagementStage...");
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
@@ -78,23 +83,30 @@ public class ManagementStage extends Stage {
         makeTabDetachable(persistenceTab);
 
         tabPane.getTabs().addAll(playerTab, characterTab, groupTab, persistenceTab, settingsTab);
+        logger.debug("All management tabs have been initialised and added to the tab pane.");
 
         // --- Player <-> Character Navigation Wiring ---
         characterTab.getCharacterForm().setOnOpenPlayerRequestHandler(player -> {
+            logger.info("Handling request to navigate to player '{}' from character tab.", player.getName());
             Stage detachedStage = detachedTabMap.get(playerTab);
             if (detachedStage != null && detachedStage.isShowing()) {
+                logger.debug("Player tab is detached; focusing its stage.");
                 detachedStage.requestFocus();
             } else {
+                logger.debug("Player tab is attached; selecting it in the main tab pane.");
                 tabPane.getSelectionModel().select(playerTab);
             }
             playerTab.editPlayer(player);
         });
 
         playerTab.setOnShowCharactersRequestHandler(player -> {
+            logger.info("Handling request to show characters for player '{}'.", player.getName());
             Stage detachedStage = detachedTabMap.get(characterTab);
             if (detachedStage != null && detachedStage.isShowing()) {
+                logger.debug("Character tab is detached; focusing its stage.");
                 detachedStage.requestFocus();
             } else {
+                logger.debug("Character tab is attached; selecting it in the main tab pane.");
                 tabPane.getSelectionModel().select(characterTab);
             }
             characterTab.showCharactersForPlayer(player);
@@ -105,15 +117,19 @@ public class ManagementStage extends Stage {
                 charToEdit = player.getCharacters().stream().collect(Collectors.toList()).get(0);
             }
             if (charToEdit != null) {
+                logger.debug("Auto-selecting character '{}' for editing.", charToEdit.getName());
                 characterTab.getCharacterForm().populateForm(charToEdit);
             }
         });
 
         playerTab.setOnCreateCharacterRequestHandler(player -> {
+            logger.info("Handling request to create a new character for player '{}'.", player.getName());
             Stage detachedStage = detachedTabMap.get(characterTab);
             if (detachedStage != null && detachedStage.isShowing()) {
+                logger.debug("Character tab is detached; focusing its stage.");
                 detachedStage.requestFocus();
             } else {
+                logger.debug("Character tab is attached; selecting it in the main tab pane.");
                 tabPane.getSelectionModel().select(characterTab);
             }
             characterTab.createCharacterForPlayer(player);
@@ -121,10 +137,13 @@ public class ManagementStage extends Stage {
 
         // --- Persistence Wiring ---
         persistenceTab.setOnLogoutRequestHandler(() -> {
+            logger.info("User initiated logout from the persistence tab.");
             try {
                 GoogleAuthManager.logout();
+                logger.debug("Google Auth Manager logout successful.");
                 this.close(); // Close the management stage
                 new ArrayList<>(detachedTabMap.values()).forEach(Stage::close); // Close all detached tabs
+                logger.info("Management stage and all detached tabs closed. Restarting application.");
 
                 // Restart the login application
                 LoginApplication loginApp = new LoginApplication();
@@ -132,24 +151,29 @@ public class ManagementStage extends Stage {
                 loginApp.start(loginStage);
 
             } catch (Exception e) {
+                logger.error("An exception occurred during the logout and restart process.", e);
                 coreProvider.createDialog(DialogType.ERROR,"Failed to logout: " + e.getMessage(), tabPane).showAndWait();
             }
         });
 
 
         this.setOnCloseRequest(event -> {
+            logger.info("ManagementStage close requested. Closing all detached tabs as well.");
             new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
         });
 
         Scene scene = new Scene(tabPane, 800, 500);
         setScene(scene);
+        logger.debug("ManagementStage scene created and set.");
     }
 
     public void addPlayerUpdateListener(PlayerUpdateListener listener) {
+        logger.debug("Adding player update listener: {}", listener.getClass().getSimpleName());
         this.playerUpdateListeners.add(listener);
     }
 
     public void notifyPlayerUpdateListeners() {
+        logger.info("Notifying {} player update listeners of a change.", playerUpdateListeners.size());
         // Tell all our listeners that something has changed!
         for (PlayerUpdateListener listener : playerUpdateListeners) {
             listener.onPlayerUpdate();
@@ -182,6 +206,7 @@ public class ManagementStage extends Stage {
         detachButton.setOnAction(event -> {
             TabPane parent = tab.getTabPane();
             if (parent != null && parent.getTabs().size() > 1) {
+                logger.info("Detaching tab: {}", title.getText());
                 int originalIndex = parent.getTabs().indexOf(tab);
                 parent.getTabs().remove(tab);
                 Stage detachedStage = new Stage();
@@ -196,16 +221,20 @@ public class ManagementStage extends Stage {
                 detachedStage.setX(parentX + 30);
                 detachedStage.setY(parentY + 60);
                 detachedTabMap.put(tab, detachedStage);
+                logger.debug("Tab '{}' is now in a separate stage.", title.getText());
                 detachedStage.setOnCloseRequest(closeEvent -> {
+                    logger.info("Re-attaching tab '{}' due to detached stage closing.", title.getText());
                     detachedTabMap.remove(tab);
                     if (!parent.getTabs().contains(tab)) {
                         int insertionIndex = Math.min(originalIndex, parent.getTabs().size());
                         parent.getTabs().add(insertionIndex, tab);
+                        logger.debug("Tab re-inserted at index {}.", insertionIndex);
                     }
                 });
                 detachedStage.show();
+            } else {
+                logger.warn("Attempted to detach tab '{}', but it was the last tab remaining.", title.getText());
             }
         });
     }
 }
-

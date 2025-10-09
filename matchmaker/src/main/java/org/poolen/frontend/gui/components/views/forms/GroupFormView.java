@@ -22,6 +22,8 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
  * A reusable JavaFX component for creating or updating a group, inheriting from BaseFormView.
  */
 public class GroupFormView extends BaseFormView<Group> {
+
+    private static final Logger logger = LoggerFactory.getLogger(GroupFormView.class);
 
     private ComboBox<Object> dmComboBox;
     private Map<House, CheckBox> houseCheckBoxes;
@@ -46,10 +50,12 @@ public class GroupFormView extends BaseFormView<Group> {
         super();
         setupFormControls();
         clearForm(); // Set initial state
+        logger.info("GroupFormView initialised.");
     }
 
     @Override
     protected void setupFormControls() {
+        logger.debug("Setting up form controls for GroupFormView.");
         dmComboBox = new ComboBox<>();
         dmComboBox.setMaxWidth(Double.MAX_VALUE);
         setupDmComboBoxCellFactory();
@@ -58,9 +64,11 @@ public class GroupFormView extends BaseFormView<Group> {
             if (isRevertingDmSelection) return;
 
             Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
+            logger.trace("DM selection changed from '{}' to '{}'.", oldVal, newVal);
             if (dmSelectRequestHandler != null && newVal instanceof Player) {
                 boolean success = dmSelectRequestHandler.onDmSelectionRequest(selectedPlayer);
                 if (!success) {
+                    logger.warn("DM selection request for '{}' was denied. Reverting selection to '{}'.", selectedPlayer.getName(), oldVal);
                     isRevertingDmSelection = true;
                     Platform.runLater(() -> {
                         dmComboBox.setValue(oldVal);
@@ -70,6 +78,7 @@ public class GroupFormView extends BaseFormView<Group> {
                 }
             }
             if (onDmSelectionHandler != null) {
+                logger.debug("Invoking DM selection handler for player: {}", selectedPlayer != null ? selectedPlayer.getName() : "null");
                 onDmSelectionHandler.accept(selectedPlayer);
             }
         });
@@ -117,6 +126,7 @@ public class GroupFormView extends BaseFormView<Group> {
     @Override
     public void populateForm(Group group) {
         super.populateForm(group);
+        logger.debug("Populating group-specific fields for group with UUID '{}'.", group.getUuid());
         if (group.getDungeonMaster() == null) {
             dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
         } else {
@@ -131,6 +141,7 @@ public class GroupFormView extends BaseFormView<Group> {
     @Override
     public void clearForm() {
         super.clearForm();
+        logger.debug("Clearing group-specific fields.");
         dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
         houseCheckBoxes.values().forEach(cb -> cb.setSelected(false));
         actionButton.setText("Create");
@@ -173,6 +184,7 @@ public class GroupFormView extends BaseFormView<Group> {
     }
 
     public void updateDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
+        logger.debug("Updating DM list. Total DMs: {}, Unavailable DMs in other groups: {}.", dmingPlayers.size(), unavailablePlayers.size());
         Object selectedDm = dmComboBox.getValue();
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
@@ -185,6 +197,7 @@ public class GroupFormView extends BaseFormView<Group> {
 
         List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm) || dm.equals(currentDmForThisGroup)).toList();
         List<Player> trulyUnavailableDms = allDms.stream().filter(dm -> unavailablePlayers.contains(dm) && !dm.equals(currentDmForThisGroup)).toList();
+        logger.trace("Found {} available DMs and {} truly unavailable DMs.", availableDms.size(), trulyUnavailableDms.size());
 
         items.addAll(availableDms);
         if (!trulyUnavailableDms.isEmpty()) {
@@ -237,4 +250,3 @@ public class GroupFormView extends BaseFormView<Group> {
         return lowerCase.substring(0, 1).toUpperCase() + lowerCase.substring(1);
     }
 }
-
