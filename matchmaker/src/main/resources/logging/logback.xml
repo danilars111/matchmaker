@@ -1,0 +1,35 @@
+<configuration>
+    <!-- A property for how our log messages should look -->
+    <property name="LOG_PATTERN"
+              value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <!-- This sends logs to the console -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- This sends logs to our uniquely named file, using the system properties we set -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${app.log.path}/matchmaker-${app.log.timestamp}.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+      This is the master switch. It applies our appenders to the whole application.
+      The logging levels now live here, not in application.properties.
+    -->
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+    <!-- Here we can set our specific logging levels -->
+    <logger name="org.poolen" level="debug"/>
+    <logger name="org.springframework" level="warn"/>
+    <logger name="org.hibernate" level="warn"/>
+
+</configuration>

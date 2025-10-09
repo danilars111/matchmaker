@@ -12,17 +12,17 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
-import org.poolen.ApplicationLauncher;
 import org.poolen.MatchmakerApplication;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.*;
-import org.poolen.frontend.util.services.TestDataGenerator;
 import org.poolen.util.PropertiesManager;
-import org.poolen.web.github.GitHubUpdateChecker;
+import org.poolen.util.SpringManager;
 import org.poolen.web.google.GoogleAuthManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 
@@ -30,14 +30,18 @@ import java.io.File;
 import java.net.BindException;
 import java.util.Optional;
 
+// Import our lovely new service and its result class!
+import org.poolen.frontend.util.services.StartupService.StartupResult;
+
+
 /**
  * The main entry point for the JavaFX GUI.
- * This refactored version aims to separate concerns:
- * - UI setup and management remains here.
- * - Spring context and application logic is delegated where possible.
- * - The startup sequence is clearer and more modular.
+ * This refactored version delegates the startup sequence to a dedicated StartupService,
+ * keeping this class focused on UI setup and user interaction.
  */
 public class LoginApplication extends Application {
+
+    private static final Logger logger = LoggerFactory.getLogger(LoginApplication.class);
 
     // --- State and Context ---
     private ConfigurableApplicationContext springContext;
@@ -49,8 +53,8 @@ public class LoginApplication extends Application {
     private UiPersistenceService uiPersistenceService;
     private UiGoogleTaskService uiGoogleTaskService;
     private UiGithubTaskService uiGithubTaskService;
-    private TestDataGenerator testDataGenerator;
     private CoreProvider coreProvider;
+    private StartupService startupService;
 
     // --- UI Components ---
     private Stage primaryStage;
@@ -61,18 +65,6 @@ public class LoginApplication extends Application {
     private Button exitButton;
     private ProgressIndicator loadingIndicator;
 
-    /**
-     * Represents the possible outcomes of the startup sequence.
-     * This helps in decoupling the startup logic from the UI updates.
-     */
-    private static class StartupResult {
-        enum Status { UPDATE_READY, LOGIN_SUCCESSFUL, SHOW_LOGIN_UI }
-        final Status status;
-        final Object data;
-
-        public StartupResult(Status status, Object data) { this.status = status; this.data = data; }
-        public StartupResult(Status status) { this(status, null); }
-    }
 
     /**
      * Initialises the Spring context and retrieves necessary beans.
@@ -80,18 +72,25 @@ public class LoginApplication extends Application {
      */
     @Override
     public void init() {
+        logger.info("Application initialisation phase started.");
         boolean isH2Mode = isH2Mode();
-        if (PropertiesManager.propertiesFileExists() || isH2Mode) {
+        boolean propertiesExist = PropertiesManager.propertiesFileExists();
+        logger.debug("H2 mode: {}, Properties file exists: {}", isH2Mode, propertiesExist);
+
+        if (propertiesExist || isH2Mode) {
             try {
+                logger.info("Properties file found or H2 mode enabled. Initialising Spring context...");
                 springContext = new SpringApplicationBuilder(MatchmakerApplication.class)
-                        .properties(ApplicationLauncher.getConfigLocation())
+                        .properties(SpringManager.getConfigLocation())
                         .run(getParameters().getRaw().toArray(new String[0]));
-                // All our lovely beans are now ready to be retrieved.
+                logger.info("Spring context successfully initialised.");
                 initialiseServices();
             } catch (Exception e) {
-                // We'll store this error and handle it gracefully in the start() method.
+                logger.error("A critical error occurred during Spring context initialisation.", e);
                 springStartupError = e;
             }
+        } else {
+            logger.warn("No properties file found and not in H2 mode. Skipping Spring context initialisation.");
         }
     }
 
@@ -101,21 +100,23 @@ public class LoginApplication extends Application {
      */
     @Override
     public void start(Stage primaryStage) {
+        logger.info("JavaFX start phase initiated. Setting up the primary stage.");
         this.primaryStage = primaryStage;
         primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
 
-        // First, perform checks that might prevent the app from starting at all.
+        logger.debug("Performing first-time setup checks...");
         if (isFirstTimeSetup()) {
+            logger.info("First-time setup detected. Aborting normal startup to show SetupStage.");
             return; // The setup stage will handle the rest.
         }
 
-        // Now, create the main login UI.
+        logger.info("Initialising main login UI components.");
         initialiseUI();
 
-        // If H2 mode is active, ask the user about generating test data.
+        logger.debug("Checking for H2 mode to determine if test data generation is needed.");
         Optional<Integer> testDataCount = askForTestDataGenerationIfInH2Mode();
 
-        // With the UI ready, begin the main startup sequence in the background.
+        logger.info("Beginning main startup sequence in a background thread.");
         beginStartupSequence(testDataCount.orElse(0));
     }
 
@@ -124,9 +125,12 @@ public class LoginApplication extends Application {
      */
     @Override
     public void stop() {
+        logger.info("Application shutdown sequence initiated.");
         if (springContext != null) {
+            logger.debug("Closing Spring context.");
             springContext.close();
         }
+        logger.info("Exiting JavaFX platform!");
         Platform.exit();
     }
 
@@ -141,7 +145,6 @@ public class LoginApplication extends Application {
 
         root = new VBox(20);
         root.setAlignment(Pos.CENTER);
-        // Using an external stylesheet would be even better for tidiness!
         root.setStyle("-fx-padding: 40; -fx-background-color: #F0F8FF;");
 
         statusLabel = new Label("Starting up...");
@@ -166,13 +169,13 @@ public class LoginApplication extends Application {
         exitButton.setVisible(false);
         exitButton.setOnAction(e -> Platform.exit());
 
-        // Bring the "continue" link a bit closer to the button above it.
         VBox.setMargin(continueOfflineLabel, new Insets(-10, 0, 0, 0));
         root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, continueOfflineLabel, exitButton);
 
         Scene scene = new Scene(root, 450, 300);
         primaryStage.setScene(scene);
         primaryStage.show();
+        logger.debug("Login UI components created and scene is now visible.");
     }
 
     /**
@@ -180,6 +183,7 @@ public class LoginApplication extends Application {
      * @param message The message to display to the user.
      */
     private void showLoginUI(String message) {
+        logger.info("Updating UI to show login options with message: '{}'", message);
         statusLabel.setText(message);
         loadingIndicator.setVisible(false);
         signInButton.setVisible(true);
@@ -191,6 +195,7 @@ public class LoginApplication extends Application {
      * Closes the login window and opens the main application management window.
      */
     private void showManagementStage() {
+        logger.info("Login successful or continuing offline. Closing login stage and showing ManagementStage.");
         primaryStage.close();
         ManagementStage managementStage = springContext.getBean(ComponentFactoryService.class).getManagementStage();
         managementStage.show();
@@ -200,6 +205,7 @@ public class LoginApplication extends Application {
      * Creates a custom button with the Google Sign-In graphic.
      */
     private Button createGoogleSignInButton() {
+        logger.debug("Creating Google Sign-In button.");
         Image signInImage = new Image(getClass().getResourceAsStream("/images/google_sign_in_button.png"));
         ImageView signInImageView = new ImageView(signInImage);
         signInImageView.setFitHeight(40);
@@ -223,16 +229,19 @@ public class LoginApplication extends Application {
      */
     private boolean isFirstTimeSetup() {
         if (!isH2Mode() && !PropertiesManager.propertiesFileExists()) {
+            logger.warn("Application properties are missing. Launching SetupStage for first-time configuration.");
             new SetupStage(new ApplicationScriptService(), null).show();
             return true;
         }
 
         if (springStartupError != null) {
+            logger.warn("A Spring initialisation error was detected. Launching SetupStage to allow user to correct settings.");
             String errorMessage = "The application couldn't start with the current settings.\n" +
                     "Please check your database connection details.";
             new SetupStage(new ApplicationScriptService(), errorMessage).show();
             return true;
         }
+        logger.debug("First-time setup checks passed successfully.");
         return false;
     }
 
@@ -240,60 +249,28 @@ public class LoginApplication extends Application {
      * Retrieves all required service beans from the Spring context.
      */
     private void initialiseServices() {
+        logger.debug("Retrieving required service beans from the Spring context.");
         uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
         uiPersistenceService = springContext.getBean(UiPersistenceService.class);
         uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
         uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
         coreProvider = springContext.getBean(ComponentFactoryService.class);
-        if (isH2Mode()) {
-            testDataGenerator = springContext.getBean(TestDataGenerator.class);
-        }
+        startupService = springContext.getBean(StartupService.class);
+        logger.info("All essential services have been initialised.");
     }
 
     /**
-     * Executes the main startup sequence in a background thread to keep the UI responsive.
+     * Executes the main startup sequence in a background thread by delegating to the StartupService.
      *
      * @param testDataPlayerCount The number of test players to generate (0 if none).
      */
     private void beginStartupSequence(int testDataPlayerCount) {
+        logger.info("Executing startup sequence via UiTaskExecutor. Test data players to generate: {}", testDataPlayerCount);
         uiTaskExecutor.execute(
                 primaryStage,
                 "Starting application...",
                 "Ready!",
-                (updater) -> {
-                    // This lambda now contains the core startup logic.
-                    // It could even be moved to a dedicated 'StartupService' class.
-
-                    // 1. Generate Test Data if requested
-                    if (testDataPlayerCount > 0) {
-                        updater.updateStatus("Generating " + testDataPlayerCount + " players...");
-                        testDataGenerator.generate(testDataPlayerCount);
-                        uiPersistenceService.saveAllWithProgress(updater);
-                    }
-
-                    // 2. Check for updates
-                    try {
-                        GitHubUpdateChecker.UpdateInfo updateInfo = uiGithubTaskService.checkForUpdate(updater);
-                        if (updateInfo.isNewVersionAvailable() && updateInfo.assetDownloadUrl() != null) {
-                            File newJarFile = uiGithubTaskService.downloadUpdate(updateInfo, updater);
-                            return new StartupResult(StartupResult.Status.UPDATE_READY, newJarFile);
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Update process failed, continuing startup: " + e.getMessage());
-                        // Don't halt startup for a failed update check.
-                    }
-
-                    // 3. Check for an existing session
-                    updater.updateStatus("Checking for existing session...");
-                    if (GoogleAuthManager.hasStoredCredentials()) {
-                        uiGoogleTaskService.connectWithStoredCredentials(updater);
-                        uiPersistenceService.findAllWithProgress(updater);
-                        return new StartupResult(StartupResult.Status.LOGIN_SUCCESSFUL);
-                    }
-
-                    // 4. If no session, prepare to show the login UI
-                    return new StartupResult(StartupResult.Status.SHOW_LOGIN_UI);
-                },
+                (updater) -> startupService.performStartupSequence(testDataPlayerCount, updater),
                 this::handleStartupResult,
                 this::handleStartupError
         );
@@ -303,14 +280,19 @@ public class LoginApplication extends Application {
      * Called when a user clicks the "Sign In" button.
      */
     private void handleUserLogin() {
+        logger.info("User initiated Google Sign-In process.");
         uiTaskExecutor.execute(
                 primaryStage, "Connecting...", "Successfully connected!",
                 (updater) -> {
+                    logger.debug("Executing Google connection and data fetch tasks.");
                     uiGoogleTaskService.connectToGoogle(updater);
                     uiPersistenceService.findAllWithProgress(updater);
                     return "unused";
                 },
-                (result) -> showManagementStage(), // On success, show the main app
+                (result) -> {
+                    logger.info("Google sign-in and data fetch successful.");
+                    showManagementStage();
+                },
                 this::handleStartupError // Reuse the same error handler
         );
     }
@@ -320,10 +302,21 @@ public class LoginApplication extends Application {
      * @param result The result from the background startup task.
      */
     private void handleStartupResult(StartupResult result) {
+        logger.info("Startup sequence completed with result status: {}", result.status);
         switch (result.status) {
-            case UPDATE_READY -> applyUpdate((File) result.data);
-            case LOGIN_SUCCESSFUL -> showManagementStage();
-            case SHOW_LOGIN_UI -> showLoginUI("Please sign in to continue.");
+            case UPDATE_READY -> {
+                logger.info("An update is ready to be applied.");
+                applyUpdate((File) result.data);
+            }
+            case LOGIN_SUCCESSFUL -> {
+                logger.info("Startup successful, previous session was valid.");
+                showManagementStage();
+            }
+            case SHOW_LOGIN_UI -> {
+                logger.info("No valid session found. Showing login UI.");
+                showLoginUI("Please sign in to continue.");
+            }
+            default -> logger.warn("Unhandled startup result status: {}", result.status);
         }
     }
 
@@ -332,9 +325,11 @@ public class LoginApplication extends Application {
      * @param error The throwable error that occurred.
      */
     private void handleStartupError(Throwable error) {
-        // Special handling for a common port conflict issue.
+        logger.error("An error occurred during the startup or login process.", error);
+
         if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
             hasAttemptedBindExceptionRetry = true;
+            logger.warn("A BindException was detected, likely a port conflict. Attempting a graceful recovery.");
             Platform.runLater(() -> {
                 GoogleAuthManager.logout();
                 showLoginUI("A service is already running on the required port.\nPlease close other instances and try again.");
@@ -342,10 +337,9 @@ public class LoginApplication extends Application {
             return;
         }
 
-        // Generic error handling
+        logger.debug("Performing generic error handling: logging out user and showing an error dialog.");
         GoogleAuthManager.logout();
         coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), root).showAndWait();
-        error.printStackTrace();
         showLoginUI("Something went wrong. Please try signing in again.");
     }
 
@@ -356,7 +350,9 @@ public class LoginApplication extends Application {
      * Checks if the application was launched with the '--h2' flag.
      */
     private boolean isH2Mode() {
-        return getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
+        boolean h2Mode = getParameters().getRaw().stream().anyMatch("--h2"::equalsIgnoreCase);
+        logger.debug("Checking for H2 mode. Result: {}", h2Mode);
+        return h2Mode;
     }
 
     /**
@@ -368,23 +364,29 @@ public class LoginApplication extends Application {
             return Optional.empty();
         }
 
+        logger.info("H2 mode active. Prompting user for test data generation.");
         Alert confirmDialog = new Alert(Alert.AlertType.CONFIRMATION, "Would you like to populate the database with dummy data?", ButtonType.YES, ButtonType.NO);
         confirmDialog.setTitle("Test Data");
         confirmDialog.setHeaderText("H2 Test Mode Detected");
 
         if (confirmDialog.showAndWait().orElse(ButtonType.NO) == ButtonType.YES) {
+            logger.debug("User chose to generate test data.");
             TextInputDialog countDialog = new TextInputDialog("20");
             countDialog.setTitle("Generate Test Data");
             countDialog.setHeaderText("How many players should we create?");
             countDialog.setContentText("Enter a number:");
             return countDialog.showAndWait().map(countStr -> {
                 try {
-                    return Integer.parseInt(countStr);
+                    int count = Integer.parseInt(countStr);
+                    logger.info("User requested to generate {} test players.", count);
+                    return count;
                 } catch (NumberFormatException e) {
-                    return 0; // Default to 0 if input is invalid
+                    logger.warn("Invalid number format '{}' entered for test data count. Defaulting to 0.", countStr);
+                    return 0;
                 }
             }).filter(count -> count > 0);
         }
+        logger.debug("User chose not to generate test data.");
         return Optional.empty();
     }
 
@@ -393,10 +395,17 @@ public class LoginApplication extends Application {
      * @param newJarFile The newly downloaded application JAR file.
      */
     private void applyUpdate(File newJarFile) {
+        logger.info("Applying update from file: {}", newJarFile.getAbsolutePath());
         uiGithubTaskService.applyUpdateAndRestart(
                 newJarFile,
-                () -> coreProvider.createDialog(DialogType.ERROR, "Cannot update while running in an IDE, darling!", root).showAndWait(),
-                (error) -> coreProvider.createDialog(DialogType.ERROR, "Update failed: " + error.getMessage(), root).showAndWait()
+                () -> {
+                    logger.warn("Update cannot be applied in an IDE environment. Showing info dialog to user.");
+                    coreProvider.createDialog(DialogType.ERROR, "Cannot update while running in an IDE, darling!", root).showAndWait();
+                },
+                (error) -> {
+                    logger.error("Failed to apply update.", error);
+                    coreProvider.createDialog(DialogType.ERROR, "Update failed: " + error.getMessage(), root).showAndWait();
+                }
         );
     }
 
@@ -405,14 +414,18 @@ public class LoginApplication extends Application {
      * This is useful for detecting port conflicts.
      */
     private boolean isRootCauseBindException(Throwable throwable) {
+        logger.debug("Checking exception chain for a root cause of BindException.");
         Throwable cause = throwable;
+        int depth = 0;
         while (cause != null) {
             if (cause instanceof BindException) {
+                logger.warn("Found BindException at depth {} in the cause chain.", depth);
                 return true;
             }
             cause = cause.getCause();
+            depth++;
         }
+        logger.debug("No BindException found in the exception chain.");
         return false;
     }
 }
-

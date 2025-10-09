@@ -1,7 +1,5 @@
 package org.poolen.util;
 
-import org.poolen.util.AppDataHandler;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -66,8 +64,25 @@ public class PropertiesManager {
                 props.load(templateStream);
             }
 
-            // Now, update it with the user's details.
-            String fullUrl = "jdbc:mysql://" + dbAddress + "?ssl-mode=REQUIRED";
+            // Now, update it with the user's details, but let's be clever about it!
+            String fullUrl = dbAddress;
+
+            // Add the protocol only if it's missing.
+            if (!fullUrl.toLowerCase().startsWith("jdbc:mysql://")) {
+                fullUrl = "jdbc:mysql://" + fullUrl;
+            }
+
+            // Add the default SSL mode only if no ssl-mode is specified at all.
+            if (!fullUrl.contains("ssl-mode=")) {
+                if (fullUrl.contains("?")) {
+                    // There are other parameters, so we add ours with an ampersand.
+                    fullUrl += "&ssl-mode=REQUIRED";
+                } else {
+                    // No other parameters, so we start the query string with a question mark.
+                    fullUrl += "?ssl-mode=REQUIRED";
+                }
+            }
+
             props.setProperty("spring.datasource.url", fullUrl);
             props.setProperty("spring.datasource.username", username);
             props.setProperty("spring.datasource.password", password);
@@ -83,4 +98,3 @@ public class PropertiesManager {
         }
     }
 }
-
