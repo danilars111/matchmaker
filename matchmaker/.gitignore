@@ -25,4 +25,4 @@ dependency-reduced-pom.xml
 .DS_Store
 
 ### Appliation Specifics ###
-/src/main/resources/credentials/credentials.json
+/src/main/resources/credentials
