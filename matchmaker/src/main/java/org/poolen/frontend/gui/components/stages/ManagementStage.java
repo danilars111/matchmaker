@@ -62,9 +62,9 @@ public class ManagementStage extends Stage {
 
         GroupManagementTab groupTab = tabProvider.getGroupManagementTab();
         groupTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
-
+/*
         PersistenceTab persistenceTab = tabProvider.getPersistenceTab();
-        persistenceTab.init(this::notifyPlayerUpdateListeners);
+        persistenceTab.init(this::notifyPlayerUpdateListeners);*/
 
         SettingsTab settingsTab = tabProvider.getSettingsTab();
 
@@ -79,9 +79,9 @@ public class ManagementStage extends Stage {
         makeTabDetachable(characterTab);
         makeTabDetachable(groupTab);
         makeTabDetachable(settingsTab);
-        makeTabDetachable(persistenceTab);
+   //     makeTabDetachable(persistenceTab);
 
-        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, persistenceTab, settingsTab);
+        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab);
         logger.debug("All management tabs have been initialised and added to the tab pane.");
 
         // --- Player <-> Character Navigation Wiring ---
@@ -133,6 +133,7 @@ public class ManagementStage extends Stage {
             }
             characterTab.createCharacterForPlayer(player);
         });
+/*
 
         // --- Persistence Wiring ---
         persistenceTab.setOnLogoutRequestHandler(() -> {
@@ -154,6 +155,7 @@ public class ManagementStage extends Stage {
                 coreProvider.createDialog(DialogType.ERROR,"Failed to logout: " + e.getMessage(), tabPane).showAndWait();
             }
         });
+*/
 
 
         this.setOnCloseRequest(event -> {

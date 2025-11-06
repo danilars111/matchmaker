@@ -26,10 +26,13 @@ import org.poolen.backend.db.interfaces.ISettings;
 import org.poolen.backend.db.interfaces.store.SettingStoreProvider;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
+import org.poolen.frontend.gui.components.stages.email.BugReportStage; // Added this import
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
+import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.services.UiPersistenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ConfigurableApplicationContext; // Added this import
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,17 +56,20 @@ public class SettingsTab extends Tab {
     private final HBox buttonBox;
     private final BorderPane root;
     private final UiPersistenceService uiPersistenceService;
-    private  final CoreProvider coreProvider;
+    private final CoreProvider coreProvider;
+    private final StageProvider stageProvider;
 
     private static final List<ISettings> HIDDEN_SETTINGS = List.of(
             Settings.MatchmakerBonusSettings.BUDDY_BONUS
     );
 
-    public SettingsTab(CoreProvider coreProvider, UiPersistenceService uiPersistenceService, SettingStoreProvider store) {
+    public SettingsTab(CoreProvider coreProvider, UiPersistenceService uiPersistenceService, SettingStoreProvider store,
+                       StageProvider stageProvider) {
         super("Settings");
         this.settingsStore = store.getSettingsStore();
         this.uiPersistenceService = uiPersistenceService;
         this.coreProvider = coreProvider;
+        this.stageProvider = stageProvider;
 
         // --- Main Layout ---
         root = new BorderPane();
@@ -75,7 +81,7 @@ public class SettingsTab extends Tab {
         scrollPane.setFitToWidth(true);
         root.setCenter(scrollPane);
 
-        // --- Action Buttons ---
+        // --- Action Buttons (Right) ---
         Button saveButton = new Button("Save Changes");
         saveButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
         Button cancelButton = new Button("Discard Changes");
@@ -84,8 +90,21 @@ public class SettingsTab extends Tab {
 
         buttonBox = new HBox(10, defaultsButton, cancelButton, saveButton);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
-        buttonBox.setPadding(new Insets(10, 0, 0, 0));
-        root.setBottom(buttonBox);
+
+        // --- Bug Report Button (Left) ---
+        Button bugReportButton = new Button("Report a Bug");
+        bugReportButton.setStyle("-fx-background-color: #5bc0de; -fx-text-fill: white;"); // A nice info blue
+        bugReportButton.setOnAction(e -> handleBugReport());
+        HBox leftButtonBox = new HBox(bugReportButton);
+        leftButtonBox.setAlignment(Pos.CENTER_LEFT);
+
+        // --- Bottom Bar Container ---
+        BorderPane bottomBar = new BorderPane();
+        bottomBar.setLeft(leftButtonBox);
+        bottomBar.setRight(buttonBox);
+        bottomBar.setPadding(new Insets(10, 0, 0, 0)); // Padding on top
+
+        root.setBottom(bottomBar);
 
         // --- Event Handlers ---
         saveButton.setOnAction(e -> saveSettings());
@@ -274,6 +293,22 @@ public class SettingsTab extends Tab {
         logger.info("Settings updated in memory. Calling persistence service to save.");
         // Note: The UiPersistenceService should handle the UI feedback (enabling buttons, changing cursor) on completion.
         uiPersistenceService.saveSettings(getTabPane().getScene().getWindow());
+    }
+
+    /**
+     * Shows the Bug Report stage.
+     */
+    private void handleBugReport() {
+        try {
+            // We use the springContext we now have from the constructor
+            BugReportStage bugReportStage = stageProvider.createBugReportStage();
+            bugReportStage.initOwner(getTabPane().getScene().getWindow());
+            bugReportStage.showAndWait();
+        } catch (Exception e) {
+            logger.error("Failed to open Bug Report window.", e);
+            // Show an error dialog if it fails to even open
+            coreProvider.createDialog(DialogType.ERROR, "Could not open bug report form: " + e.getMessage(), this.getTabPane()).showAndWait();
+        }
     }
 
     private String formatEnumName(String enumName) {

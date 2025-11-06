@@ -1,6 +1,7 @@
 package org.poolen.frontend.exceptions;
 
 import javafx.application.Platform;
+import org.poolen.frontend.gui.components.stages.email.CrashReportStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -45,7 +46,7 @@ public class GlobalExceptionHandler implements Thread.UncaughtExceptionHandler {
         // What a diva!
         Platform.runLater(() -> {
             // Create and show our lovely new pop-up window
-            new CrashReportWindow(e, springContext).showAndWait();
+            new CrashReportStage(e, springContext).showAndWait();
 
             // After the window is closed (either by sending or just closing),
             // we do a controlled shutdown.

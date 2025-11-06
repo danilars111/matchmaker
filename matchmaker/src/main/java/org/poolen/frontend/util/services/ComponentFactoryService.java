@@ -17,6 +17,9 @@ import org.poolen.frontend.gui.components.overlays.LoadingOverlay;
 import org.poolen.frontend.gui.components.stages.ExportGroupsStage;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
+import org.poolen.frontend.gui.components.stages.email.AccessRequestStage;
+import org.poolen.frontend.gui.components.stages.email.BugReportStage;
+import org.poolen.frontend.gui.components.stages.email.CrashReportStage;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PersistenceTab;
@@ -38,6 +41,7 @@ import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -68,9 +72,14 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private PlayerManagementRosterTableView playerManagementRosterTableView;
     private GroupTableView groupTableView;
     private GroupDisplayView groupDisplayView;
+    private final ConfigurableApplicationContext springContext;
 
     @Autowired
-    public ComponentFactoryService(Store store, UiPersistenceService uiPersistenceService, CharacterFactory characterFactory, PlayerFactory playerFactory, SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker, ApplicationScriptService applicationScriptService) {
+    public ComponentFactoryService(Store store, UiPersistenceService uiPersistenceService,
+                                   CharacterFactory characterFactory, PlayerFactory playerFactory,
+                                   SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker,
+                                   ApplicationScriptService applicationScriptService,
+                                   ConfigurableApplicationContext springContext) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
         this.characterFactory = characterFactory;
@@ -78,6 +87,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         this.sheetsServiceManager = sheetsServiceManager;
         this.matchmaker = matchmaker;
         this.applicationScriptService = applicationScriptService;
+        this.springContext = springContext;
         logger.info("ComponentFactoryService initialised with all required beans.");
     }
 
@@ -112,6 +122,21 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
                 throw new IllegalArgumentException("Unknown DialogType: " + type);
         }
     }
+    public AccessRequestStage createAccessRequestStage() {
+        logger.debug("Creating new AccessRequestStage instance.");
+        return new AccessRequestStage(springContext);
+    }
+
+    public BugReportStage createBugReportStage() {
+        logger.debug("Creating new BugReportStage instance.");
+        return new BugReportStage(springContext);
+    }
+
+    public CrashReportStage createCrashReportStage(Throwable e) {
+        logger.debug("Creating new CrashReportStage instance for exception.");
+        return new CrashReportStage(e, springContext);
+    }
+
 
 
     /*******************************************************************************************
@@ -134,6 +159,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         }
         return this.exportGroupsStage;
     }
+
     /**********
      ** Tabs **
      **********/
@@ -169,7 +195,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public SettingsTab getSettingsTab() {
         if (this.settingsTab == null) {
             logger.info("Creating singleton instance of SettingsTab.");
-            this.settingsTab = new SettingsTab(this, uiPersistenceService, store);
+            this.settingsTab = new SettingsTab(this, uiPersistenceService, store, this);
         }
         return this.settingsTab;
     }
