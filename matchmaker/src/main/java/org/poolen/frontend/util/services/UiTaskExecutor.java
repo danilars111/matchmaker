@@ -10,6 +10,8 @@ import org.poolen.frontend.gui.components.dialogs.ErrorDialog;
 import org.poolen.frontend.gui.components.overlays.LoadingOverlay;
 import org.poolen.frontend.util.interfaces.ProgressAwareTask;
 import org.poolen.frontend.util.interfaces.UiUpdater;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.function.Consumer;
@@ -20,16 +22,20 @@ import java.util.function.Consumer;
  */
 @Service
 public class UiTaskExecutor {
+
+    private static final Logger logger = LoggerFactory.getLogger(UiTaskExecutor.class);
+
     /**
      * The primary execution logic.
      */
     public <T> void execute(Window owner, String initialMessage, String successMessage, ProgressAwareTask<T> work, Consumer<T> onSuccess, Consumer<Throwable> onError) {
         if (owner == null || owner.getScene() == null) {
-            System.err.println("Cannot execute task: Owner window or scene is null.");
+            logger.error("Cannot execute task: Owner window or scene is null.");
             onError.accept(new IllegalStateException("Task owner or scene is null."));
             return;
         }
 
+        logger.info("Executing new background task. Initial message: '{}'", initialMessage);
         final Scene scene = owner.getScene();
         final LoadingOverlay overlay = new LoadingOverlay();
 
@@ -48,12 +54,14 @@ public class UiTaskExecutor {
         Task<T> task = new Task<>() {
             @Override
             protected T call() throws Exception {
+                logger.debug("Background task started on thread: {}", Thread.currentThread().getName());
                 return work.execute(updater);
             }
 
             @Override
             protected void succeeded() {
                 T result = getValue();
+                logger.info("Background task completed successfully.");
                 String finalMessage = (successMessage != null) ? successMessage : (result != null ? result.toString() : "Success!");
                 overlay.showSuccessAndThenHide(scene, finalMessage);
                 PauseTransition successCallbackDelay = new PauseTransition(Duration.millis(600));
@@ -63,17 +71,20 @@ public class UiTaskExecutor {
 
             @Override
             protected void failed() {
+                Throwable ex = getException();
+                logger.error("Background task failed with an exception.", ex);
                 overlay.hide(scene);
-                onError.accept(getException());
+                onError.accept(ex);
             }
         };
 
         try {
             overlay.show(scene, initialMessage);
-            new Thread(task).start();
+            Thread taskThread = new Thread(task);
+            taskThread.setDaemon(true);
+            taskThread.start();
         } catch (Exception e) {
-            System.err.println("Failed to set up and start the UI task.");
-            e.printStackTrace();
+            logger.error("Failed to set up and start the UI task.", e);
             overlay.hide(scene);
             onError.accept(e);
         }
@@ -85,10 +96,9 @@ public class UiTaskExecutor {
     public <T> void execute(Window owner, String initialMessage, String successMessage, ProgressAwareTask<T> work, Consumer<T> onSuccess) {
         execute(owner, initialMessage, successMessage, work, onSuccess,
                 (error) -> {
-                    error.printStackTrace();
+                    logger.error("An unexpected error occurred in task with default handler:", error);
                     new ErrorDialog("An unexpected error occurred: " + error.getMessage(), owner.getScene().getRoot()).showAndWait();
                 }
         );
     }
 }
-

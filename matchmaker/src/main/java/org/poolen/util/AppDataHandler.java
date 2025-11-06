@@ -1,5 +1,8 @@
 package org.poolen.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +13,8 @@ import java.nio.file.Paths;
  * This ensures that configuration files, tokens, and other data are stored in standard, user-specific locations.
  */
 public final class AppDataHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(AppDataHandler.class);
 
     /**
      * Private constructor to prevent instantiation of this utility class.
@@ -26,6 +31,7 @@ public final class AppDataHandler {
      * @return A Path object pointing to the application data directory, or null if it could not be created.
      */
     public static Path getAppDataDirectory() {
+        logger.debug("Getting app data directory using default app name from AppConfig.");
         return getAppDataDirectory(AppConfig.getAppName());
     }
 
@@ -51,29 +57,31 @@ public final class AppDataHandler {
             String appDataEnv = System.getenv("APPDATA");
             if (appDataEnv != null && !appDataEnv.isEmpty()) {
                 appDataPath = Paths.get(appDataEnv, appName);
+                logger.debug("OS detected: Windows. Using APPDATA environment variable. Path: {}", appDataPath);
             } else {
                 // Fallback if APPDATA is not set for some reason
                 appDataPath = userHome.resolve("AppData/Roaming/" + appName);
+                logger.warn("OS detected: Windows. APPDATA env variable not set. Using fallback path: {}", appDataPath);
             }
         } else if (os.contains("mac")) {
             // macOS: ~/Library/Application Support
             appDataPath = userHome.resolve("Library/Application Support/" + appName);
+            logger.debug("OS detected: macOS. Using Library/Application Support. Path: {}", appDataPath);
         } else {
             // Linux and other Unix-like systems, following XDG Base Directory Specification
             appDataPath = userHome.resolve(".config/" + appName);
+            logger.debug("OS detected: Unix-like (Linux/Other). Using .config directory. Path: {}", appDataPath);
         }
 
         try {
             // Create all necessary parent directories if they don't exist
+            logger.debug("Ensuring application data directory exists at: {}", appDataPath);
             Files.createDirectories(appDataPath);
         } catch (IOException e) {
-            // Using System.err is a standard way to log errors without crashing the app
-            System.err.println("Failed to create application data directory at " + appDataPath);
-            e.printStackTrace(); // This provides more detail for debugging
+            logger.error("Failed to create application data directory at: {}", appDataPath, e);
             return null; // Return null to indicate failure
         }
 
         return appDataPath;
     }
 }
-

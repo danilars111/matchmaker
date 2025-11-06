@@ -5,6 +5,8 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.CharacterFactory;
 import org.poolen.backend.db.factories.PlayerFactory;
 import org.poolen.backend.db.store.CharacterStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 @Service
 public class TestDataGenerator {
 
+    private static final Logger logger = LoggerFactory.getLogger(TestDataGenerator.class);
+
     private final PlayerFactory playerFactory;
     private final CharacterFactory characterFactory;
     private final List<String> names;
@@ -45,13 +49,14 @@ public class TestDataGenerator {
      * @param playerCount The number of unique players to generate.
      */
     public void generate(int playerCount) {
+        logger.info("Attempting to generate {} test players...", playerCount);
         if (names.isEmpty()) {
-            System.err.println("Cannot generate test data: name list is empty.");
+            logger.error("Cannot generate test data: name list is empty or failed to load.");
             return;
         }
 
         if (playerCount > names.size()) {
-            System.err.println("Cannot generate " + playerCount + " unique players, only " + names.size() + " names available.");
+            logger.warn("Cannot generate {} unique players, only {} names available. Generating {} instead.", playerCount, names.size(), names.size());
             playerCount = names.size();
         }
 
@@ -59,6 +64,7 @@ public class TestDataGenerator {
         Collections.shuffle(shuffledPlayerNames);
 
         int dmCount = (int) Math.ceil(playerCount / 6.0);
+        logger.debug("Generating {} players with {} DMs.", playerCount, dmCount);
 
         for (int i = 0; i < playerCount; i++) {
             boolean isDm = i < dmCount;
@@ -72,7 +78,7 @@ public class TestDataGenerator {
                 characterFactory.create(player, characterName, randomHouse, isMain);
             }
         }
-        System.out.println("Successfully generated and saved " + playerCount + " players with characters.");
+        logger.info("Successfully generated and saved {} players with characters.", playerCount);
     }
 
     /**
@@ -81,18 +87,20 @@ public class TestDataGenerator {
      * @return A list of names.
      */
     private List<String> loadNames() {
+        logger.info("Loading names from /test/names.txt...");
         try (InputStream is = getClass().getResourceAsStream("/test/names.txt")) {
             if (is == null) {
-                System.err.println("Could not find names.txt in resources/test");
+                logger.error("Could not find names.txt in resources/test. Test data generation will fail.");
                 return Collections.emptyList();
             }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-                return reader.lines().filter(line -> !line.isBlank()).collect(Collectors.toList());
+                List<String> loadedNames = reader.lines().filter(line -> !line.isBlank()).collect(Collectors.toList());
+                logger.info("Successfully loaded {} names from resources.", loadedNames.size());
+                return loadedNames;
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Failed to read names.txt from resources.", e);
             return Collections.emptyList();
         }
     }
 }
-

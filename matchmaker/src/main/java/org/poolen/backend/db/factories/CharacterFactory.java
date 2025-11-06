@@ -5,6 +5,8 @@ import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.Store;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +19,8 @@ import java.util.UUID;
  */
 @Service
 public class CharacterFactory {
-   // private static final CharacterFactory INSTANCE = new CharacterFactory();
+    // private static final CharacterFactory INSTANCE = new CharacterFactory();
+    private static final Logger logger = LoggerFactory.getLogger(CharacterFactory.class);
     CharacterStore store;
 
 
@@ -25,13 +28,14 @@ public class CharacterFactory {
     @Autowired
     public CharacterFactory(Store store) {
         this.store = store.getCharacterStore();
+        logger.info("CharacterFactory initialised.");
     }
 
     /**
      * Gets the single instance of the CharacterFactory.
      * @return The singleton instance.
      */
-/*    public static CharacterFactory getInstance() {
+/* public static CharacterFactory getInstance() {
         return INSTANCE;
     }*/
 
@@ -47,6 +51,7 @@ public class CharacterFactory {
      * @throws IllegalArgumentException if a business rule is violated.
      */
     public Character create(Player player, String name, House house, boolean isMain) {
+        logger.info("Creating new character for player '{}' (Name: {}, House: {}, IsMain: {}).", player.getName(), name, house, isMain);
         return create(null, player, name, house, isMain);
     }
 
@@ -64,11 +69,18 @@ public class CharacterFactory {
      * @throws IllegalArgumentException if a business rule is violated.
      */
     public Character create(UUID uuid, Player player, String name, House house, boolean isMain) {
+        if (uuid != null) {
+            logger.info("Creating character from data for player '{}' (UUID: {}, Name: {}, House: {}, IsMain: {}).",
+                    player.getName(), uuid, name, house, isMain);
+        }
 
         // Rule 1: A player cannot have more than two active (non-retired) characters.
         long unretiredCount = player.getCharacters().stream().filter(c -> !c.isRetired()).count();
         if (unretiredCount >= 2) {
-            throw new IllegalArgumentException("Player already has the maximum of 2 unretired characters, darling!");
+            String errorMsg = String.format("Player %s (UUID: %s) already has the maximum of 2 unretired characters. Cannot create new character.",
+                    player.getName(), player.getUuid());
+            logger.warn(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
         }
 
         // Rule 2: A player can only have one main character.
@@ -76,7 +88,10 @@ public class CharacterFactory {
             // We'll check both the isMain flag and the convention that the main character is at index 0.
             boolean hasMain = player.getCharacters().stream().anyMatch(Character::isMain);
             if (hasMain) {
-                throw new IllegalArgumentException("Cannot create a new main character for a player who already has one, darling!");
+                String errorMsg = String.format("Player %s (UUID: %s) already has a main character. Cannot create a new main character.",
+                        player.getName(), player.getUuid());
+                logger.warn(errorMsg);
+                throw new IllegalArgumentException(errorMsg);
             }
         }
 
@@ -85,12 +100,11 @@ public class CharacterFactory {
         newCharacter.setPlayer(player);
         newCharacter.setMain(isMain);
 
-
-
         player.addCharacter(newCharacter);
 
         store.addCharacter(newCharacter);
+        logger.info("Successfully created and stored new character '{}' (UUID: {}) for player '{}'.",
+                newCharacter.getName(), newCharacter.getUuid(), player.getName());
         return newCharacter;
     }
 }
-

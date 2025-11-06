@@ -13,6 +13,8 @@ import org.poolen.backend.db.store.CharacterStore;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.db.store.Store;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
 @Lazy
 public class SheetDataMapper {
 
+    private static final Logger logger = LoggerFactory.getLogger(SheetDataMapper.class);
+
     // --- Headers ---
     public static final List<Object> GROUPS_HEADER = Arrays.asList("DM", "Players", "Adventure Description/Recap", "Datum Irl", "Recap Writer", "Kommentar", "Deadline");
 
@@ -39,17 +43,23 @@ public class SheetDataMapper {
     @Autowired
     public SheetDataMapper(Store store) {
         this.settingsStore = store.getSettingsStore();
+        logger.info("SheetDataMapper initialised.");
     }
 
     public List<List<Object>> mapGroupsToSheet(List<Group> groupsToLog) {
+        logger.info("Mapping {} groups to Google Sheets format.", groupsToLog.size());
         List<List<Object>> groupData = new ArrayList<>();
         // Get the deadline from our new setting!
         int deadlineInWeeks = (Integer) settingsStore.getSetting(Settings.PersistenceSettings.RECAP_DEADLINE).getSettingValue();
+        logger.debug("Using recap deadline of {} weeks from settings.", deadlineInWeeks);
 
         for (Group group : groupsToLog) {
             List<Object> row = new ArrayList<>();
             LocalDate sessionDate = group.getDate();
-            if (sessionDate == null) sessionDate = LocalDate.now();
+            if (sessionDate == null) {
+                logger.warn("Group with UUID {} has a null date. Defaulting to current date for row mapping.", group.getUuid());
+                sessionDate = LocalDate.now();
+            }
 
             // Use the setting to calculate the deadline
             LocalDate deadlineDate = sessionDate.plusWeeks(deadlineInWeeks);
@@ -66,8 +76,9 @@ public class SheetDataMapper {
             row.add("");
             row.add(deadlineDate.format(DATE_FORMATTER));
             groupData.add(row);
+            logger.trace("Mapped row for group UUID {}: DM='{}', Players='{}'", group.getUuid(), row.get(0), row.get(1));
         }
+        logger.info("Successfully mapped {} groups to {} rows of data.", groupsToLog.size(), groupData.size());
         return groupData;
     }
 }
-

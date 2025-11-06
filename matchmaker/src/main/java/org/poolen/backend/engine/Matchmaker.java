@@ -7,6 +7,8 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.db.store.Store;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +36,9 @@ import static org.poolen.backend.db.constants.Settings.MatchmakerMultiplierSetti
 @Service
 @Lazy
 public class Matchmaker {
+
+    private static final Logger logger = LoggerFactory.getLogger(Matchmaker.class);
+
     private List<Group> groups;
     private List<Player> players;
 
@@ -63,8 +68,10 @@ public class Matchmaker {
 
 
     public Matchmaker(Store store) {
+        logger.info("Matchmaker initialising...");
         this.settingsStore = store.getSettingsStore();
 
+        logger.debug("Loading settings and populating house priority map...");
         housePriorityMap.put(House.GARNET, (List<House>) settingsStore.getSetting(GARNET_PRIORITIES).getSettingValue());
         housePriorityMap.put(House.AMBER, (List<House>) settingsStore.getSetting(AMBER_PRIORITIES).getSettingValue());
         housePriorityMap.put(House.AVENTURINE, (List<House>) settingsStore.getSetting(AVENTURINE_PRIORITIES).getSettingValue());
@@ -82,33 +89,51 @@ public class Matchmaker {
         HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_THIRD_CHOICE_MULTIPLIER).getSettingValue();
         HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_FOURTH_CHOICE_MULTIPLIER).getSettingValue();
 
+        logger.debug("Matchmaker settings loaded:");
+        logger.debug("HOUSE_MATCH_BONUS: {}", HOUSE_MATCH_BONUS);
+        logger.debug("BUDDY_MATCH_BONUS: {}", BUDDY_MATCH_BONUS);
+        logger.debug("BLACKLIST_MATCH_BONUS: {}", BLACKLIST_MATCH_BONUS);
+        logger.debug("RECENCY_GRUDGE_PERIOD: {}", RECENCY_GRUDGE_PERIOD);
+        logger.debug("MAX_REUNION_MATCH_BONUS: {}", MAX_REUNION_MATCH_BONUS);
+        logger.debug("MAIN_CHARACTER_MATCH_MULTIPLIER: {}", MAIN_CHARACTER_MATCH_MULTIPLIER);
+        logger.debug("HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER: {}", HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER);
+        logger.debug("HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER: {}", HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER);
+        logger.debug("HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER: {}", HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER);
+        logger.info("Matchmaker initialised with all settings.");
     }
 
     public List<Group> match() {
-        if (players.isEmpty() || groups.isEmpty()) {
+        logger.info("Matchmaking started for {} players and {} groups.",
+                (players != null ? players.size() : 0), (groups != null ? groups.size() : 0));
+        if (players == null || groups == null || players.isEmpty() || groups.isEmpty()) {
+            logger.warn("Matchmaking aborted: No players or no groups provided.");
             return this.groups;
         }
 
         runOptimalHouseMatch();
         applyHolisticSwaps();
 
+        logger.info("Matchmaking finished.");
         return this.groups;
     }
 
     private void runOptimalHouseMatch() {
+        logger.info("Running optimal house match...");
         int numPlayers = this.players.size();
         int numGroups = this.groups.size();
         int baseSize = numPlayers / numGroups;
         int remainder = numPlayers % numGroups;
+        logger.debug("Calculating group sizes. {} players, {} groups. Base size: {}, Remainder: {}", numPlayers, numGroups, baseSize, remainder);
 
         List<Integer> groupSizes = new ArrayList<>();
         for (int i = 0; i < numGroups; i++) {
             groupSizes.add(baseSize + (i < remainder ? 1 : 0));
         }
         int totalSlots = groupSizes.stream().mapToInt(Integer::intValue).sum();
+        logger.debug("Total available slots: {}. Group sizes: {}", totalSlots, groupSizes);
 
         if (numPlayers > totalSlots) {
-            System.err.println("Error: More players than available slots.");
+            logger.error("Matchmaking error: More players ({}) than available slots ({}).", numPlayers, totalSlots);
             return;
         }
 
@@ -121,6 +146,7 @@ public class Matchmaker {
 
         LinearSumAssignment assignment = new LinearSumAssignment();
         try {
+            logger.debug("Building cost matrix for {} players and {} total slots.", numPlayers, totalSlots);
             for (int i = 0; i < numPlayers; i++) {
                 for (int j = 0; j < totalSlots; j++) {
                     Player player = this.players.get(i);
@@ -128,19 +154,28 @@ public class Matchmaker {
                     Group group = this.groups.get(groupIndex);
                     double score = initialHouseScore(player, group);
                     double cost = MAX_INITIAL_SCORE - score;
+                    logger.trace("Cost for Player '{}' -> Group '{}' (Slot {}): {} (Score: {})", player.getName(), group.getUuid(), j, cost, score);
                     assignment.addArcWithCost(i, j, (long) cost);
                 }
             }
 
-            if (assignment.solve() == LinearSumAssignment.Status.OPTIMAL) {
+            LinearSumAssignment.Status solveStatus = assignment.solve();
+            logger.info("LinearSumAssignment solve status: {}", solveStatus);
+            if (solveStatus == LinearSumAssignment.Status.OPTIMAL) {
+                logger.info("Optimal house match found. Assigning players to groups.");
                 for (int i = 0; i < numPlayers; i++) {
                     int slotIndex = assignment.getRightMate(i);
                     if (slotIndex != -1) {
                         Player player = this.players.get(i);
                         int groupIndex = slotToGroupMap.get(slotIndex);
                         this.groups.get(groupIndex).addPartyMember(player);
+                        logger.debug("Assigned player '{}' to group '{}' (slot index {}).", player.getName(), this.groups.get(groupIndex).getUuid(), slotIndex);
+                    } else {
+                        logger.warn("Player '{}' (index {}) was not assigned a slot.", this.players.get(i).getName(), i);
                     }
                 }
+            } else {
+                logger.error("Optimal house match could not be found. Solve status: {}", solveStatus);
             }
         } finally {
             assignment.delete();
@@ -148,8 +183,12 @@ public class Matchmaker {
     }
 
     private void applyHolisticSwaps() {
+        logger.info("Applying holistic swaps to improve social scores...");
         boolean improvementFound;
+        int iteration = 0;
         do {
+            iteration++;
+            logger.debug("Starting swap iteration {}.", iteration);
             improvementFound = false;
             for (int i = 0; i < groups.size(); i++) {
                 for (int j = i + 1; j < groups.size(); j++) {
@@ -157,18 +196,21 @@ public class Matchmaker {
                     Group g2 = groups.get(j);
                     for (Player p1 : new ArrayList<>(g1.getParty().values())) {
                         for (Player p2 : new ArrayList<>(g2.getParty().values())) {
+                            logger.trace("Checking swap between p1 '{}' (group {}) and p2 '{}' (group {}).", p1.getName(), g1.getUuid(), p2.getName(), g2.getUuid());
 
                             // Calculate the total "happiness" score of the two groups as they are now.
                             double currentTotalScore = calculateTotalScoreForGroup(g1) + calculateTotalScoreForGroup(g2);
                             // Calculate what the score would be if we swapped these two players.
                             double newTotalScore = calculateHypotheticalTotalScore(g1, p1, p2) + calculateHypotheticalTotalScore(g2, p2, p1);
 
+                            logger.trace("Current score: {}. Hypothetical score: {}.", currentTotalScore, newTotalScore);
                             if (newTotalScore > currentTotalScore) {
                                 g1.removePartyMember(p1);
                                 g2.removePartyMember(p2);
                                 g1.addPartyMember(p2);
                                 g2.addPartyMember(p1);
-                                System.out.println("Holistic Swap: Swapped " + p1.getName() + " and " + p2.getName() + ".");
+                                logger.info("Holistic Swap: Swapped '{}' (from group {}) and '{}' (from group {}). Score improved from {} to {}.",
+                                        p1.getName(), g1.getUuid(), p2.getName(), g2.getUuid(), currentTotalScore, newTotalScore);
                                 improvementFound = true;
                                 break;
                             }
@@ -180,9 +222,11 @@ public class Matchmaker {
                 if (improvementFound) break;
             }
         } while (improvementFound);
+        logger.info("Finished holistic swap iterations after {} loops. No further improvements found.", iteration);
     }
 
     private double calculateHypotheticalTotalScore(Group originalGroup, Player playerToRemove, Player playerToAdd) {
+        logger.trace("Calculating hypothetical score for group '{}' with player '{}' added and '{}' removed.", originalGroup.getUuid(), playerToAdd.getName(), playerToRemove.getName());
         List<Player> hypotheticalParty = new ArrayList<>(originalGroup.getParty().values());
         hypotheticalParty.remove(playerToRemove);
         hypotheticalParty.add(playerToAdd);
@@ -196,6 +240,7 @@ public class Matchmaker {
     }
 
     private double calculateTotalScoreForGroup(Group group) {
+        logger.trace("Calculating total score for group '{}' with {} members.", group.getUuid(), group.getParty().size());
         double totalScore = 0;
         List<Player> party = new ArrayList<>(group.getParty().values());
 
@@ -204,12 +249,13 @@ public class Matchmaker {
             for (int j = i + 1; j < party.size(); j++) {
                 Player p1 = party.get(i);
                 Player p2 = party.get(j);
+                double pairScore = 0;
 
                 if (p1.getBlacklist().contains(p2.getUuid()) || p2.getBlacklist().contains(p1.getUuid())) {
-                    totalScore += BLACKLIST_MATCH_BONUS;
+                    pairScore += BLACKLIST_MATCH_BONUS;
                 }
                 if (p1.getBuddylist().contains(p2.getUuid()) || p2.getBuddylist().contains(p1.getUuid())) {
-                    totalScore += BUDDY_MATCH_BONUS;
+                    pairScore += BUDDY_MATCH_BONUS;
                 }
 
                 // Assuming p1.getPlayerLog() now returns Map<UUID, LocalDate>
@@ -219,35 +265,47 @@ public class Matchmaker {
                     if (weeksAgo < RECENCY_GRUDGE_PERIOD) {
                         // Apply a sliding scale penalty. Max penalty for playing this week.
                         double reunionPenalty = MAX_REUNION_MATCH_BONUS * (1.0 - ((double) weeksAgo / RECENCY_GRUDGE_PERIOD));
-                        totalScore += MAX_REUNION_MATCH_BONUS - reunionPenalty;
+                        pairScore += MAX_REUNION_MATCH_BONUS - reunionPenalty;
+                        logger.trace("... (p1 '{}', p2 '{}'): Recency grudge applied. Weeks ago: {}. Penalty: {}", p1.getName(), p2.getName(), weeksAgo, reunionPenalty);
                     } else {
-                        totalScore += MAX_REUNION_MATCH_BONUS;
+                        pairScore += MAX_REUNION_MATCH_BONUS;
                     }
                 } else {
-                    totalScore += MAX_REUNION_MATCH_BONUS;
+                    pairScore += MAX_REUNION_MATCH_BONUS; // Max bonus for never having played together
                 }
+                logger.trace("... (p1 '{}', p2 '{}'): Pair score: {}", p1.getName(), p2.getName(), pairScore);
+                totalScore += pairScore;
             } // <-- End of the player-pair loop
         } // <-- End of the outer player loop
 
         // Part 2: Calculate DM Blacklist score (now runs just once per group!)
-        for (Player player : party) {
-            if (player.getDmBlacklist().contains(group.getDungeonMaster().getUuid())) {
-                totalScore += BLACKLIST_MATCH_BONUS;
+        if (group.getDungeonMaster() != null) {
+            for (Player player : party) {
+                if (player.getDmBlacklist().contains(group.getDungeonMaster().getUuid())) {
+                    totalScore += BLACKLIST_MATCH_BONUS;
+                    logger.trace("... (p '{}', DM '{}'): DM Blacklist bonus applied.", player.getName(), group.getDungeonMaster().getName());
+                }
             }
+        } else {
+            logger.warn("Group {} has no DM. Skipping DM blacklist check.", group.getUuid());
         }
+
 
         // Part 3: Add House Preference Score
         for (Player player : party) {
             totalScore += getTieredHouseScore(player, group);
         }
 
+        logger.trace("Total score for group '{}' calculated: {}", group.getUuid(), totalScore);
         return totalScore;
     }
 
     private double getTieredHouseScore(Player player, Group group) {
         if (player.getCharacters().isEmpty()) {
-            throw new RuntimeException("Player's need to have a character");
+            logger.error("Player '{}' (UUID: {}) has no characters. Cannot calculate house score. Returning default.", player.getName(), player.getUuid());
+            return HOUSE_DEFAULT_SCORE;
         }
+        logger.trace("... Calculating tiered house score for player '{}'.", player.getName());
 
         double bestScoreForPlayer = HOUSE_DEFAULT_SCORE;
         List<House> groupHouses = group.getHouses(); // Get the list of themes for the group
@@ -255,14 +313,15 @@ public class Matchmaker {
         // Iterate through all of the player's characters to find their best possible score
         for (Character character : player.getCharacters()) {
             House playerHouse = character.getHouse();
-
             double bestScoreForThisCharacter = 0;
+            logger.trace("... ... Checking character '{}' (House: {}).", character.getName(), playerHouse);
 
             // First, check if this character is a perfect match for ANY of the group's themes.
             boolean isPerfectMatch = groupHouses.contains(playerHouse);
 
             if (isPerfectMatch) {
                 bestScoreForThisCharacter = HOUSE_MATCH_BONUS;
+                logger.trace("... ... ... Perfect house match found. Score: {}", bestScoreForThisCharacter);
             } else {
                 // If not a perfect match, find the best possible tiered score.
                 double bestTieredScore = HOUSE_DEFAULT_SCORE;
@@ -283,11 +342,12 @@ public class Matchmaker {
                                 currentTieredScore = HOUSE_MATCH_BONUS * HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER;
                                 break;
                             default:
-                                currentTieredScore = HOUSE_MATCH_BONUS;
+                                currentTieredScore = HOUSE_DEFAULT_SCORE; // Changed from HOUSE_MATCH_BONUS, as default is 1.0
                                 break;
                         }
                         if (currentTieredScore > bestTieredScore) {
                             bestTieredScore = currentTieredScore;
+                            logger.trace("... ... ... Tiered match found: GroupHouse '{}', PrefIndex '{}', Score '{}'.", groupHouse, priorityIndex, currentTieredScore);
                         }
                     }
                 }
@@ -297,6 +357,7 @@ public class Matchmaker {
             // Add the main character bonus if this is their first character
             if (character.isMain()) {
                 bestScoreForThisCharacter += MAIN_CHARACTER_MATCH_MULTIPLIER;
+                logger.trace("... ... ... Added main character bonus ({}). New score: {}", MAIN_CHARACTER_MATCH_MULTIPLIER, bestScoreForThisCharacter);
             }
 
             // The player's overall best score is the best they can get from any of their characters.
@@ -305,6 +366,7 @@ public class Matchmaker {
             }
         }
 
+        logger.trace("... Player '{}': Best score from all characters: {}.", player.getName(), bestScoreForPlayer);
         return bestScoreForPlayer;
     }
 
@@ -317,6 +379,9 @@ public class Matchmaker {
     }
 
     public void setGroups(List<Group> groups) {
+        if (groups != null) {
+            logger.debug("Setting {} groups for matchmaker.", groups.size());
+        }
         this.groups = groups;
     }
 
@@ -325,6 +390,9 @@ public class Matchmaker {
     }
 
     public void setPlayers(List<Player> players) {
+        if (players != null) {
+            logger.debug("Setting {} players for matchmaker.", players.size());
+        }
         this.players = players;
     }
 }

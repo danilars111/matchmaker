@@ -3,11 +3,14 @@ package org.poolen.backend.db.factories;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A factory for creating Group objects, ensuring consistent creation logic.
@@ -15,10 +18,13 @@ import java.util.List;
  */
 public class GroupFactory {
 
+    private static final Logger logger = LoggerFactory.getLogger(GroupFactory.class);
     private static final GroupFactory INSTANCE = new GroupFactory();
 
     // Private constructor to enforce the singleton pattern
-    private GroupFactory() {}
+    private GroupFactory() {
+        logger.info("GroupFactory initialised (singleton).");
+    }
 
     /**
      * Gets the single instance of the GroupFactory.
@@ -35,6 +41,8 @@ public class GroupFactory {
      * @return The newly created Group object.
      */
     public Group create(Player dungeonMaster, List<House> houses) {
+        String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
+        logger.info("Creating new group for DM '{}' with {} houses for the upcoming Friday.", dmName, houses.size());
         return create(dungeonMaster, houses, getNextFriday());
     }
 
@@ -47,6 +55,10 @@ public class GroupFactory {
      * @return The newly created Group object.
      */
     public Group create(Player dungeonMaster, List<House> houses, LocalDate date) {
+        String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
+        logger.debug("Creating new group (DM: '{}', Houses: [{}], Date: {})",
+                dmName, houses.stream().map(House::name).collect(Collectors.joining(", ")), date);
+        // Note: Group constructor is not logged here, assuming it will be logged if we add logging to the Group entity itself.
         return new Group(dungeonMaster, houses, date);
     }
 
@@ -58,6 +70,9 @@ public class GroupFactory {
      * @return The newly created Group object.
      */
     public Group create(Player dungeonMaster, List<House> houses, List<Player> party) {
+        String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
+        logger.info("Creating new group for DM '{}' with {} houses and {} party members for the upcoming Friday.",
+                dmName, houses.size(), party.size());
         return create(dungeonMaster, houses, getNextFriday(), party);
     }
 
@@ -71,13 +86,20 @@ public class GroupFactory {
      * @throws IllegalArgumentException if the DM is also in the party list.
      */
     public Group create(Player dungeonMaster, List<House> houses, LocalDate date, List<Player> party) {
-        if (party.stream().anyMatch(p -> p.getUuid().equals(dungeonMaster.getUuid()))) {
-            throw new IllegalArgumentException("A Dungeon Master cannot be a player in their own group, you cheeky thing!");
+        String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
+        logger.debug("Creating new group (DM: '{}', Houses: [{}], Date: {}, Party Size: {})",
+                dmName, houses.stream().map(House::name).collect(Collectors.joining(", ")), date, party.size());
+
+        if (dungeonMaster != null && party.stream().anyMatch(p -> p.getUuid().equals(dungeonMaster.getUuid()))) {
+            String errorMsg = String.format("A Dungeon Master (%s) cannot be a player in their own group.", dmName);
+            logger.warn(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
         }
 
         Group newGroup = new Group(dungeonMaster, houses, date);
         party.forEach(newGroup::addPartyMember);
 
+        logger.info("Successfully created new group with UUID {} for DM '{}'.", newGroup.getUuid(), dmName);
         return newGroup;
     }
 
@@ -87,7 +109,7 @@ public class GroupFactory {
      * @return A LocalDate object for the next Friday.
      */
     private LocalDate getNextFriday() {
+        logger.trace("Calculating next Friday's date.");
         return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.FRIDAY));
     }
 }
-

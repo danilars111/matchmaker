@@ -1,5 +1,8 @@
 package org.poolen.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -10,25 +13,30 @@ import java.util.Properties;
  */
 public final class AppConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(AppConfig.class);
     private static final Properties properties = new Properties();
     private static final String APP_NAME;
 
     // A static initializer block to load the properties file once when the class is first used.
     static {
+        logger.info("Initialising AppConfig. Loading application.properties...");
+        String appNameProperty = null;
         try (InputStream input = AppConfig.class.getClassLoader().getResourceAsStream("application.properties")) {
             if (input == null) {
-                System.err.println("ERROR: Could not find application.properties file in classpath.");
+                logger.error("Could not find application.properties file in classpath. Application name will use a sensible default.");
                 // Set a sensible default name if the properties file is missing for any reason.
-                APP_NAME = "MatchmakerApp";
+                appNameProperty = "MatchmakerApp";
             } else {
                 properties.load(input);
-                APP_NAME = properties.getProperty("app.name");
+                appNameProperty = properties.getProperty("app.name");
+                logger.info("Successfully loaded application.properties.");
             }
         } catch (IOException ex) {
-            System.err.println("ERROR: Failed to load application properties.");
-            ex.printStackTrace();
+            logger.error("Failed to load application properties. This may cause issues.", ex);
             // In case of an error, throw an exception to make the problem obvious.
             throw new RuntimeException("Failed to load application properties", ex);
+        } finally {
+            APP_NAME = appNameProperty;
         }
     }
 
@@ -46,6 +54,7 @@ public final class AppConfig {
     public static String getAppName() {
         if (APP_NAME == null || APP_NAME.trim().isEmpty() || APP_NAME.startsWith("$")) {
             // This handles cases where the property is missing or Maven filtering didn't run
+            logger.warn("Application name property was null, empty, or unfiltered ('{}'). Returning default 'MatchmakerApp'.", APP_NAME);
             return "MatchmakerApp";
         }
         return APP_NAME;
