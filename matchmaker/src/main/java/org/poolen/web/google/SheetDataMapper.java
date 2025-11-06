@@ -50,7 +50,7 @@ public class SheetDataMapper {
         logger.info("Mapping {} groups to Google Sheets format.", groupsToLog.size());
         List<List<Object>> groupData = new ArrayList<>();
         // Get the deadline from our new setting!
-        int deadlineInWeeks = (Integer) settingsStore.getSetting(Settings.PersistenceSettings.RECAP_DEADLINE).getSettingValue();
+        Double deadlineInWeeks = ((Double) settingsStore.getSetting(Settings.PersistenceSettings.RECAP_DEADLINE).getSettingValue());
         logger.debug("Using recap deadline of {} weeks from settings.", deadlineInWeeks);
 
         for (Group group : groupsToLog) {
@@ -62,7 +62,7 @@ public class SheetDataMapper {
             }
 
             // Use the setting to calculate the deadline
-            LocalDate deadlineDate = sessionDate.plusWeeks(deadlineInWeeks);
+            LocalDate deadlineDate = sessionDate.plusWeeks(deadlineInWeeks.intValue());
 
             row.add(group.getDungeonMaster() != null ? group.getDungeonMaster().getName() : "N/A");
             String playerNames = group.getParty().values().stream()

@@ -66,6 +66,8 @@ public class ExportGroupsStage extends Stage {
     public void init(List<Group> groups, Window owner) {
         this.groups = groups;
         this.owner = owner;
+        initModality(Modality.WINDOW_MODAL);
+        initOwner(owner);
     }
     public void start() {
         if(groups == null || owner == null) {
@@ -75,8 +77,6 @@ public class ExportGroupsStage extends Stage {
         }
         logger.info("Initialising and showing ExportGroupsStage for {} groups.", groups.size());
 
-        initModality(Modality.WINDOW_MODAL);
-        initOwner(owner);
         setTitle("Export Groups");
 
         BorderPane root = new BorderPane();
