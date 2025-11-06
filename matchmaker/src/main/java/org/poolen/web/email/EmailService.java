@@ -80,7 +80,6 @@ public class EmailService {
             // Now for the attachment!
             FileSystemResource file = new FileSystemResource(new File(pathToAttachment));
 
-            // It's always a good girl's idea to check if the file actually exists!
             if (!file.exists()) {
                 logger.error("Attachment file not found at path: {}", pathToAttachment);
                 // We'll just log the error and not send the email

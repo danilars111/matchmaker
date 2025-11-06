@@ -75,7 +75,6 @@ public class ManagementStage extends Stage {
         addPlayerUpdateListener(groupTab);
         addPlayerUpdateListener(playerTab);
 
-
         makeTabDetachable(playerTab);
         makeTabDetachable(characterTab);
         makeTabDetachable(groupTab);
