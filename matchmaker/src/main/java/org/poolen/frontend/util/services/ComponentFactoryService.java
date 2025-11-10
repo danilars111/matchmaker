@@ -182,7 +182,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public GroupManagementTab getGroupManagementTab() {
         if (this.groupManagementTab == null) {
             logger.info("Creating singleton instance of GroupManagementTab.");
-            this.groupManagementTab = new GroupManagementTab(this,this, this, sheetsServiceManager, matchmaker);
+            this.groupManagementTab = new GroupManagementTab(this,this, this,
+                    sheetsServiceManager, uiTaskExecutor,matchmaker);
         }
         return this.groupManagementTab;
     }

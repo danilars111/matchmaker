@@ -13,17 +13,13 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
-import org.poolen.frontend.gui.LoginApplication;
-import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
-import org.poolen.frontend.gui.components.tabs.PersistenceTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
-import org.poolen.web.google.GoogleAuthManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +36,8 @@ import java.util.stream.Collectors;
 public class ManagementStage extends Stage {
 
     private static final Logger logger = LoggerFactory.getLogger(ManagementStage.class);
+    private static final int MIN_WIDTH = 1000;
+    private static final int MIN_HEIGHT = 700;
 
     private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
@@ -50,6 +48,9 @@ public class ManagementStage extends Stage {
         logger.info("Initialising ManagementStage...");
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
+
+        this.setMinWidth(MIN_WIDTH);
+        this.setMinHeight(MIN_HEIGHT);
 
         this.dmingPlayers = new HashMap<>();
         this.attendingPlayers = new HashMap<>();
@@ -163,7 +164,7 @@ public class ManagementStage extends Stage {
             new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
         });
 
-        Scene scene = new Scene(tabPane, 800, 500);
+        Scene scene = new Scene(tabPane, MIN_WIDTH, MIN_HEIGHT);
         setScene(scene);
         logger.debug("ManagementStage scene created and set.");
     }

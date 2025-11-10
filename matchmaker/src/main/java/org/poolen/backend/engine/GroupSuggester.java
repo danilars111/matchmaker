@@ -4,6 +4,7 @@ import com.google.ortools.graph.LinearSumAssignment;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.util.interfaces.UiUpdater;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,8 @@ public class GroupSuggester {
         logger.info("GroupSuggester initialised with {} DMs and {} players to match.", this.dungeonMasters.size(), this.playersToMatch.size());
     }
 
-    public List<House> suggestGroupThemes() {
+    public List<House> suggestGroupThemes(UiUpdater updater) {
+        updater.updateStatus("Suggesting group themes");
         logger.info("Suggesting group themes for {} DMs and {} players.", dungeonMasters.size(), playersToMatch.size());
         if (dungeonMasters.isEmpty() || playersToMatch.isEmpty()) {
             logger.warn("No dungeon masters or no players to match. Returning empty suggestion list.");
@@ -56,11 +58,16 @@ public class GroupSuggester {
 
         // Simulate matchmaking for each combination to find the one with the lowest potential cost
         for (List<House> combination : themeCombinations) {
-            long currentCost = calculateTotalCost(this.playersToMatch, combination);
+            long currentCost = calculateTotalCost(this.playersToMatch, combination, updater);
             logger.trace("Calculated cost for theme combination {}: {}", combination, currentCost);
             if (currentCost < minCost) {
+
+                updater.updateStatus("Optimal combination with cost %s".formatted(currentCost));
                 minCost = currentCost;
                 bestCombination = combination;
+                if(currentCost == 0) {
+                    break;
+                }
             }
         }
 
@@ -68,7 +75,7 @@ public class GroupSuggester {
         return bestCombination;
     }
 
-    private long calculateTotalCost(List<Player> players, List<House> themeCombination) {
+    private long calculateTotalCost(List<Player> players, List<House> themeCombination, UiUpdater updater) {
         if (players.isEmpty() || themeCombination.isEmpty()) {
             logger.warn("Cannot calculate cost: player list or theme combination is empty.");
             return Long.MAX_VALUE;
@@ -87,21 +94,18 @@ public class GroupSuggester {
         }
         int totalSlots = groupSizes.stream().mapToInt(Integer::intValue).sum();
         logger.trace("Calculated {} total slots with group sizes: {}", totalSlots, groupSizes);
-        // --------------------------------------------------------------------
 
         if (numPlayers > totalSlots) {
             logger.warn("Cannot calculate cost: More players ({}) than total slots ({}).", numPlayers, totalSlots);
             return Long.MAX_VALUE; // Safeguard
         }
 
-        // --- Step 2: Build the Slot-to-Group Map (Mirrors Matchmaker logic) ---
         List<Integer> slotToGroupMap = new ArrayList<>();
         for (int i = 0; i < numGroups; i++) {
             for (int j = 0; j < groupSizes.get(i); j++) {
                 slotToGroupMap.add(i);
             }
         }
-
         LinearSumAssignment assignment = new LinearSumAssignment();
         long totalCost = Long.MAX_VALUE;
         try {

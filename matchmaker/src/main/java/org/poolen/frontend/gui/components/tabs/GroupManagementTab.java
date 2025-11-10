@@ -3,6 +3,7 @@ package org.poolen.frontend.gui.components.tabs;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
+import javafx.stage.Window;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
@@ -20,6 +21,7 @@ import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.interfaces.providers.ViewProvider;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,15 +67,19 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Matchmaker matchmaker;
     private final StageProvider stageProvider;
     private final CoreProvider coreProvider;
+    private final UiTaskExecutor uiTaskExecutor;
+
 
     public GroupManagementTab(CoreProvider coreProvider, ViewProvider viewProvider, StageProvider stageProvider,
-                              SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker) {
+                              SheetsServiceManager sheetsServiceManager, UiTaskExecutor uiTaskExecutor,
+                              Matchmaker matchmaker) {
         super("Group Management");
 
         this.sheetsServiceManager = sheetsServiceManager;
         this.matchmaker = matchmaker;
         this.stageProvider = stageProvider;
         this.coreProvider = coreProvider;
+        this.uiTaskExecutor = uiTaskExecutor;
 
         this.root = new SplitPane();
         this.groupForm = viewProvider.getGroupFormView();
@@ -95,6 +101,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         logger.info("Starting GroupManagementTab.");
 
         this.newPartyMap = new HashMap<>();
+
+
         // Default the event date to the nearest upcoming Friday.
         this.eventDate = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
         logger.debug("Default event date set to: {}", eventDate);
@@ -119,11 +127,22 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupDisplayView.setOnDmUpdateRequest(this::handleDmUpdateRequestFromCard);
         groupDisplayView.setOnLocationUpdate(this::handleLocationUpdateFromCard);
         groupDisplayView.setOnDateSelected(this::handleDateChange);
+
+
+
         groupDisplayView.setOnSuggestionRequest(() -> {
             logger.debug("User requested group theme suggestions.");
             GroupSuggester suggester = new GroupSuggester(attendingPlayers.values(), dmingPlayers.values());
-            List<House> suggestions = suggester.suggestGroupThemes();
-            groupDisplayView.displaySuggestions(suggestions);
+
+            Window parentWindow = (getTabPane() != null && getTabPane().getScene() != null)
+                    ? getTabPane().getScene().getWindow()
+                    : null;
+
+            uiTaskExecutor.execute(parentWindow, "Suggesting groups...",
+                    "Group suggestions found..",
+                    (updater) -> suggester.suggestGroupThemes(updater),
+                    (result) -> groupDisplayView.displaySuggestions(result)
+                    );
         });
         groupDisplayView.setOnSuggestedGroupsCreate(this::handleCreateSuggestedGroups);
         groupDisplayView.setOnAutoPopulate(this::handleAutoPopulate);
@@ -283,9 +302,22 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 matchmaker.setPlayers(attendingPlayers.values().stream().filter(
                         player -> !dmingPlayers.containsKey(player.getUuid())).collect(Collectors.toList()));
                 matchmaker.setGroups(groups);
-                this.groups = matchmaker.match(); // The matchmaker returns the populated list.
-                logger.info("Matchmaker finished. {} groups populated.", groups.size());
-                cleanUp();
+
+                Window parentWindow = (getTabPane() != null && getTabPane().getScene() != null)
+                        ? getTabPane().getScene().getWindow()
+                        : null;
+
+                uiTaskExecutor.execute(parentWindow,
+                        "Matching Groups...",
+                        "Groups Matched Successfully..",
+                        (updater) -> matchmaker.match(),
+                        (result) -> {
+                            this.groups = result; // The matchmaker returns the populated list.
+                            logger.info("Matchmaker finished. {} groups populated.", groups.size());
+                            cleanUp();
+                });
+
+
             } else {
                 logger.info("User cancelled auto-population.");
             }

@@ -59,6 +59,17 @@ public abstract class BaseFormView<T> extends GridPane {
             logger.debug("UUID '{}' copied to clipboard.", uuidField.getText());
         });
 
+        double fixedWidth = 45;
+        double fixedHeight = 40;
+
+        copyButton.setMinWidth(fixedWidth);
+        copyButton.setPrefWidth(fixedWidth);
+        copyButton.setMaxWidth(fixedWidth);
+
+        copyButton.setMinHeight(fixedHeight);
+        copyButton.setPrefHeight(fixedHeight);
+        copyButton.setMaxHeight(fixedHeight);
+
         HBox uuidBox = new HBox(5, uuidField, copyButton);
         HBox.setHgrow(uuidField, Priority.ALWAYS);
 
