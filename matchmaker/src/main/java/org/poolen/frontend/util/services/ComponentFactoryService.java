@@ -37,6 +37,7 @@ import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
 import org.poolen.frontend.util.interfaces.providers.ViewProvider;
+import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final SheetsServiceManager sheetsServiceManager;
     private final Matchmaker matchmaker;
     private final ApplicationScriptService applicationScriptService;
+    private final GoogleAuthManager authManager;
 
     // Singleton components
     private ManagementStage managementStage;
@@ -79,6 +81,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
                                    CharacterFactory characterFactory, PlayerFactory playerFactory,
                                    SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker,
                                    ApplicationScriptService applicationScriptService,
+                                   GoogleAuthManager authManager,
                                    ConfigurableApplicationContext springContext) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
@@ -87,6 +90,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         this.sheetsServiceManager = sheetsServiceManager;
         this.matchmaker = matchmaker;
         this.applicationScriptService = applicationScriptService;
+        this.authManager = authManager;
         this.springContext = springContext;
         logger.info("ComponentFactoryService initialised with all required beans.");
     }
@@ -181,7 +185,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public PersistenceTab getPersistenceTab() {
         if (this.persistenceTab == null) {
             logger.info("Creating singleton instance of PersistenceTab.");
-            this.persistenceTab = new PersistenceTab(this, uiPersistenceService);
+            this.persistenceTab = new PersistenceTab(this, uiPersistenceService, authManager);
         }
         return this.persistenceTab;
     }

@@ -26,3 +26,4 @@ dependency-reduced-pom.xml
 
 ### Appliation Specifics ###
 /src/main/resources/credentials
+/.idea/

@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Handles the application's startup sequence logic.
@@ -25,6 +26,7 @@ public class StartupService {
     private final UiPersistenceService uiPersistenceService;
     private final UiGithubTaskService uiGithubTaskService;
     private final UiGoogleTaskService uiGoogleTaskService;
+    private final GoogleAuthManager authManager;
 
     /**
      * Constructs the service with its required dependencies.
@@ -37,11 +39,13 @@ public class StartupService {
     public StartupService(org.poolen.frontend.util.services.TestDataGenerator testDataGenerator,
                           UiPersistenceService uiPersistenceService,
                           UiGithubTaskService uiGithubTaskService,
-                          UiGoogleTaskService uiGoogleTaskService) {
+                          UiGoogleTaskService uiGoogleTaskService,
+                          GoogleAuthManager authManager) {
         this.testDataGenerator = testDataGenerator;
         this.uiPersistenceService = uiPersistenceService;
         this.uiGithubTaskService = uiGithubTaskService;
         this.uiGoogleTaskService = uiGoogleTaskService;
+        this.authManager = authManager;
         logger.info("StartupService initialised.");
     }
 
@@ -97,12 +101,26 @@ public class StartupService {
         // 3. Check for an existing session to welcome the user back.
         updater.updateStatus("Checking for existing session...");
         logger.info("Checking for stored Google credentials...");
-        if (GoogleAuthManager.hasStoredCredentials()) {
-            logger.info("Stored credentials found. Attempting to connect.");
+        try {
+            // We just try to connect. This will throw an exception if it fails.
             uiGoogleTaskService.connectWithStoredCredentials(updater);
+
+            // If we get here, it worked! We're logged in.
+            logger.info("Successfully connected with stored credentials.");
             uiPersistenceService.findAllWithProgress(updater);
-            logger.info("Successfully connected with stored credentials. Returning LOGIN_SUCCESSFUL status.");
+            logger.info("Returning LOGIN_SUCCESSFUL status.");
             return new StartupResult(StartupResult.Status.LOGIN_SUCCESSFUL);
+
+        } catch (IOException e) {
+            // This 'catch' block is now our "if (false)"
+            // It means no valid credentials were found, or the refresh failed.
+            logger.info("No valid stored credentials found (or connection failed). Proceeding to login screen.");
+            // We just let the method continue to the 'logged out' state...
+
+        } catch (Exception e) {
+            // It's also good to catch other unexpected errors!
+            logger.error("An unexpected error occurred during automatic login.", e);
+            // And still fall through to the 'logged out' state...
         }
 
         // 4. If nothing else, it's time to show the login screen.

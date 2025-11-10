@@ -53,6 +53,7 @@ public class LoginApplication extends Application {
     private UiGithubTaskService uiGithubTaskService;
     private CoreProvider coreProvider;
     private StartupService startupService;
+    private GoogleAuthManager authManager;
 
     // --- UI Components ---
     private Stage primaryStage;
@@ -254,6 +255,7 @@ public class LoginApplication extends Application {
         uiGithubTaskService = springContext.getBean(UiGithubTaskService.class);
         coreProvider = springContext.getBean(ComponentFactoryService.class);
         startupService = springContext.getBean(StartupService.class);
+        authManager = springContext.getBean(GoogleAuthManager.class);
         logger.info("All essential services have been initialised.");
     }
 
@@ -329,14 +331,14 @@ public class LoginApplication extends Application {
             hasAttemptedBindExceptionRetry = true;
             logger.warn("A BindException was detected, likely a port conflict. Attempting a graceful recovery.");
             Platform.runLater(() -> {
-                GoogleAuthManager.logout();
+                authManager.logout();
                 showLoginUI("A service is already running on the required port.\nPlease close other instances and try again.");
             });
             return;
         }
 
         logger.debug("Performing generic error handling: logging out user and showing an error dialog.");
-        GoogleAuthManager.logout();
+        authManager.logout();
         coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), root).showAndWait();
         showLoginUI("Something went wrong. Please try signing in again.");
     }

@@ -9,6 +9,8 @@ import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.db.store.Store;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -26,20 +28,29 @@ import java.util.regex.Pattern;
 /**
  * Manages all interactions with the Google Sheets API, including authentication,
  * reading data, and writing data.
+ *
+ * This bean is 'session' scoped, meaning a new instance is created for each
+ * user session. This is crucial for holding user-specific state like the
+ * 'sheetsService' instance.
  */
 @Service
+// @Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS) // You are right, my love! This isn't needed for this app!
 public class SheetsServiceManager {
 
     private static final Logger logger = LoggerFactory.getLogger(SheetsServiceManager.class);
-    private static Sheets sheetsService;
+
+    // This is now an instance field, tied to a specific user's session.
+    private Sheets sheetsService;
+
     private final SettingsStore settingsStore;
-
     private final SheetDataMapper sheetDataMapper;
+    private final GoogleAuthManager googleAuthManager; // Injected!
 
-    public SheetsServiceManager(SheetDataMapper sheetDataMapper, Store store) {
+    public SheetsServiceManager(SheetDataMapper sheetDataMapper, Store store, GoogleAuthManager googleAuthManager) {
         this.sheetDataMapper = sheetDataMapper;
         this.settingsStore = store.getSettingsStore();
-        logger.info("SheetsServiceManager initialised.");
+        this.googleAuthManager = googleAuthManager; // Store the injected auth manager
+        logger.info("SheetsServiceManager instance created (session-scoped).");
     }
 
     /**
@@ -49,18 +60,27 @@ public class SheetsServiceManager {
      */
     public void connect(Consumer<String> urlDisplayer) throws IOException {
         logger.info("Initiating new Google Sheets connection with user auth flow.");
-        Credential credential = GoogleAuthManager.getCredentials(urlDisplayer);
+        // Use the injected auth manager instance
+        Credential credential = googleAuthManager.authorizeNewUser(urlDisplayer);
+        if (credential == null) {
+            throw new IOException("Authorization was cancelled or failed.");
+        }
         buildSheetsService(credential);
         logger.info("Successfully connected and built Sheets service.");
     }
 
     /**
      * Connects to Google Sheets using already stored credentials.
-     * @throws IOException if stored credentials cannot be loaded.
+     * @throws IOException if stored credentials cannot be loaded or are invalid.
      */
     public void connectWithStoredCredentials() throws IOException {
         logger.info("Connecting to Google Sheets using stored credentials.");
-        Credential credential = GoogleAuthManager.loadStoredCredential();
+        // Use the injected auth manager and the new validation method
+        Credential credential = googleAuthManager.loadAndValidateStoredCredential();
+        if (credential == null) {
+            logger.warn("Failed to connect with stored credentials (not found or invalid).");
+            throw new IOException("No valid stored credentials found.");
+        }
         buildSheetsService(credential);
         logger.info("Successfully connected and built Sheets service with stored credentials.");
     }
@@ -70,10 +90,11 @@ public class SheetsServiceManager {
      * @param credential The authenticated user credential.
      */
     private void buildSheetsService(Credential credential) {
-        logger.info("Building Google Sheets service.");
-        sheetsService = new Sheets.Builder(
-                GoogleAuthManager.getHttpTransport(),
-                GoogleAuthManager.getJsonFactory(),
+        logger.info("Building Google Sheets service for this session.");
+        // Build the instance-specific sheetsService
+        this.sheetsService = new Sheets.Builder(
+                googleAuthManager.getHttpTransport(), // Use instance method
+                GoogleAuthManager.getJsonFactory(),   // This one is still static, and that's fine
                 credential)
                 .setApplicationName("Matchmaker")
                 .build();
@@ -83,7 +104,8 @@ public class SheetsServiceManager {
      * Appends the provided groups to the recap sheet and adds formatting.
      */
     public void appendGroupsToSheet(String spreadsheetId, List<Group> groups) throws IOException {
-        if (sheetsService == null) {
+        // Use the instance field
+        if (this.sheetsService == null) {
             logger.error("Cannot append groups: Sheets service is not initialised. Not connected to Google Sheets.");
             throw new IllegalStateException("Not connected to Google Sheets.");
         }
@@ -91,7 +113,8 @@ public class SheetsServiceManager {
         String recapSheetName = (String) settingsStore.getSetting(Settings.PersistenceSettings.RECAP_SHEET_NAME).getSettingValue();
         logger.info("Attempting to append {} groups to spreadsheet '{}', sheet '{}'.", groups.size(), spreadsheetId, recapSheetName);
 
-        ensureSheetAndHeaderExist(spreadsheetId, recapSheetName, SheetDataMapper.GROUPS_HEADER);
+        // Call the new instance method
+        this.ensureSheetAndHeaderExist(spreadsheetId, recapSheetName, SheetDataMapper.GROUPS_HEADER);
 
         List<List<Object>> valuesToAppend = sheetDataMapper.mapGroupsToSheet(groups);
         if (valuesToAppend.isEmpty()) {
@@ -100,7 +123,8 @@ public class SheetsServiceManager {
         }
 
         ValueRange body = new ValueRange().setValues(valuesToAppend);
-        AppendValuesResponse appendResponse = sheetsService.spreadsheets().values()
+        // Use the instance field
+        AppendValuesResponse appendResponse = this.sheetsService.spreadsheets().values()
                 .append(spreadsheetId, recapSheetName, body)
                 .setValueInputOption("USER_ENTERED")
                 .setInsertDataOption("INSERT_ROWS")
@@ -108,11 +132,14 @@ public class SheetsServiceManager {
                 .execute();
 
         logger.info("Successfully appended {} rows of data. Updated range: {}", valuesToAppend.size(), appendResponse.getUpdates().getUpdatedRange());
-        reformatGroupSheet(spreadsheetId, recapSheetName, appendResponse);
+        // Call the new instance method
+        this.reformatGroupSheet(spreadsheetId, recapSheetName, appendResponse);
     }
 
-    private static void reformatGroupSheet(String spreadsheetId, String sheetName, AppendValuesResponse appendResponse) throws IOException {
-        Spreadsheet spreadsheet = sheetsService.spreadsheets().get(spreadsheetId).setFields("sheets.properties").execute();
+    // No longer static!
+    private void reformatGroupSheet(String spreadsheetId, String sheetName, AppendValuesResponse appendResponse) throws IOException {
+        // Use the instance field
+        Spreadsheet spreadsheet = this.sheetsService.spreadsheets().get(spreadsheetId).setFields("sheets.properties").execute();
         Integer sheetId = spreadsheet.getSheets().stream()
                 .filter(s -> s.getProperties().getTitle().equals(sheetName))
                 .map(s -> s.getProperties().getSheetId())
@@ -125,7 +152,8 @@ public class SheetsServiceManager {
         }
         logger.info("Attempting to reformat group sheet '{}' (ID: {}) after appending.", sheetName, sheetId);
 
-        ValueRange fullSheetData = sheetsService.spreadsheets().values().get(spreadsheetId, sheetName).execute();
+        // Use the instance field
+        ValueRange fullSheetData = this.sheetsService.spreadsheets().values().get(spreadsheetId, sheetName).execute();
         List<List<Object>> allValues = fullSheetData.getValues();
         if (allValues == null || allValues.size() <= 1) {
             logger.warn("No data found in sheet '{}' after append. Aborting reformatting.", sheetName);
@@ -192,15 +220,17 @@ public class SheetsServiceManager {
         if (!requests.isEmpty()) {
             logger.debug("Applying {} formatting requests to sheet '{}'.", requests.size(), sheetName);
             BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest().setRequests(requests);
-            sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdate).execute();
+            // Use the instance field
+            this.sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdate).execute();
             logger.info("Successfully applied all formatting requests.");
         }
     }
 
-
-    private static void ensureSheetExists(String spreadsheetId, String sheetName) throws IOException {
+    // No longer static!
+    private void ensureSheetExists(String spreadsheetId, String sheetName) throws IOException {
         logger.info("Ensuring sheet '{}' exists in spreadsheet '{}'.", sheetName, spreadsheetId);
-        Spreadsheet spreadsheet = sheetsService.spreadsheets().get(spreadsheetId).execute();
+        // Use the instance field
+        Spreadsheet spreadsheet = this.sheetsService.spreadsheets().get(spreadsheetId).execute();
         boolean sheetExists = spreadsheet.getSheets().stream()
                 .anyMatch(s -> s.getProperties().getTitle().equals(sheetName));
 
@@ -212,22 +242,27 @@ public class SheetsServiceManager {
             BatchUpdateSpreadsheetRequest body = new BatchUpdateSpreadsheetRequest()
                     .setRequests(Collections.singletonList(new Request().setAddSheet(addSheetRequest)));
 
-            sheetsService.spreadsheets().batchUpdate(spreadsheetId, body).execute();
+            // Use the instance field
+            this.sheetsService.spreadsheets().batchUpdate(spreadsheetId, body).execute();
             logger.info("Sheet '{}' created successfully.", sheetName);
         } else {
             logger.debug("Sheet '{}' already exists.", sheetName);
         }
     }
 
-    private static void ensureSheetAndHeaderExist(String spreadsheetId, String sheetName, List<Object> header) throws IOException {
+    // No longer static!
+    private void ensureSheetAndHeaderExist(String spreadsheetId, String sheetName, List<Object> header) throws IOException {
         logger.info("Ensuring sheet '{}' exists and has the correct header.", sheetName);
-        ensureSheetExists(spreadsheetId, sheetName);
+        // Call the new instance method
+        this.ensureSheetExists(spreadsheetId, sheetName);
 
-        ValueRange response = sheetsService.spreadsheets().values().get(spreadsheetId, sheetName).execute();
+        // Use the instance field
+        ValueRange response = this.sheetsService.spreadsheets().values().get(spreadsheetId, sheetName).execute();
         if (response.getValues() == null || response.getValues().isEmpty()) {
             logger.info("Sheet '{}' is empty. Writing header row.", sheetName);
             ValueRange headerBody = new ValueRange().setValues(Collections.singletonList(header));
-            sheetsService.spreadsheets().values()
+            // Use the instance field
+            this.sheetsService.spreadsheets().values()
                     .update(spreadsheetId, sheetName, headerBody)
                     .setValueInputOption("USER_ENTERED")
                     .execute();

@@ -37,12 +37,15 @@ public class PersistenceTab extends Tab {
     private Runnable onLogoutRequestHandler;
     private final UiPersistenceService uiPersistenceService;
     private final CoreProvider coreProvider;
+    private final GoogleAuthManager authManager;
 
-    public PersistenceTab(CoreProvider coreProvider, UiPersistenceService uiPersistenceService) {
+    public PersistenceTab(CoreProvider coreProvider, UiPersistenceService uiPersistenceService,
+                          GoogleAuthManager authManager) {
         super("Persistence");
 
         this.uiPersistenceService = uiPersistenceService;
         this.coreProvider = coreProvider;
+        this.authManager = authManager;
 
         // --- UI Components ---
         signInButton = createGoogleSignInButton();
@@ -128,7 +131,7 @@ public class PersistenceTab extends Tab {
             @Override
             protected Boolean call() throws Exception {
                 logger.trace("Background task started to check for stored credentials.");
-                return GoogleAuthManager.hasStoredCredentials();
+                return authManager.loadAndValidateStoredCredential() != null;
             }
 
             @Override
