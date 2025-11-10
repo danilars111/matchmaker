@@ -203,7 +203,6 @@ public class ExportGroupsStage extends Stage {
 
         logger.debug("Spreadsheet ID is present. Starting background task to write groups.");
         runTask("Writing to Google Sheets...", () -> {
-            //sheetsServiceManager.saveData(spreadsheetId);
             sheetsServiceManager.appendGroupsToSheet(spreadsheetId, groups);
             return "Groups have been written to the sheet.";
         });

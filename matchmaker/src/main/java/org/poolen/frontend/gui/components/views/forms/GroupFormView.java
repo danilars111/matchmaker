@@ -11,6 +11,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Separator;
+import javafx.scene.control.TextField; // Import the TextField class
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -37,6 +38,7 @@ public class GroupFormView extends BaseFormView<Group> {
     private static final Logger logger = LoggerFactory.getLogger(GroupFormView.class);
 
     private ComboBox<Object> dmComboBox;
+    private TextField locationField; // Add a field for the location
     private Map<House, CheckBox> houseCheckBoxes;
     private Button deleteButton;
     private Button showPlayersButton;
@@ -97,6 +99,11 @@ public class GroupFormView extends BaseFormView<Group> {
             houseGrid.add(cb, i % 2, i / 2);
         }
 
+        // --- Add Location Field ---
+        locationField = new TextField();
+        locationField.setPromptText("Enter session location (e.g., Room 5)");
+        locationField.setMaxWidth(Double.MAX_VALUE);
+
         showPlayersButton = new Button("Show Players");
         showPlayersButton.setMaxWidth(Double.MAX_VALUE);
         showPlayersButton.setStyle("-fx-background-color: #6A5ACD; -fx-text-fill: white;");
@@ -108,14 +115,16 @@ public class GroupFormView extends BaseFormView<Group> {
         add(dmComboBox, 0, 3);
         add(new Label("House Themes:"), 0, 4);
         add(houseGrid, 0, 5);
-        add(showPlayersButton, 0, 6);
-        add(deleteButton, 0, 7);
+        add(new Label("Location:"), 0, 6); // Add label for location
+        add(locationField, 0, 7);         // Add location field
+        add(showPlayersButton, 0, 8);     // Shift row index
+        add(deleteButton, 0, 9);          // Shift row index
 
         // Add the common controls from the parent at the end
         VBox spacer = new VBox();
         GridPane.setVgrow(spacer, Priority.ALWAYS);
-        add(spacer, 0, 8);
-        add(mainActionsBox, 0, 9);
+        add(spacer, 0, 10);               // Shift row index
+        add(mainActionsBox, 0, 11);       // Shift row index
     }
 
     @Override
@@ -132,6 +141,8 @@ public class GroupFormView extends BaseFormView<Group> {
         } else {
             dmComboBox.setValue(group.getDungeonMaster());
         }
+        // Assuming Group has a getLocation() method
+        locationField.setText(group.getLocation() != null ? group.getLocation() : "");
         houseCheckBoxes.forEach((house, checkBox) -> checkBox.setSelected(group.getHouses().contains(house)));
         actionButton.setText("Update");
         actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
@@ -143,6 +154,7 @@ public class GroupFormView extends BaseFormView<Group> {
         super.clearForm();
         logger.debug("Clearing group-specific fields.");
         dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
+        locationField.clear(); // Clear the location field
         houseCheckBoxes.values().forEach(cb -> cb.setSelected(false));
         actionButton.setText("Create");
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
@@ -154,6 +166,18 @@ public class GroupFormView extends BaseFormView<Group> {
     public Player getSelectedDm() {
         Object selected = dmComboBox.getValue();
         return (selected instanceof Player) ? (Player) selected : null;
+    }
+
+    /**
+     * Gets the text from the location field.
+     * @return The location string, or null if the field is blank.
+     */
+    public String getSelectedLocation() {
+        String loc = locationField.getText();
+        if (loc == null || loc.trim().isEmpty()) {
+            return null;
+        }
+        return loc.trim();
     }
 
     public List<House> getSelectedHouses() {

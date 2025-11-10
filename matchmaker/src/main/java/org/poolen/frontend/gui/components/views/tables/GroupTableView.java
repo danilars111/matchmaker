@@ -15,6 +15,7 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField; // Import TextField
 import javafx.scene.control.TitledPane;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.ClipboardContent;
@@ -36,6 +37,7 @@ import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects; // Import Objects
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -50,17 +52,19 @@ public class GroupTableView extends TitledPane {
     private static final DataFormat PLAYER_TRANSFER_FORMAT = new DataFormat("application/x-player-transfer");
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
 
-    private final TableView<Player> partyTable;
+    private final TableView<Player> partyTable = new TableView<>();
     private final Button editButton;
     private final Button deleteButton;
     private Group currentGroup;
     private PlayerMoveHandler onPlayerMoveHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
+    private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler; // Handler for location
 
     private final Label dmNameLabel;
     private final Label themesLabel;
     private final Label partySizeLabel;
     private final ComboBox<Object> dmComboBox;
+    private final TextField locationField; // Field for location
     private boolean isUpdatingComboBox = false;
 
     public GroupTableView() {
@@ -88,6 +92,7 @@ public class GroupTableView extends TitledPane {
         // --- Information Header ---
         dmComboBox = new ComboBox<>();
         dmComboBox.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(dmComboBox, Priority.ALWAYS); // Make it grow
         setupDmComboBoxCellFactory();
 
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -107,15 +112,33 @@ public class GroupTableView extends TitledPane {
             }
         });
 
+        // --- Location Field ---
+        locationField = new TextField();
+        locationField.setPromptText("Location");
+        locationField.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(locationField, Priority.ALWAYS); // Make it grow
+
+        // Add listeners to save on focus lost or "Enter"
+        locationField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused) { // Lost focus
+                saveLocation();
+            }
+        });
+        locationField.setOnAction(e -> { // Pressed Enter
+            saveLocation();
+            partyTable.requestFocus(); // Move focus away
+        });
+
+
         editButton = new Button("Edit");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        HBox infoHeader = new HBox(5, dmComboBox, headerSpacer, editButton);
+        // Add locationField to the info header HBox
+        HBox infoHeader = new HBox(5, dmComboBox, locationField, headerSpacer, editButton);
         infoHeader.setAlignment(Pos.CENTER_LEFT);
         infoHeader.setPadding(new Insets(5, 10, 0, 10));
 
         // --- Party Roster Table ---
-        partyTable = new TableView<>();
         setupDragAndDrop();
 
         TableColumn<Player, Void> rowNumCol = new TableColumn<>("#");
@@ -148,6 +171,30 @@ public class GroupTableView extends TitledPane {
         this.setExpanded(true);
     }
 
+    /**
+     * Helper method to save the location field's value back to the group.
+     */
+    private void saveLocation() {
+        if (currentGroup == null || onLocationUpdateRequestHandler == null) return;
+
+        String newLocation = locationField.getText();
+        if (newLocation != null) newLocation = newLocation.trim();
+        if (newLocation != null && newLocation.isEmpty()) newLocation = null; // Treat empty string as null
+
+        String oldLocation = currentGroup.getLocation();
+
+        // Only fire the update if the value has actually changed
+        if (Objects.equals(newLocation, oldLocation)) {
+            return;
+        }
+
+        boolean success = onLocationUpdateRequestHandler.apply(currentGroup, newLocation);
+        if (!success) {
+            // If the handler (e.g., in GroupManagementTab) reports failure, revert.
+            locationField.setText(oldLocation);
+        }
+    }
+
     public void setGroup(Group group) {
         this.currentGroup = group;
         String dmName = group.getDungeonMaster() != null ? group.getDungeonMaster().getName() : "N/A";
@@ -165,9 +212,13 @@ public class GroupTableView extends TitledPane {
         } else {
             dmComboBox.setValue(group.getDungeonMaster());
         }
+
+        // Populate the location field
+        locationField.setText(group.getLocation() != null ? group.getLocation() : "");
     }
 
     public void setDmList(Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms) {
+        isUpdatingComboBox = true; // Add this flag
         Player currentDmForThisGroup = currentGroup != null ? currentGroup.getDungeonMaster() : null;
 
         Object selectedDm = dmComboBox.getValue();
@@ -200,6 +251,7 @@ public class GroupTableView extends TitledPane {
         } else {
             dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
         }
+        isUpdatingComboBox = false; // Release this flag
     }
 
     private void setupDmComboBoxCellFactory() {
@@ -277,6 +329,8 @@ public class GroupTableView extends TitledPane {
         });
     }
 
+
+
     public void setOnEditAction(Consumer<Group> onEdit) {
         editButton.setOnAction(e -> {
             if (currentGroup != null) onEdit.accept(currentGroup);
@@ -296,5 +350,13 @@ public class GroupTableView extends TitledPane {
     public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
         this.onDmUpdateRequestHandler = handler;
     }
-}
 
+    /**
+     * Sets the handler to be called when the location is updated.
+     * The handler receives the Group and the new location String, and should return true on success.
+     * @param handler The function to execute on location update.
+     */
+    public void setOnLocationUpdate(BiFunction<Group, String, Boolean> handler) {
+        this.onLocationUpdateRequestHandler = handler;
+    }
+}

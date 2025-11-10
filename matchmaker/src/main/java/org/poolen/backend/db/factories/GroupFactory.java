@@ -59,7 +59,7 @@ public class GroupFactory {
         logger.debug("Creating new group (DM: '{}', Houses: [{}], Date: {})",
                 dmName, houses.stream().map(House::name).collect(Collectors.joining(", ")), date);
         // Note: Group constructor is not logged here, assuming it will be logged if we add logging to the Group entity itself.
-        return new Group(dungeonMaster, houses, date);
+        return new Group(dungeonMaster, houses, date, null);
     }
 
     /**
@@ -69,23 +69,24 @@ public class GroupFactory {
      * @param party A list of players to add to the group.
      * @return The newly created Group object.
      */
-    public Group create(Player dungeonMaster, List<House> houses, List<Player> party) {
+    public Group create(Player dungeonMaster, List<House> houses, String location, List<Player> party) {
         String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
         logger.info("Creating new group for DM '{}' with {} houses and {} party members for the upcoming Friday.",
                 dmName, houses.size(), party.size());
-        return create(dungeonMaster, houses, getNextFriday(), party);
+        return create(dungeonMaster, houses, getNextFriday(), location, party);
     }
 
     /**
-     * Creates a new group with a pre-filled party and one or more house themes for a specific date.
+     * Creates a new group with a pre-filled party and one or more house themes for a specific date and location.
      * @param dungeonMaster The player who will be the DM.
      * @param houses A list of house themes for the group.
      * @param date The specific date for the session.
+     * @param party The specific location for the session.
      * @param party A list of players to add to the group.
      * @return The newly created Group object.
      * @throws IllegalArgumentException if the DM is also in the party list.
      */
-    public Group create(Player dungeonMaster, List<House> houses, LocalDate date, List<Player> party) {
+    public Group create(Player dungeonMaster, List<House> houses, LocalDate date, String location, List<Player> party) {
         String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
         logger.debug("Creating new group (DM: '{}', Houses: [{}], Date: {}, Party Size: {})",
                 dmName, houses.stream().map(House::name).collect(Collectors.joining(", ")), date, party.size());
@@ -96,7 +97,7 @@ public class GroupFactory {
             throw new IllegalArgumentException(errorMsg);
         }
 
-        Group newGroup = new Group(dungeonMaster, houses, date);
+        Group newGroup = new Group(dungeonMaster, houses, date, location);
         party.forEach(newGroup::addPartyMember);
 
         logger.info("Successfully created new group with UUID {} for DM '{}'.", newGroup.getUuid(), dmName);

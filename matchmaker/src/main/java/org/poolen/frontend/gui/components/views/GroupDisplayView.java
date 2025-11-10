@@ -62,6 +62,7 @@ public class GroupDisplayView extends BorderPane {
     private Runnable onAutoPopulateHandler;
     private Runnable onExportRequestHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
+    private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler; // Add this line
     private Consumer<LocalDate> onDateSelectedHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
@@ -248,11 +249,12 @@ public class GroupDisplayView extends BorderPane {
 
         for (Group group : currentGroups) {
             GroupTableView groupCard = new GroupTableView();
-            groupCard.setGroup(group);
+            groupCard.setGroup(group); // This will pass the group with the new location
             if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
             if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
             if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
             if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
+            if (onLocationUpdateRequestHandler != null) groupCard.setOnLocationUpdate(onLocationUpdateRequestHandler); // Add this line
             if (dmingPlayers != null && allAssignedDms != null) groupCard.setDmList(dmingPlayers, allAssignedDms);
 
             groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
@@ -314,6 +316,14 @@ public class GroupDisplayView extends BorderPane {
 
     public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
         this.onDmUpdateRequestHandler = handler;
+    }
+
+    /**
+     * Sets the handler for when a group's location is updated from its card.
+     * @param handler The handler function.
+     */
+    public void setOnLocationUpdate(BiFunction<Group, String, Boolean> handler) {
+        this.onLocationUpdateRequestHandler = handler;
     }
 
     public void setOnDateSelected(Consumer<LocalDate> handler) {

@@ -117,6 +117,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         groupDisplayView.setOnGroupDelete(this::handleDeleteFromCard);
         groupDisplayView.setOnPlayerMove(this::handlePlayerMove);
         groupDisplayView.setOnDmUpdateRequest(this::handleDmUpdateRequestFromCard);
+        groupDisplayView.setOnLocationUpdate(this::handleLocationUpdateFromCard);
         groupDisplayView.setOnDateSelected(this::handleDateChange);
         groupDisplayView.setOnSuggestionRequest(() -> {
             logger.debug("User requested group theme suggestions.");
@@ -221,6 +222,20 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         return true;
     }
 
+    /**
+     * Handles the quick-update of a group's location directly from its GroupTableView card.
+     * @param groupToUpdate The group to modify.
+     * @param newLocation The new location string.
+     * @return true, indicating the update was successful.
+     */
+    private boolean handleLocationUpdateFromCard(Group groupToUpdate, String newLocation) {
+        logger.info("Updating location for group '{}' from card view to '{}'.", groupToUpdate.getUuid(), newLocation);
+        groupToUpdate.setLocation(newLocation);
+        // No cleanup() needed here as this change doesn't affect other groups' states
+        // The Group object in the 'groups' list is updated by reference.
+        return true;
+    }
+
 
     private void updateDmList() {
         Group groupBeingEdited = groupForm.getItemBeingEdited();
@@ -280,7 +295,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private void handleCreateSuggestedGroups(List<House> themes) {
         logger.info("Creating {} suggested groups based on themes.", themes.size());
         for (House theme : themes) {
-            groups.add(groupFactory.create(null, List.of(theme), eventDate, new ArrayList<>()));
+            // Passing null for location as it's not specified in this context
+            groups.add(groupFactory.create(null, List.of(theme), eventDate, null, new ArrayList<>()));
         }
         cleanUp();
     }
@@ -288,8 +304,11 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private void handleGroupAction() {
         Group groupToEdit = (Group) groupForm.getItemBeingEdited();
         Player selectedDm = groupForm.getSelectedDm();
+        String selectedLocation = groupForm.getSelectedLocation(); // Get location from form
+
         if (groupToEdit == null) {
-            logger.info("Creating a new group with DM '{}' and {} party members.", selectedDm != null ? selectedDm.getName() : "None", newPartyMap.size());
+            logger.info("Creating a new group with DM '{}', location '{}', and {} party members.",
+                    selectedDm != null ? selectedDm.getName() : "None", selectedLocation, newPartyMap.size());
             // Logic for applying pending changes before creation
             dmsToReassignAsPlayer.keySet().forEach(Group::removeDungeonMaster);
             playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
@@ -298,7 +317,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 Group source = findGroupForPlayer(player);
                 if (source != null) source.removePartyMember(player);
             });
-            groups.add(groupFactory.create(selectedDm, groupForm.getSelectedHouses(), eventDate, new ArrayList<>(newPartyMap.values())));
+            // Use the factory method that includes location
+            groups.add(groupFactory.create(selectedDm, groupForm.getSelectedHouses(), eventDate, selectedLocation, new ArrayList<>(newPartyMap.values())));
         } else {
             logger.info("Updating existing group '{}'.", groupToEdit.getUuid());
             // Logic for applying pending changes during update
@@ -311,6 +331,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 groupToEdit.setDungeonMaster(selectedDm);
             }
             groupToEdit.setHouses(groupForm.getSelectedHouses());
+            groupToEdit.setLocation(selectedLocation); // Update the group's location
         }
         cleanUp();
     }

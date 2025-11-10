@@ -21,12 +21,14 @@ public class Group {
     private Map<UUID, Player> party;
     private List<House> houses;
     private LocalDate date;
+    private String location;
 
-    public Group(Player dungeonMaster, List<House> houses, LocalDate date) {
+    public Group(Player dungeonMaster, List<House> houses, LocalDate date, String location) {
         this.uuid = UUID.randomUUID();
         this.dungeonMaster = dungeonMaster;
         this.houses = new ArrayList<>(houses); // Create a mutable copy
         this.date = date;
+        this.location = location;
         this.party = new HashMap<>();
     }
 
@@ -60,6 +62,7 @@ public class Group {
 
         String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "_Unassigned_";
         sb.append("**Dungeon Master:** ").append(dmName).append("\n");
+        sb.append("**Location:** ").append(location).append("\n");
 
         String houseThemes = houses.stream()
                 .map(house -> {
@@ -70,7 +73,7 @@ public class Group {
         if (houseThemes.isEmpty()) {
             houseThemes = "_None_";
         }
-        sb.append("**House Themes:** ").append(houseThemes).append("\n");
+        sb.append("**Geode(s):** ").append(houseThemes).append("\n");
 
         sb.append("**Party Members (" + party.size() + "):**\n");
         if (party.isEmpty()) {
@@ -99,6 +102,14 @@ public class Group {
 
     public Map<UUID, Player> getParty() {
         return Collections.unmodifiableMap(party);
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public void addPartyMember(Player player) {

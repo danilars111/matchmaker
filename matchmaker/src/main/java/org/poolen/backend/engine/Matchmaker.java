@@ -233,7 +233,7 @@ public class Matchmaker {
 
         // --- The Fix! ---
         // The new Group constructor needs the list of houses from the original group.
-        Group hypotheticalGroup = new Group(originalGroup.getDungeonMaster(), originalGroup.getHouses(), LocalDate.now());
+        Group hypotheticalGroup = new Group(originalGroup.getDungeonMaster(), originalGroup.getHouses(), LocalDate.now(), null);
         hypotheticalParty.forEach(hypotheticalGroup::addPartyMember);
 
         return calculateTotalScoreForGroup(hypotheticalGroup);
