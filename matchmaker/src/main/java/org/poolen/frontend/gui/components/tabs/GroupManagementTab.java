@@ -381,7 +381,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             if (response.isPresent() && response.get() == ButtonType.YES) {
                 logger.info("User confirmed reassigning DM '{}' as a player.", player.getName());
                 dmsToReassignAsPlayer.put(dmSourceGroup, player);
-                Group targetGroup = (Group) groupForm.getItemBeingEdited();
+                Group targetGroup = groupForm.getItemBeingEdited();
                 if (targetGroup != null) targetGroup.addPartyMember(player);
                 else newPartyMap.put(player.getUuid(), player);
                 return true;

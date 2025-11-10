@@ -1,8 +1,6 @@
 package org.poolen.frontend.util.services;
 
-import jakarta.annotation.PostConstruct;
 import javafx.scene.Node;
-import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.CharacterFactory;
 import org.poolen.backend.db.factories.PlayerFactory;
 import org.poolen.backend.db.store.Store;
@@ -57,6 +55,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final Matchmaker matchmaker;
     private final ApplicationScriptService applicationScriptService;
     private final GoogleAuthManager authManager;
+    private final UiGoogleTaskService uiGoogleTaskService;
+    private final UiTaskExecutor uiTaskExecutor;
 
     // Singleton components
     private ManagementStage managementStage;
@@ -82,6 +82,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
                                    SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker,
                                    ApplicationScriptService applicationScriptService,
                                    GoogleAuthManager authManager,
+                                   UiGoogleTaskService uiGoogleTaskService,
+                                   UiTaskExecutor uiTaskExecutor,
                                    ConfigurableApplicationContext springContext) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
@@ -91,6 +93,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         this.matchmaker = matchmaker;
         this.applicationScriptService = applicationScriptService;
         this.authManager = authManager;
+        this.uiGoogleTaskService = uiGoogleTaskService;
+        this.uiTaskExecutor = uiTaskExecutor;
         this.springContext = springContext;
         logger.info("ComponentFactoryService initialised with all required beans.");
     }
@@ -159,7 +163,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public ExportGroupsStage getExportGroupsStage() {
         if(this.exportGroupsStage == null) {
             logger.info("Creating singleton instance of ExportGroupsStage.");
-            this.exportGroupsStage = new ExportGroupsStage(this, sheetsServiceManager, store);
+            this.exportGroupsStage = new ExportGroupsStage(this, sheetsServiceManager, store, authManager);
         }
         return this.exportGroupsStage;
     }
@@ -199,7 +203,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public SettingsTab getSettingsTab() {
         if (this.settingsTab == null) {
             logger.info("Creating singleton instance of SettingsTab.");
-            this.settingsTab = new SettingsTab(this, uiPersistenceService, store, this);
+            this.settingsTab = new SettingsTab(this, uiPersistenceService, store,
+                    this, authManager, uiTaskExecutor, uiGoogleTaskService);
         }
         return this.settingsTab;
     }

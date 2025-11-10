@@ -26,6 +26,7 @@ import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.web.discord.DiscordWebhookManager;
+import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,51 +50,39 @@ public class ExportGroupsStage extends Stage {
 
     private final SettingsStore settingsStore;
     private List<Group> groups;
-    private VBox loadingBox;
-    private Button writeToSheetButton;
-    private Button postToDiscordButton;
-    private Button closeButton;
-    private TextArea markdownArea;
+    private final VBox loadingBox; // We create this in the constructor now, darling!
+    private final Button writeToSheetButton;
+    private final Button postToDiscordButton;
+    private final Button closeButton;
+    private final TextArea markdownArea;
     private final SheetsServiceManager sheetsServiceManager;
-    private Window owner;
+    private final GoogleAuthManager authManager;
+    private Window owner; // This will be set in init()
     private final CoreProvider coreProvider;
+    private final HBox buttonBox;
+    private final Label copyStatusLabel;
 
-    public ExportGroupsStage(CoreProvider coreProvider, SheetsServiceManager sheetsServiceManager, SettingStoreProvider storeProvider) {
+    public ExportGroupsStage(CoreProvider coreProvider, SheetsServiceManager sheetsServiceManager,
+                             SettingStoreProvider storeProvider, GoogleAuthManager authManager) {
         this.settingsStore = storeProvider.getSettingsStore();
         this.sheetsServiceManager = sheetsServiceManager;
         this.coreProvider = coreProvider;
-    }
-    public void init(List<Group> groups, Window owner) {
-        this.groups = groups;
-        this.owner = owner;
-        initModality(Modality.WINDOW_MODAL);
-        initOwner(owner);
-    }
-    public void start() {
-        if(groups == null || owner == null) {
-            String errorMsg = String.format("%s has not been initialized correctly.", this.getClass().getSimpleName());
-            logger.error(errorMsg);
-            throw new IllegalStateException(errorMsg);
-        }
-        logger.info("Initialising and showing ExportGroupsStage for {} groups.", groups.size());
+        this.authManager = authManager;
 
-        setTitle("Export Groups");
-
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(15));
+        // We create them all *once* in the constructor so they are never null!
+        logger.debug("ExportGroupsStage constructor: Initialising UI components.");
 
         // --- Markdown Text Area ---
-        this.markdownArea = new TextArea(generateMarkdown(groups));
+        this.markdownArea = new TextArea();
         markdownArea.setWrapText(true);
         markdownArea.setEditable(false);
         markdownArea.setStyle("-fx-font-family: 'monospaced';");
-        root.setCenter(markdownArea);
 
         // --- Loading Indicator (initially hidden) ---
+        // We'll add the label in the runTask method!
         loadingBox = new VBox(10, new ProgressIndicator());
         loadingBox.setAlignment(Pos.CENTER);
         loadingBox.setVisible(false);
-
 
         // --- Buttons ---
         writeToSheetButton = new Button("Write to Sheets");
@@ -105,7 +94,7 @@ public class ExportGroupsStage extends Stage {
         postToDiscordButton.setOnAction(e -> handlePostToDiscord());
 
         Button copyButton = new Button("Copy to Clipboard");
-        Label copyStatusLabel = new Label();
+        copyStatusLabel = new Label(); // We need to see this later!
 
         copyButton.setOnAction(e -> {
             try {
@@ -132,14 +121,55 @@ public class ExportGroupsStage extends Stage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox buttonBox = new HBox(10, copyButton, copyStatusLabel, spacer, postToDiscordButton, writeToSheetButton, closeButton);
+        buttonBox = new HBox(10, copyButton, copyStatusLabel, spacer, postToDiscordButton, writeToSheetButton, closeButton);
         buttonBox.setAlignment(Pos.CENTER_LEFT);
         BorderPane.setMargin(buttonBox, new Insets(15, 0, 0, 0));
-        root.setBottom(buttonBox);
+        // --- All components are now ready! ---
+    }
 
-        Scene scene = new Scene(root, 700, 450);
-        setScene(scene);
-        logger.debug("ExportGroupsStage UI constructed and scene is set.");
+    public void init(List<Group> groups, Window owner) {
+        this.groups = groups;
+        this.owner = owner;
+        // We only call these *one time* setup methods if the owner hasn't been set yet!
+        if (getOwner() == null) {
+            logger.debug("First-time init. Setting modality and owner.");
+            initModality(Modality.WINDOW_MODAL);
+            initOwner(owner);
+        } else {
+            logger.debug("Re-running init. Modality and owner are already set.");
+        }
+    }
+    public void start() {
+        if(groups == null || owner == null) {
+            String errorMsg = String.format("%s has not been initialized correctly.", this.getClass().getSimpleName());
+            logger.error(errorMsg);
+            throw new IllegalStateException(errorMsg);
+        }
+        logger.info("Initialising and showing ExportGroupsStage for {} groups.", groups.size());
+
+        // We only build the UI *once*, the very first time!
+        if (getScene() == null) {
+            logger.debug("Scene is null. Assembling ExportGroupsStage UI for the first time.");
+            setTitle("Export Groups");
+
+            // We just *use* our components, we don't create them here!
+            BorderPane root = new BorderPane();
+            root.setPadding(new Insets(15));
+            root.setCenter(markdownArea);
+            root.setBottom(buttonBox);
+
+            Scene scene = new Scene(root, 700, 450);
+            setScene(scene);
+            logger.debug("ExportGroupsStage UI constructed and scene is set.");
+        }
+        writeToSheetButton.setDisable(authManager.loadAndValidateStoredCredential() == null);
+
+        // This makes sure that if we re-open, the text is new
+        // and we're not stuck on the "loading" screen!
+        logger.debug("Refreshing content and resetting view for stage.");
+        markdownArea.setText(generateMarkdown(groups));
+        copyStatusLabel.setText(""); // Reset the "Copied!" label
+        restoreOriginalView();
     }
 
     private void handlePostToDiscord() {
@@ -184,7 +214,7 @@ public class ExportGroupsStage extends Stage {
         BorderPane rootPane = (BorderPane) getScene().getRoot();
         // The loadingBox now needs a Label.
         Label loadingLabel = new Label(loadingMessage);
-        loadingBox.getChildren().setAll(loadingLabel, new ProgressIndicator());
+        loadingBox.getChildren().setAll(loadingLabel, new ProgressIndicator()); // This is safer!
         rootPane.setCenter(loadingBox);
         loadingBox.setVisible(true);
         setAllButtonsDisabled(true);
@@ -215,6 +245,11 @@ public class ExportGroupsStage extends Stage {
     }
 
     private void restoreOriginalView() {
+        // We need to check if the scene is null, just in case!
+        if (getScene() == null || getScene().getRoot() == null) {
+            logger.debug("restoreOriginalView called, but scene/root is null. Skipping.");
+            return;
+        }
         logger.debug("Restoring original view after task completion.");
         BorderPane rootPane = (BorderPane) getScene().getRoot();
         rootPane.setCenter(markdownArea);
@@ -223,7 +258,6 @@ public class ExportGroupsStage extends Stage {
     }
 
     private void setAllButtonsDisabled(boolean disabled) {
-        writeToSheetButton.setDisable(disabled);
         postToDiscordButton.setDisable(disabled);
         closeButton.setDisable(disabled);
     }

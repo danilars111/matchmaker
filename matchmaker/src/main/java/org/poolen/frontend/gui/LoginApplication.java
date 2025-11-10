@@ -9,6 +9,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
@@ -16,6 +17,8 @@ import org.poolen.MatchmakerApplication;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
+import org.poolen.frontend.gui.components.stages.email.AccessRequestStage;
+import org.poolen.web.google.GoogleAuthManager.AuthorizationTimeoutException;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.*;
 import org.poolen.util.PropertiesManager;
@@ -61,6 +64,7 @@ public class LoginApplication extends Application {
     private Label statusLabel;
     private Button signInButton;
     private Label continueOfflineLabel;
+    private Button requestAccessButton;
     private Button exitButton;
     private ProgressIndicator loadingIndicator;
 
@@ -157,19 +161,42 @@ public class LoginApplication extends Application {
         signInButton.setVisible(false);
         signInButton.setOnAction(e -> handleUserLogin());
 
+        // Let's create our new button!
+        requestAccessButton = new Button("Request Access");
+        requestAccessButton.setVisible(true);
+        requestAccessButton.setOnAction(e -> handleRequestAccess());
+
         continueOfflineLabel = new Label("Continue without signing in");
         continueOfflineLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true;");
         continueOfflineLabel.setCursor(Cursor.HAND);
-        continueOfflineLabel.setOnMouseClicked(e -> showManagementStage());
+        continueOfflineLabel.setOnMouseClicked(e -> {
+            uiTaskExecutor.execute(
+                    primaryStage, "Connecting...", "Successfully connected!",
+                    (updater) -> {
+                        logger.debug("Fetching data from DB.");
+                        uiPersistenceService.findAllWithProgress(updater);
+                        return "unused";
+                    },
+                    (result) -> {
+                        logger.info("Data fetch successful.");
+                        showManagementStage();
+                    },
+                    this::handleStartupError // Reuse the same error handler
+            );
+        });
         continueOfflineLabel.setVisible(false);
 
         exitButton = new Button("Exit");
-        exitButton.setStyle("-fx-font-size: 14px; -fx-background-color: #6c757d; -fx-text-fill: white;");
-        exitButton.setVisible(false);
+        exitButton.setVisible(true); // Always visible!
         exitButton.setOnAction(e -> Platform.exit());
 
+        // Our new side-by-side button row!
+        HBox buttonRow = new HBox(10, requestAccessButton, exitButton);
+        buttonRow.setAlignment(Pos.CENTER);
+
         VBox.setMargin(continueOfflineLabel, new Insets(-10, 0, 0, 0));
-        root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, continueOfflineLabel, exitButton);
+        // VBox.setMargin(requestAccessButton, new Insets(5, 0, 0, 0)); // We don't need this margin anymore!
+        root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, continueOfflineLabel, buttonRow);
 
         Scene scene = new Scene(root, 450, 300);
         primaryStage.setScene(scene);
@@ -187,6 +214,7 @@ public class LoginApplication extends Application {
         loadingIndicator.setVisible(false);
         signInButton.setVisible(true);
         continueOfflineLabel.setVisible(true);
+        requestAccessButton.setVisible(true); // Just to be sure!
         exitButton.setVisible(true);
     }
 
@@ -198,6 +226,16 @@ public class LoginApplication extends Application {
         primaryStage.close();
         ManagementStage managementStage = springContext.getBean(ComponentFactoryService.class).getManagementStage();
         managementStage.show();
+    }
+
+    /**
+     * This is our new handler, just for that button!
+     */
+    private void handleRequestAccess() {
+        logger.info("User clicked 'Request Access'. Opening AccessRequestStage.");
+        // We just use the springContext we already have, darling!
+        AccessRequestStage accessStage = new AccessRequestStage(springContext);
+        accessStage.show();
     }
 
     /**
@@ -330,17 +368,34 @@ public class LoginApplication extends Application {
         if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
             hasAttemptedBindExceptionRetry = true;
             logger.warn("A BindException was detected, likely a port conflict. Attempting a graceful recovery.");
-            Platform.runLater(() -> {
-                authManager.logout();
-                showLoginUI("A service is already running on the required port.\nPlease close other instances and try again.");
-            });
             return;
         }
 
-        logger.debug("Performing generic error handling: logging out user and showing an error dialog.");
-        authManager.logout();
-        coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), root).showAndWait();
-        showLoginUI("Something went wrong. Please try signing in again.");
+        if (isRootCauseTimeoutException(error)) {
+            logger.warn("Authorization timed out, likely a 403. Showing 'Request Access' button.");
+            Platform.runLater(() -> {
+                statusLabel.setText("Login timed out.\nThis may be because you are not an approved user.");
+                loadingIndicator.setVisible(false);
+                signInButton.setVisible(true);
+                continueOfflineLabel.setVisible(true);
+            });
+            return;
+        }
+        uiTaskExecutor.execute(
+                primaryStage, "Disconnecting...", "Successfully disconnected!",
+                (updater) -> {
+                    logger.debug("Performing generic error handling: disconnecting user and showing an error dialog.");
+                    uiGoogleTaskService.disconnectFromGoogle(updater);
+                    return "unused";
+                },
+                (result) -> {
+                    logger.info("Diconnection successful.");
+                    Platform.runLater(() -> {
+                        coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), root).showAndWait();
+                    });
+                    showLoginUI("Something went wrong. Please try signing in again.");
+                }
+        );
     }
 
 
@@ -426,6 +481,26 @@ public class LoginApplication extends Application {
             depth++;
         }
         logger.debug("No BindException found in the exception chain.");
+        return false;
+    }
+
+    /**
+     * Traverses the cause chain of an exception to find our new TimeoutException.
+     * This is our trigger to show the "Request Access" button!
+     */
+    private boolean isRootCauseTimeoutException(Throwable throwable) {
+        logger.debug("Checking exception chain for a root cause of AuthorizationTimeoutException.");
+        Throwable cause = throwable;
+        int depth = 0;
+        while (cause != null) {
+            if (cause instanceof AuthorizationTimeoutException) {
+                logger.warn("Found AuthorizationTimeoutException at depth {} in the cause chain.", depth);
+                return true;
+            }
+            cause = cause.getCause();
+            depth++;
+        }
+        logger.debug("No AuthorizationTimeoutException found in the exception chain.");
         return false;
     }
 }

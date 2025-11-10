@@ -79,6 +79,7 @@ public class SheetsServiceManager {
         Credential credential = googleAuthManager.loadAndValidateStoredCredential();
         if (credential == null) {
             logger.warn("Failed to connect with stored credentials (not found or invalid).");
+            disconnectSheetService();
             throw new IOException("No valid stored credentials found.");
         }
         buildSheetsService(credential);
@@ -270,5 +271,10 @@ public class SheetsServiceManager {
         } else {
             logger.debug("Sheet '{}' already has content. Assuming header exists.", sheetName);
         }
+    }
+
+    public void disconnectSheetService() {
+        logger.info("Disconnecting from Google Sheets. Clearing in-memory service.");
+        this.sheetsService = null;
     }
 }

@@ -54,6 +54,16 @@ public class UiGoogleTaskService {
         logger.info("Connection process complete.");
     }
 
+    public void disconnectFromGoogle(UiUpdater updater) {
+        logger.info("Starting Google disconnect process...");
+        updater.updateStatus("Attempting to disconnect from Google");
+
+        authManager.logout();
+        sheetsServiceManager.disconnectSheetService();
+
+        logger.info("Disconnection process complete.");
+    }
+
     /**
      * Our fabulous new express path for auto-login!
      */

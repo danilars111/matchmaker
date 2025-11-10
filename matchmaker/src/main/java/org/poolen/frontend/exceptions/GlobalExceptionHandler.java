@@ -43,16 +43,36 @@ public class GlobalExceptionHandler implements Thread.UncaughtExceptionHandler {
         logger.error("--- END OF EXCEPTION ---");
 
         // We MUST show the GUI on the JavaFX thread, or it will throw *another* tantrum!
-        // What a diva!
         Platform.runLater(() -> {
-            // Create and show our lovely new pop-up window
-            new CrashReportStage(e, springContext).showAndWait();
 
-            // After the window is closed (either by sending or just closing),
-            // we do a controlled shutdown.
-            logger.info("Shutting down after crash report.");
-            Platform.exit();
-            System.exit(1); // Use a non-zero exit code to signal an error
+            // --- HERE IS OUR BOMB-PROOF FIX, MY LOVE! ---
+            try {
+                // 1. We TRY to create our lovely new pop-up window
+                CrashReportStage crashStage = new CrashReportStage(e, springContext);
+
+                // 2. We set the shutdown logic to run *after* the window is closed!
+                crashStage.setOnHidden(event -> {
+                    logger.info("Shutting down after crash report.");
+                    Platform.exit();
+                    System.exit(1); // Use a non-zero exit code to signal an error
+                });
+
+                // 3. Now, we can just *show* it, which is safe and won't be closed!
+                crashStage.show();
+
+            } catch (Throwable innerError) {
+                // OH MY GODDESS, THE LIFEBOAT IS SINKING!
+                // This means our CrashReportStage *itself* failed to even be created.
+                // We can't show a GUI, so we just log this catastrophic failure
+                // and shut down immediately.
+                logger.error("--- CATASTROPHIC FAILURE IN EXCEPTION HANDLER ---");
+                logger.error("The CrashReportStage failed to launch. This is a critical bug.", innerError);
+                logger.error("The original exception that we *tried* to report was:", e);
+
+                // We have no UI, just exit.
+                Platform.exit();
+                System.exit(1);
+            }
         });
     }
 }

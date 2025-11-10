@@ -33,10 +33,19 @@ public class CrashReportStage extends BaseEmailFormStage {
 
     public CrashReportStage(Throwable e, ConfigurableApplicationContext context) {
         // Pass the context to the parent constructor
-        super(context);
+        super(context); // This will call createFormContent()
+
+        // --- OUR FIX, MY LOVE! ---
+        // The super() constructor has run, and createFormContent() has
+        // created our stackTraceArea, but it's empty.
+        // NOW, we can safely set our field and update the text area!
         this.exception = e;
-        // The rest of the UI setup is handled by the base class constructor,
-        // which will call our abstract methods.
+        if (stackTraceArea != null) {
+            stackTraceArea.setText(getStackTraceAsString(this.exception));
+        } else {
+            // This should never happen, but it's a good safeguard!
+            logger.error("stackTraceArea was null after super() constructor!");
+        }
     }
 
     @Override
@@ -75,7 +84,10 @@ public class CrashReportStage extends BaseEmailFormStage {
         userInfoArea.setWrapText(true);
         userInfoArea.setPrefHeight(80);
 
-        stackTraceArea = new TextArea(getStackTraceAsString(exception));
+        // --- OUR FIX, MY LOVE! ---
+        // We create the text area, but we *don't* set its text here!
+        // The 'exception' field is still null at this point!
+        stackTraceArea = new TextArea(); // No text set here!
         stackTraceArea.setEditable(false);
         stackTraceArea.setWrapText(true);
         TitledPane stackTracePane = new TitledPane("Error Details", stackTraceArea);
@@ -156,6 +168,11 @@ public class CrashReportStage extends BaseEmailFormStage {
      * A tidy little helper to get the stack trace as a string.
      */
     private String getStackTraceAsString(Throwable e) {
+        // We can even add a little safety check, just in case!
+        if (e == null) {
+            logger.error("getStackTraceAsString called with a null exception!");
+            return "Error: Exception was null.";
+        }
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
         e.printStackTrace(pw);

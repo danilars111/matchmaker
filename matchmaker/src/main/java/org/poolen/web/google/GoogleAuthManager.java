@@ -76,13 +76,21 @@ public class GoogleAuthManager {
      */
     private volatile LocalServerReceiver receiver;
     private volatile boolean timedOut = false;
-
     /**
      * Custom exception for when the user explicitly denies access in the Google consent screen.
      */
     public static class AccessDeniedException extends IOException {
         public AccessDeniedException(String message, Throwable cause) {
             super(message, cause);
+        }
+    }
+
+    /**
+     * Custom exception for when the login times out.
+     */
+    public static class AuthorizationTimeoutException extends IOException {
+        public AuthorizationTimeoutException(String message) {
+            super(message);
         }
     }
 
@@ -179,7 +187,7 @@ public class GoogleAuthManager {
                     authTimer.cancel();
                     if (timedOut) {
                         LOGGER.warn("waitForCode() returned null, and timeout flag is true.");
-                        throw new IOException("Authorization timed out.");
+                        throw new AuthorizationTimeoutException("Authorization timed out.");
                     } else {
                         LOGGER.warn("waitForCode() returned null, but no timeout. Assuming manual cancel.");
                         return null; // Or throw a "Cancelled" exception

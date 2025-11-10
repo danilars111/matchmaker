@@ -1,6 +1,5 @@
 package org.poolen.frontend.util.services;
 
-import jakarta.annotation.PostConstruct;
 import org.poolen.frontend.util.interfaces.UiUpdater;
 import org.poolen.web.github.GitHubUpdateChecker;
 import org.poolen.web.google.GoogleAuthManager;
