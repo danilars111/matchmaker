@@ -11,6 +11,7 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextArea;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -41,6 +42,9 @@ public class LoadingOverlay {
     private final TextArea detailsText;
     private final Button copyButton;
 
+    // Our beautiful new cancel button, darling!
+    private final Button cancelButton;
+
     public LoadingOverlay() {
         // --- Create the visual components ---
         statusLabel = new Label();
@@ -70,13 +74,25 @@ public class LoadingOverlay {
         detailsText.setEditable(false);
         detailsText.setWrapText(true);
         detailsText.setPrefHeight(80);
+
         copyButton = new Button("Copy to Clipboard");
         copyButton.setOnAction(e -> {
             logger.info("User copied details to clipboard.");
             Clipboard.getSystemClipboard().setContent(new ClipboardContent(){{putString(detailsText.getText());}});
             copyButton.setText("Copied!");
         });
-        detailsBox.getChildren().addAll(detailsLabel, detailsText, copyButton);
+
+        // Create our new button!
+        cancelButton = new Button("Cancel");
+        // We'll hide it by default, our showDetails method will control it!
+        cancelButton.setVisible(false);
+        cancelButton.setManaged(false);
+
+        // Let's put our buttons side-by-side in their own little box!
+        HBox buttonBox = new HBox(10, copyButton, cancelButton);
+        buttonBox.setAlignment(Pos.CENTER);
+
+        detailsBox.getChildren().addAll(detailsLabel, detailsText, buttonBox); // Add the HBox
         detailsBox.setVisible(false);
 
         VBox loadingBox = new VBox(20, statusLabel, iconPane, detailsBox);
@@ -101,6 +117,11 @@ public class LoadingOverlay {
         checkMark.setVisible(false);
         detailsBox.setVisible(false);
         copyButton.setText("Copy to Clipboard");
+
+        // Make sure our cancel button is reset
+        cancelButton.setVisible(false);
+        cancelButton.setManaged(false);
+
         statusLabel.setText(initialMessage);
 
         this.originalRoot = scene.getRoot();
@@ -139,6 +160,11 @@ public class LoadingOverlay {
         statusLabel.setText(successMessage);
         progressIndicator.setVisible(false);
         detailsBox.setVisible(false);
+
+        // Make sure our cancel button is reset
+        cancelButton.setVisible(false);
+        cancelButton.setManaged(false);
+
         checkMark.setVisible(true);
 
         PauseTransition delay = new PauseTransition(Duration.millis(500));
@@ -147,14 +173,40 @@ public class LoadingOverlay {
     }
 
     /**
-     * A lovely new method to show our details box with a custom label!
+     * Show our details box with a custom label!
+     * This version hides the cancel button.
      * @param label The text for the label above the text area.
      * @param details The text to display in the main text area.
      */
     public void showDetails(String label, String details) {
-        logger.info("Displaying details box with label: '{}'", label);
+        // Just call our new, main method with no action!
+        showDetails(label, details, null);
+    }
+
+    /**
+     * Shows the details box with an
+     * optional, fully customisable cancel button!
+     * @param label The text for the label above the text area.
+     * @param details The text to display in the main text area.
+     * @param onCancelAction The action (as a Runnable) to perform when cancel is clicked.
+     * If null, the cancel button is hidden.
+     */
+    public void showDetails(String label, String details, Runnable onCancelAction) {
+        logger.info("Displaying details box with label: '{}', cancelable: {}", label, (onCancelAction != null));
         detailsLabel.setText(label);
         detailsText.setText(details);
+
+        boolean showCancel = (onCancelAction != null);
+
+        if (showCancel) {
+            // Set the action for our button
+            cancelButton.setOnAction(e -> onCancelAction.run());
+        }
+
+        // Show/hide the button!
+        cancelButton.setVisible(showCancel);
+        cancelButton.setManaged(showCancel);
+
         detailsBox.setVisible(true);
     }
 

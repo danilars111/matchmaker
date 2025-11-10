@@ -93,7 +93,6 @@ public class PropertiesManager {
             logger.debug("Loaded default properties template from resources.");
         }
 
-        // --- NEW! Load the Email Keys from our resource JSON ---
         try (InputStream jsonStream = PropertiesManager.class.getResourceAsStream(EMAIL_CREDENTIALS_FILE)) {
             if (jsonStream == null) {
                 logger.error("Email credentials file not found in JAR at: {}", EMAIL_CREDENTIALS_FILE);
@@ -122,7 +121,6 @@ public class PropertiesManager {
             logger.error("Failed to read or parse {}: {}", EMAIL_CREDENTIALS_FILE, e.getMessage(), e);
             throw e; // Re-throw so we know something went wrong
         }
-        // ----------------------------------------------------
 
         return props;
     }

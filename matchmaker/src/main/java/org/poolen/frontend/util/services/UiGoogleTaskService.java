@@ -2,6 +2,7 @@ package org.poolen.frontend.util.services;
 
 import javafx.stage.Window;
 import org.poolen.frontend.util.interfaces.UiUpdater;
+import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,11 +22,14 @@ public class UiGoogleTaskService {
 
     private final SheetsServiceManager sheetsServiceManager;
     private final UiTaskExecutor uiTaskExecutor;
+    private final GoogleAuthManager authManager;
 
     @Autowired
-    public UiGoogleTaskService(SheetsServiceManager sheetsServiceManager, UiTaskExecutor uiTaskExecutor) {
+    public UiGoogleTaskService(SheetsServiceManager sheetsServiceManager, GoogleAuthManager authManager,
+                               UiTaskExecutor uiTaskExecutor) {
         this.sheetsServiceManager = sheetsServiceManager;
         this.uiTaskExecutor = uiTaskExecutor;
+        this.authManager = authManager;
         logger.info("UiGoogleTaskService initialised.");
     }
 
@@ -44,7 +48,8 @@ public class UiGoogleTaskService {
         // It uses our updater to show the details in the overlay.
         sheetsServiceManager.connect(url -> {
             logger.debug("Received authorization URL. Displaying to user.");
-            updater.showDetails("If your browser doesn't open, please use this link:", url);
+            updater.showDetails("If your browser doesn't open, please use this link:", url,
+                    authManager::abortAuthorization);
         });
         logger.info("Connection process complete.");
     }

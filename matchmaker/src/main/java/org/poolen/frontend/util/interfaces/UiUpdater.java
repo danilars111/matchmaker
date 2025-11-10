@@ -16,5 +16,5 @@ public interface UiUpdater {
      * @param label The text for the label above the text area.
      * @param details The text to display in the main text area.
      */
-    void showDetails(String label, String details);
+    void showDetails(String label, String details, Runnable onCancelAction);
 }

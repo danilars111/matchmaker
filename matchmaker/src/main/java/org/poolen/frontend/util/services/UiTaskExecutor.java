@@ -46,8 +46,8 @@ public class UiTaskExecutor {
             }
 
             @Override
-            public void showDetails(String label, String details) {
-                Platform.runLater(() -> overlay.showDetails(label, details));
+            public void showDetails(String label, String details, Runnable onCancelAction) {
+                Platform.runLater(() -> overlay.showDetails(label, details, onCancelAction));
             }
         };
 
