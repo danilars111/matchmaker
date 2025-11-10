@@ -2,15 +2,13 @@ package org.poolen.frontend.gui.components.views;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.geometry.VPos;
 import javafx.scene.control.Button;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TitledPane;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.ColumnConstraints;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane; // Import FlowPane
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -40,7 +38,7 @@ public class GroupDisplayView extends BorderPane {
 
     private static final Logger logger = LoggerFactory.getLogger(GroupDisplayView.class);
 
-    private final GridPane groupGrid;
+    private final FlowPane groupFlowPane; // Replaced GridPane with FlowPane
     private final StackPane contentPane;
     private final Button suggestButton;
     private final Button createSuggestedButton;
@@ -62,22 +60,21 @@ public class GroupDisplayView extends BorderPane {
     private Runnable onAutoPopulateHandler;
     private Runnable onExportRequestHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
-    private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler; // Add this line
+    private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler;
     private Consumer<LocalDate> onDateSelectedHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
     private Map<UUID, Player> dmingPlayers;
     private Set<Player> allAssignedDms;
     private final List<GroupTableView> groupCards = new ArrayList<>();
-    private static final double ESTIMATED_CARD_WIDTH = 200.0;
-    private int lastColumnCount = -1;
+    private static final double CARD_WIDTH = 450.0; // A fixed, reasonable width for our cards
 
     public GroupDisplayView() {
         super();
-        this.groupGrid = new GridPane();
-        groupGrid.setHgap(10);
-        groupGrid.setVgap(10);
-        groupGrid.setPadding(new Insets(10));
+        // --- Replaced GridPane with FlowPane ---
+        this.groupFlowPane = new FlowPane(10, 10); // Set HGap and VGap to 10
+        groupFlowPane.setPadding(new Insets(10));
+        groupFlowPane.setAlignment(Pos.TOP_CENTER); // <-- This is the magic line!
 
         // --- Suggestion UI ---
         suggestButton = new Button("Suggest Groups");
@@ -155,7 +152,7 @@ public class GroupDisplayView extends BorderPane {
         footer.setAlignment(Pos.CENTER_LEFT);
 
         // --- Center Content ---
-        gridScrollPane = new ScrollPane(groupGrid);
+        gridScrollPane = new ScrollPane(groupFlowPane); // Point ScrollPane to the FlowPane
         gridScrollPane.setFitToWidth(true);
         gridScrollPane.setStyle("-fx-background-color: transparent;");
 
@@ -166,9 +163,6 @@ public class GroupDisplayView extends BorderPane {
         this.setCenter(contentPane);
         this.setBottom(footer);
 
-        this.widthProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal.doubleValue() > 0) updateGridLayout(newVal.doubleValue());
-        });
         logger.info("GroupDisplayView initialised.");
     }
 
@@ -195,8 +189,7 @@ public class GroupDisplayView extends BorderPane {
             gridScrollPane.setVisible(true);
 
             suggestionContainer.setVisible(false);
-            this.lastColumnCount = -1;
-            updateGridLayout(this.getWidth());
+            rebuildGroupCards(); // Replaced call to updateGridLayout
         }
     }
 
@@ -220,55 +213,6 @@ public class GroupDisplayView extends BorderPane {
             }
             createSuggestedButton.setVisible(true);
         }
-    }
-
-    private void updateGridLayout(double currentWidth) {
-        if (currentGroups == null || currentWidth <= 0) return;
-
-        int newMaxCols = (int) (currentWidth / ESTIMATED_CARD_WIDTH);
-        if (newMaxCols < 1) newMaxCols = 1;
-        if (currentGroups.size() > 0) {
-            newMaxCols = Math.min(newMaxCols, currentGroups.size());
-        }
-        if (newMaxCols == lastColumnCount) return;
-        logger.debug("Updating grid layout. Current width: {}. New column count: {}.", currentWidth, newMaxCols);
-        this.lastColumnCount = newMaxCols;
-
-        groupCards.clear();
-        groupGrid.getChildren().clear();
-        groupGrid.getColumnConstraints().clear();
-
-        for (int i = 0; i < newMaxCols; i++) {
-            ColumnConstraints colConst = new ColumnConstraints();
-            colConst.setHgrow(Priority.ALWAYS);
-            groupGrid.getColumnConstraints().add(colConst);
-        }
-
-        int col = 0;
-        int row = 0;
-
-        for (Group group : currentGroups) {
-            GroupTableView groupCard = new GroupTableView();
-            groupCard.setGroup(group); // This will pass the group with the new location
-            if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
-            if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
-            if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
-            if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
-            if (onLocationUpdateRequestHandler != null) groupCard.setOnLocationUpdate(onLocationUpdateRequestHandler); // Add this line
-            if (dmingPlayers != null && allAssignedDms != null) groupCard.setDmList(dmingPlayers, allAssignedDms);
-
-            groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
-            groupCards.add(groupCard);
-            GridPane.setValignment(groupCard, VPos.TOP);
-            groupGrid.add(groupCard, col, row);
-
-            col++;
-            if (col >= newMaxCols) {
-                col = 0;
-                row++;
-            }
-        }
-        updateExpandCollapseButtons();
     }
 
     private void setAllCardsExpanded(boolean expanded) {
@@ -316,6 +260,36 @@ public class GroupDisplayView extends BorderPane {
 
     public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
         this.onDmUpdateRequestHandler = handler;
+    }
+
+    /**
+     * Rebuilds the group cards in the FlowPane.
+     * This is much simpler than the old grid layout logic!
+     */
+    private void rebuildGroupCards() {
+        groupCards.clear();
+        groupFlowPane.getChildren().clear();
+
+        for (Group group : currentGroups) {
+            GroupTableView groupCard = new GroupTableView();
+            groupCard.setGroup(group); // This will pass the group with the new location
+            if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
+            if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
+            if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
+            if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
+            if (onLocationUpdateRequestHandler != null) groupCard.setOnLocationUpdate(onLocationUpdateRequestHandler);
+            if (dmingPlayers != null && allAssignedDms != null) groupCard.setDmList(dmingPlayers, allAssignedDms);
+
+            // --- This is the important part ---
+            // We give the card a fixed preferred width, and the FlowPane handles the rest.
+            groupCard.setPrefWidth(CARD_WIDTH);
+            groupCard.setMinWidth(CARD_WIDTH); // Ensure it doesn't shrink smaller
+
+            groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
+            groupCards.add(groupCard);
+            groupFlowPane.getChildren().add(groupCard); // Add directly to the FlowPane
+        }
+        updateExpandCollapseButtons();
     }
 
     /**

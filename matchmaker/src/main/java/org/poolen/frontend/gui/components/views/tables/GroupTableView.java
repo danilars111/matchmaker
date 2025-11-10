@@ -52,7 +52,7 @@ public class GroupTableView extends TitledPane {
     private static final DataFormat PLAYER_TRANSFER_FORMAT = new DataFormat("application/x-player-transfer");
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
 
-    private final TableView<Player> partyTable = new TableView<>();
+    private final TableView<Player> partyTable = new TableView<>();;
     private final Button editButton;
     private final Button deleteButton;
     private Group currentGroup;
@@ -130,9 +130,10 @@ public class GroupTableView extends TitledPane {
         });
 
 
-        editButton = new Button("Edit");
+        editButton = new Button("Edit"); // Changed from "Edit" to a pencil icon
+        //editButton.setStyle("-fx-font-size: 14px; -fx-padding: 3 8 3 8; -fx-background-color: #f0f0f0;"); // Added style for the icon button
         Region headerSpacer = new Region();
-        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        // HBox.setHgrow(headerSpacer, Priority.ALWAYS); // <-- Removed this line!
         // Add locationField to the info header HBox
         HBox infoHeader = new HBox(5, dmComboBox, locationField, headerSpacer, editButton);
         infoHeader.setAlignment(Pos.CENTER_LEFT);
