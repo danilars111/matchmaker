@@ -13,6 +13,7 @@ import org.poolen.frontend.gui.components.dialogs.InfoDialog;
 import org.poolen.frontend.gui.components.dialogs.UnsavedChangesDialog;
 import org.poolen.frontend.gui.components.overlays.LoadingOverlay;
 import org.poolen.frontend.gui.components.stages.ExportGroupsStage;
+import org.poolen.frontend.gui.components.stages.ImportMatcherStage;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
 import org.poolen.frontend.gui.components.stages.email.AccessRequestStage;
@@ -61,6 +62,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     // Singleton components
     private ManagementStage managementStage;
     private  ExportGroupsStage exportGroupsStage;
+    private ImportMatcherStage importMatcherStage;
     private CharacterManagementTab characterManagementTab;
     private GroupManagementTab groupManagementTab;
     private SheetsTab sheetsTab;
@@ -156,7 +158,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public ManagementStage getManagementStage() {
         if (this.managementStage == null) {
             logger.info("Creating singleton instance of ManagementStage.");
-            this.managementStage = new ManagementStage(this,this);
+            this.managementStage = new ManagementStage(this,this, this);
         }
         return this.managementStage;
     }
@@ -166,6 +168,15 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
             this.exportGroupsStage = new ExportGroupsStage(this, sheetsServiceManager, store, authManager);
         }
         return this.exportGroupsStage;
+    }
+
+    public ImportMatcherStage getImportMatcherStage() {
+        if (this.importMatcherStage == null) {
+            logger.info("Creating singleton instance of ImportMatcherStage.");
+            // We pass it all the things it needs, which this factory has!
+            this.importMatcherStage = new ImportMatcherStage(this, store, playerFactory, characterFactory);
+        }
+        return this.importMatcherStage;
     }
 
     /**********

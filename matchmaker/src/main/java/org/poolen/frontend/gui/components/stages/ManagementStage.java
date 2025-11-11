@@ -13,6 +13,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
@@ -20,6 +21,7 @@ import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.components.tabs.SheetsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
+import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
@@ -45,12 +47,18 @@ public class ManagementStage extends Stage {
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
-
-    // --- Look! We're saving this as a field now! ---
     private final SheetsTab sheetsTab;
+    private final CoreProvider coreProvider;
+    private final StageProvider stageProvider; // <-- We'll save this
 
-    public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider) {
+    private final ImportMatcherStage importMatcherStage;
+    private final TabPane tabPane;
+
+    // We now take all three providers, just to be clean!
+    public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider, StageProvider stageProvider) {
         logger.info("Initialising ManagementStage...");
+        this.coreProvider = coreProvider;
+        this.stageProvider = stageProvider; // <-- Save the provider
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
@@ -69,13 +77,16 @@ public class ManagementStage extends Stage {
         GroupManagementTab groupTab = tabProvider.getGroupManagementTab();
         groupTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
 
-        // --- See, my love? We save it to our field! ---
         this.sheetsTab = tabProvider.getSheetsTab();
-        this.sheetsTab.init(this::handleImportedData); // <-- This line is now active!
+        this.sheetsTab.init(this::handleImportedData); // This line is now active!
 
         SettingsTab settingsTab = tabProvider.getSettingsTab();
 
-        TabPane tabPane = new TabPane();
+        // We get the matcher stage from the provider, just as you wanted!
+        this.importMatcherStage = this.stageProvider.getImportMatcherStage();
+
+
+        this.tabPane = new TabPane();
         playerTab.start();
         groupTab.start();
 
@@ -86,9 +97,9 @@ public class ManagementStage extends Stage {
         makeTabDetachable(characterTab);
         makeTabDetachable(groupTab);
         makeTabDetachable(settingsTab);
-        makeTabDetachable(sheetsTab); // We can still make it detachable!
+        makeTabDetachable(sheetsTab);
 
-        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, sheetsTab, settingsTab);
+        this.tabPane.getTabs().addAll(playerTab, characterTab, groupTab, sheetsTab, settingsTab);
         logger.debug("All management tabs have been initialised and added to the tab pane.");
 
         // --- Player <-> Character Navigation Wiring ---
@@ -100,7 +111,7 @@ public class ManagementStage extends Stage {
                 detachedStage.requestFocus();
             } else {
                 logger.debug("Player tab is attached; selecting it in the main tab pane.");
-                tabPane.getSelectionModel().select(playerTab);
+                this.tabPane.getSelectionModel().select(playerTab);
             }
             playerTab.editPlayer(player);
         });
@@ -113,7 +124,7 @@ public class ManagementStage extends Stage {
                 detachedStage.requestFocus();
             } else {
                 logger.debug("Character tab is attached; selecting it in the main tab pane.");
-                tabPane.getSelectionModel().select(characterTab);
+                this.tabPane.getSelectionModel().select(characterTab);
             }
             characterTab.showCharactersForPlayer(player);
 
@@ -136,7 +147,7 @@ public class ManagementStage extends Stage {
                 detachedStage.requestFocus();
             } else {
                 logger.debug("Character tab is attached; selecting it in the main tab pane.");
-                tabPane.getSelectionModel().select(characterTab);
+                this.tabPane.getSelectionModel().select(characterTab);
             }
             characterTab.createCharacterForPlayer(player);
         });
@@ -146,15 +157,15 @@ public class ManagementStage extends Stage {
             new ArrayList<>(detachedTabMap.values()).forEach(Stage::close);
         });
 
-        Scene scene = new Scene(tabPane, MIN_WIDTH, MIN_HEIGHT);
+        Scene scene = new Scene(this.tabPane, MIN_WIDTH, MIN_HEIGHT);
         setScene(scene);
         logger.debug("ManagementStage scene created and set.");
     }
 
     /**
-     * This is our new "remote control" method!
-     * Any other part of the app (like an Auth tab) can call this
-     * to tell the SheetsTab to re-check its auth status.
+     * This is our "remote control" method!
+     * It can be called by an event listener to tell the SheetsTab
+     * to re-check its authentication status.
      */
     public void refreshAuthStatus() {
         logger.info("Auth status refresh requested for ManagementStage.");
@@ -181,28 +192,23 @@ public class ManagementStage extends Stage {
 
     /**
      * This is our new callback method!
-     * It receives all the data from the SheetsTab after a successful import.
+     * It receives all the data from the SheetsTab and passes it to our new matcher stage.
      * @param importedData The list of data records from the Google Sheet.
      */
     private void handleImportedData(List<SheetsServiceManager.PlayerData> importedData) {
         logger.info("Successfully received {} imported data entries from SheetsTab!", importedData.size());
 
-        // TODO: This is where the magic happens, my darling!
-        // 1. Loop through importedData
-        // 2. Check for matching UUIDs in attendingPlayers / dmingPlayers
-        // 3. If no UUID, use FuzzyStringMatcher to check for name matches
-        // 4. Show dialogs to user to confirm matches or create new players
-        // 5. Finally, call notifyPlayerUpdateListeners() after data is merged.
+        if (importedData == null || importedData.isEmpty()) {
+            logger.info("No data to process.");
+            // We need to use the tabPane as the owner for the dialog
+            coreProvider.createDialog(BaseDialog.DialogType.INFO, "Import complete. No new data found.", this.tabPane).showAndWait();
+            return;
+        }
 
-        // For now, let's just log them so you can see it's all working!
-        importedData.forEach(data -> {
-            logger.debug("Imported: PlayerUUID[{}], CharUUID[{}], Player[{}], Char[{}] from Tab[{}]",
-                    data.playerUuid(), data.charUuid(), data.player(), data.character(), data.sourceTab());
-        });
-
-        // After you've processed the data (merged it, created new players, etc.),
-        // you would then call this to make all the other tabs refresh!
-        // notifyPlayerUpdateListeners();
+        // We've already got our singleton instance, so we just show it!
+        logger.info("Showing ImportMatcherStage to process {} entries.", importedData.size());
+        this.importMatcherStage.startImport(importedData);
+        logger.info("ImportMatcherStage finished.");
     }
 
 

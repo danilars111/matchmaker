@@ -10,13 +10,12 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Tab;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.constants.Settings;
-// This is the correct one you pointed out, my clever girl!
 import org.poolen.backend.db.interfaces.store.SettingStoreProvider;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
-// I've removed the naughty, conflicting import!
 import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.web.google.GoogleAuthManager;
 import org.poolen.web.google.SheetsServiceManager;
@@ -26,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -40,26 +40,21 @@ public class SheetsTab extends Tab {
     private final GoogleAuthManager authManager;
     private final SettingsStore settingsStore;
     private final SheetsServiceManager sheetsServiceManager;
-    private final UiTaskExecutor uiTaskExecutor; // Our shiny new service!
-
+    private final UiTaskExecutor uiTaskExecutor;
     private Button importButton;
     private Label statusLabel;
-    private ProgressIndicator progressIndicator; // We still need this for the little auth check
+    private ProgressIndicator progressIndicator;
     private VBox root;
-
-    // Settings
     private String sheetId;
     private String garnetSheet;
     private String amberSheet;
     private String aventurineSheet;
     private String opalSheet;
-
-    // Callback for when data is successfully imported
     private Consumer<List<PlayerData>> onDataImported;
 
     public SheetsTab(CoreProvider coreProvider,
                      GoogleAuthManager authManager,
-                     SettingStoreProvider settingsStoreProvider, // And fixed in the constructor!
+                     SettingStoreProvider settingsStoreProvider,
                      SheetsServiceManager sheetsServiceManager,
                      UiTaskExecutor uiTaskExecutor) {
         super("Sheets");
@@ -68,7 +63,7 @@ public class SheetsTab extends Tab {
         this.authManager = authManager;
         this.sheetsServiceManager = sheetsServiceManager;
         this.settingsStore = settingsStoreProvider.getSettingsStore();
-        this.uiTaskExecutor = uiTaskExecutor; // And stored!
+        this.uiTaskExecutor = uiTaskExecutor;
 
         buildUi();
         wireEvents();
@@ -103,7 +98,7 @@ public class SheetsTab extends Tab {
         importButton.setPrefWidth(300);
 
         statusLabel = new Label("Checking sign-in status...");
-        progressIndicator = new ProgressIndicator(); // We keep this for the inline auth check
+        progressIndicator = new ProgressIndicator();
         progressIndicator.setVisible(false);
 
         HBox statusBox = new HBox(10, statusLabel, progressIndicator);
@@ -202,21 +197,27 @@ public class SheetsTab extends Tab {
             return;
         }
 
-        final List<String> sheetNames = List.of(garnetSheet, amberSheet, aventurineSheet, opalSheet);
+        final Map<String, House> sheetsToImport = Map.of(
+                garnetSheet, House.GARNET,
+                amberSheet, House.AMBER,
+                aventurineSheet, House.AVENTURINE,
+                opalSheet, House.OPAL
+        );
 
-        // We use our new UiTaskExecutor! So much cleaner!
         uiTaskExecutor.execute(
                 getTabPane().getScene().getWindow(), // owner
                 "Importing data from all tabs...", // initialMessage
                 null, // We'll provide a custom success message in the callback
                 (updater) -> { // work (ProgressAwareTask<T>)
                     List<PlayerData> allData = new ArrayList<>();
-                    for (String sheetName : sheetNames) {
+                    for (Map.Entry<String, House> entry : sheetsToImport.entrySet()) {
+                        String sheetName = entry.getKey();
+                        House house = entry.getValue();
+
                         if (sheetName != null && !sheetName.isEmpty()) {
-                            // We can update the overlay message!
                             updater.updateStatus("Importing from: " + sheetName + "...");
                             logger.info("Importing data from tab: {}", sheetName);
-                            allData.addAll(sheetsServiceManager.importPlayerData(sheetId, sheetName));
+                            allData.addAll(sheetsServiceManager.importPlayerData(sheetId, sheetName, house));
                         } else {
                             logger.warn("A sheet name was null or empty, skipping.");
                         }
@@ -226,10 +227,8 @@ public class SheetsTab extends Tab {
                 (resultData) -> { // onSuccess (Consumer<T>)
                     String message = String.format("Successfully imported %d player/character entries.", resultData.size());
                     logger.info("Background import task completed successfully. {}", message);
-                    // We show our own dialog with the count
-                    Platform.runLater(()-> coreProvider.createDialog(DialogType.INFO, message, SheetsTab.this.getTabPane()).showAndWait());
 
-
+                    // We just go straight to the matcher!
                     if (onDataImported != null) {
                         onDataImported.accept(resultData);
                     }
@@ -237,7 +236,7 @@ public class SheetsTab extends Tab {
                 },
                 (error) -> { // onError (Consumer<Throwable>)
                     logger.error("Background import task failed.", error);
-                    coreProvider.createDialog(DialogType.ERROR, "Import failed: " + error.getMessage(), SheetsTab.this.getTabPane()).showAndWait();
+                    Platform.runLater(() -> coreProvider.createDialog(DialogType.ERROR, "Import failed: ".formatted(error.getMessage()), SheetsTab.this.getTabPane()).showAndWait());
                     statusLabel.setText("Import failed. Ready.");
                 }
         );
