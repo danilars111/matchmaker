@@ -174,6 +174,21 @@ public class Player {
         }
     }
 
+    public boolean deepEquals(Player player) {
+        if( this == player) { return  true; }
+        if(player == null) { return  false; }
+        return Objects.equals(this.uuid, player.uuid) &&
+                Objects.equals(this.name, player.name) &&
+                Objects.equals(this.characters, player.characters) &&
+                Objects.equals(this.buddylist, player.buddylist) &&
+                Objects.equals(this.blacklist, player.blacklist) &&
+                Objects.equals(this.DmBlacklist, player.DmBlacklist) &&
+                Objects.equals(this.playerLog,player.playerLog) &&
+                Objects.equals(this.lastSeen, player.lastSeen) &&
+                this.isDungeonMaster == player.isDungeonMaster;
+    }
+
+
     @Override
     public boolean equals(Object o) {
         if (this == o) { return true; }
