@@ -65,7 +65,6 @@ public class ImportMatcherStage extends Stage {
     private int currentIndex;
     private Runnable onFinishedCallback;
 
-    // --- UI Components ---
     private BorderPane root;
     private Label titleLabel;
     private Label progressLabel;
@@ -87,6 +86,8 @@ public class ImportMatcherStage extends Stage {
     private Button btnSave;
     private Button btnExport;
     private Button btnClose;
+
+    private Button btnBack;
     private Button btnSkip;
 
 
@@ -109,7 +110,6 @@ public class ImportMatcherStage extends Stage {
             this.finalCharName = originalData.character();
         }
 
-        // Getters
         public PlayerData getOriginalData() { return originalData; }
         public Player getResolvedPlayer() { return resolvedPlayer; }
         public Character getResolvedCharacter() { return resolvedCharacter; }
@@ -117,7 +117,6 @@ public class ImportMatcherStage extends Stage {
         public String getFinalCharName() { return finalCharName; }
         public Status getStatus() { return status; }
 
-        // Setters
         public void setResolvedPlayer(Player p) { this.resolvedPlayer = p; }
         public void setResolvedCharacter(Character c) { this.resolvedCharacter = c; }
         public void setFinalPlayerName(String name) { this.finalPlayerName = name; }
@@ -200,15 +199,19 @@ public class ImportMatcherStage extends Stage {
         centerBox.getChildren().addAll(importBox, matchingBox, completionBox);
         root.setCenter(centerBox);
 
+        btnBack = new Button("Back");
         btnSkip = new Button("Skip This Item");
-        HBox bottomButtonBox = new HBox(10, btnSkip);
+        HBox bottomButtonBox = new HBox(10, btnBack, btnSkip);
         bottomButtonBox.setAlignment(Pos.CENTER_RIGHT);
         root.setBottom(bottomButtonBox);
 
+        btnBack.setOnAction(e -> showItem(currentIndex - 1));
+
         btnSkip.setOnAction(e -> {
-            processingQueue.get(currentIndex - 1).setStatus(ImportMatchTask.Status.SKIPPED);
-            processNextItem();
+            processingQueue.get(currentIndex).setStatus(ImportMatchTask.Status.SKIPPED);
+            showItem(currentIndex + 1);
         });
+
         btnClose.setOnAction(e -> this.close());
         btnSave.setOnAction(e -> handleSave());
         btnExport.setOnAction(e -> handleExport());
@@ -221,6 +224,7 @@ public class ImportMatcherStage extends Stage {
         matchingBox.setVisible(show);
         matchingBox.setManaged(show);
         btnSkip.setVisible(show);
+        btnBack.setVisible(show);
     }
 
     private void showChoiceUI(boolean show) {
@@ -257,20 +261,25 @@ public class ImportMatcherStage extends Stage {
 
     @Override
     public void showAndWait() {
-        processNextItem();
+        showItem(0); // Show the first item
         super.showAndWait();
     }
 
     /**
-     * Processes the next item in the queue.
+     * Replaces processNextItem()! This is our new "page" loader.
      */
-    private void processNextItem() {
+    private void showItem(int index) {
+        if (index < 0) {
+            return; // Can't go back past the beginning
+        }
+
         showMatchingUI(true);
         showChoiceUI(false);
         showNameChoiceUI(false);
         showCompletionUI(false);
+        btnBack.setDisable(index == 0); // Disable "Back" on the first item
 
-        if (currentIndex >= processingQueue.size()) {
+        if (index >= processingQueue.size()) {
             logger.info("Import matching finished.");
             showMatchingUI(false);
             importBox.setVisible(false);
@@ -279,17 +288,21 @@ public class ImportMatcherStage extends Stage {
             return;
         }
 
+        currentIndex = index; // Set our new current index
         ImportMatchTask currentTask = processingQueue.get(currentIndex);
-        currentIndex++;
 
         PlayerData item = currentTask.getOriginalData();
-        progressLabel.setText(String.format("Item %d of %d", currentIndex, processingQueue.size()));
+        progressLabel.setText(String.format("Item %d of %d", currentIndex + 1, processingQueue.size()));
         importPlayerLabel.setText(String.format("Player: '%s' (UUID: %s)", item.player(), item.playerUuid().isEmpty() ? "N/A" : item.playerUuid()));
         importCharLabel.setText(String.format("Character: '%s' (UUID: %s) (House: %s)",
                 item.character().isEmpty() ? "N/A" : item.character(),
                 item.charUuid().isEmpty() ? "N/A" : item.charUuid(),
                 item.house()));
         actionLabel.setText("Processing Player...");
+
+        // We reset the task status, just in case they went "Back"
+        // to re-do a "Skipped" item
+        currentTask.setStatus(ImportMatchTask.Status.PENDING);
 
         processPlayer(currentTask);
     }
@@ -369,12 +382,9 @@ public class ImportMatcherStage extends Stage {
         PlayerData item = currentTask.getOriginalData();
         Player owner = currentTask.getResolvedPlayer();
 
-        if (item.character().isEmpty()) {
-            logger.debug("No character name for this item. Skipping to next.");
-            currentTask.setStatus(ImportMatchTask.Status.COMPLETED);
-            processNextItem();
-            return;
-        }
+        // --- THIS IS THE FIX! ---
+        // That naughty "if (item.character().isEmpty())" block is GONE!
+        // Now we just... process it normally, just as you wanted!
 
         if (!item.charUuid().isEmpty()) {
             try {
@@ -391,13 +401,13 @@ public class ImportMatcherStage extends Stage {
                                     c.setPlayer(owner);
                                     currentTask.setFinalCharName(chosenName);
                                     currentTask.setStatus(ImportMatchTask.Status.COMPLETED);
-                                    processNextItem();
+                                    showItem(currentIndex + 1);
                                 });
                     } else {
                         c.setPlayer(owner);
                         currentTask.setFinalCharName(c.getName());
                         currentTask.setStatus(ImportMatchTask.Status.COMPLETED);
-                        processNextItem();
+                        showItem(currentIndex + 1);
                     }
                     return;
                 }
@@ -425,12 +435,12 @@ public class ImportMatcherStage extends Stage {
                                         match.setName(chosenName);
                                         currentTask.setFinalCharName(chosenName);
                                         currentTask.setStatus(ImportMatchTask.Status.COMPLETED);
-                                        processNextItem();
+                                        showItem(currentIndex + 1);
                                     });
                         } else {
                             currentTask.setFinalCharName(match.getName());
                             currentTask.setStatus(ImportMatchTask.Status.COMPLETED);
-                            processNextItem();
+                            showItem(currentIndex + 1);
                         }
                     } else {
                         logger.debug("User selected 'Create New' for character '{}'", item.character());
@@ -440,7 +450,7 @@ public class ImportMatcherStage extends Stage {
                             currentTask.setFinalCharName(newChar.getName());
                         }
                         currentTask.setStatus(ImportMatchTask.Status.COMPLETED);
-                        processNextItem();
+                        showItem(currentIndex + 1);
                     }
                 }
         );
@@ -475,7 +485,6 @@ public class ImportMatcherStage extends Stage {
             return;
         }
 
-        // This is where we convert our naughty UI class to the clean record!
         List<SheetsServiceManager.ExportData> exportDataList = processingQueue.stream()
                 .filter(t -> t.getStatus() == ImportMatchTask.Status.COMPLETED)
                 .map(t -> new SheetsServiceManager.ExportData(
