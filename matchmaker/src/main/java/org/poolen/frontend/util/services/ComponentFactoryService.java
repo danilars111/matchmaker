@@ -20,7 +20,7 @@ import org.poolen.frontend.gui.components.stages.email.BugReportStage;
 import org.poolen.frontend.gui.components.stages.email.CrashReportStage;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
-import org.poolen.frontend.gui.components.tabs.PersistenceTab;
+import org.poolen.frontend.gui.components.tabs.SheetsTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
 import org.poolen.frontend.gui.components.views.GroupDisplayView;
@@ -63,7 +63,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private  ExportGroupsStage exportGroupsStage;
     private CharacterManagementTab characterManagementTab;
     private GroupManagementTab groupManagementTab;
-    private PersistenceTab persistenceTab;
+    private SheetsTab sheetsTab;
     private PlayerManagementTab playerManagementTab;
     private SettingsTab settingsTab;
     private CharacterFormView characterFormView;
@@ -187,12 +187,12 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         }
         return this.groupManagementTab;
     }
-    public PersistenceTab getPersistenceTab() {
-        if (this.persistenceTab == null) {
+    public SheetsTab getSheetsTab() {
+        if (this.sheetsTab == null) {
             logger.info("Creating singleton instance of PersistenceTab.");
-            this.persistenceTab = new PersistenceTab(this, uiPersistenceService, authManager);
+            this.sheetsTab = new SheetsTab(this, authManager, store, sheetsServiceManager, uiTaskExecutor);
         }
-        return this.persistenceTab;
+        return this.sheetsTab;
     }
     public PlayerManagementTab getPlayerManagementTab() {
         if (this.playerManagementTab == null) {

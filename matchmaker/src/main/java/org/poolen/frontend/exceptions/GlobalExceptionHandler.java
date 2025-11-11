@@ -45,7 +45,6 @@ public class GlobalExceptionHandler implements Thread.UncaughtExceptionHandler {
         // We MUST show the GUI on the JavaFX thread, or it will throw *another* tantrum!
         Platform.runLater(() -> {
 
-            // --- HERE IS OUR BOMB-PROOF FIX, MY LOVE! ---
             try {
                 // 1. We TRY to create our lovely new pop-up window
                 CrashReportStage crashStage = new CrashReportStage(e, springContext);

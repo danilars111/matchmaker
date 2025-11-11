@@ -7,10 +7,9 @@ import org.poolen.backend.db.constants.Settings;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.db.store.Store;
+import org.poolen.backend.util.FuzzyStringMatcher; // Correctly imported!
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Scope;
-import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -271,6 +270,146 @@ public class SheetsServiceManager {
         } else {
             logger.debug("Sheet '{}' already has content. Assuming header exists.", sheetName);
         }
+    }
+
+    /**
+     * A simple record to hold the imported player data.
+     * This is a modern, concise way to create a simple data-holding class.
+     *
+     * We now include optional UUIDs for both Player and Character.
+     */
+    public record PlayerData(String playerUuid, String charUuid, String player, String character, String sourceTab) {}
+
+    /**
+     * Imports Player and Character data from a specific tab using fuzzy header matching.
+     * It will also look for optional Player UUID and Character UUID columns.
+     *
+     * @param spreadsheetId The ID of the Google Sheet.
+     * @param tabName The name of the tab to import from (e.g., "Tab1").
+     * @return A list of PlayerData records.
+     * @throws IOException If the Sheets API call fails.
+     */
+    public List<PlayerData> importPlayerData(String spreadsheetId, String tabName) throws IOException {
+        if (this.sheetsService == null) {
+            logger.error("Cannot import data: Sheets service is not initialised.");
+            throw new IllegalStateException("Not connected to Google Sheets.");
+        }
+
+        logger.info("Starting player data import from spreadsheet '{}', tab '{}'", spreadsheetId, tabName);
+
+        // 1. Read the header row (first row) to find our columns
+        String headerRange = tabName + "!1:1";
+        ValueRange headerResponse = this.sheetsService.spreadsheets().values().get(spreadsheetId, headerRange).execute();
+        List<Object> headerRow = (headerResponse.getValues() != null && !headerResponse.getValues().isEmpty())
+                ? headerResponse.getValues().get(0) : null;
+
+        if (headerRow == null || headerRow.isEmpty()) {
+            logger.warn("Could not read header row from tab '{}'. Skipping.", tabName);
+            return Collections.emptyList();
+        }
+
+        // 2. Find the column indices using fuzzy matching
+        int playerColIndex = -1;
+        int charColIndex = -1;
+        int playerUuidColIndex = -1; // Our new addition!
+        int charUuidColIndex = -1;   // And the second one!
+        // A threshold of 1 is good for headers - it allows one typo or a plural 's' etc.
+        final int HEADER_THRESHOLD = 1;
+
+        for (int i = 0; i < headerRow.size(); i++) {
+            if (headerRow.get(i) == null) continue; // Skip empty header cells
+
+            String header = headerRow.get(i).toString().trim();
+
+            // Using our lovely, clean utility class!
+            if (FuzzyStringMatcher.areStringsSimilar(header, "Player", HEADER_THRESHOLD)) {
+                playerColIndex = i;
+                logger.info("Found 'Player' column in tab '{}' at index {} (Header: '{}')", tabName, i, header);
+            }
+            if (FuzzyStringMatcher.areStringsSimilar(header, "Character Name", HEADER_THRESHOLD)) {
+                charColIndex = i;
+                logger.info("Found 'Character Name' column in tab '{}' at index {} (Header: '{}')", tabName, i, header);
+            }
+            // And our new checks for the UUIDs!
+            if (FuzzyStringMatcher.areStringsSimilar(header, "Player UUID", HEADER_THRESHOLD)) {
+                playerUuidColIndex = i;
+                logger.info("Found 'Player UUID' column in tab '{}' at index {} (Header: '{}')", tabName, i, header);
+            }
+            if (FuzzyStringMatcher.areStringsSimilar(header, "Character UUID", HEADER_THRESHOLD)) {
+                charUuidColIndex = i;
+                logger.info("Found 'Character UUID' column in tab '{}' at index {} (Header: '{}')", tabName, i, header);
+            }
+        }
+
+        // Log if we didn't find the optional UUIDs, but don't stop.
+        if (playerUuidColIndex == -1) {
+            logger.info("No 'Player UUID' column found in tab '{}'.", tabName);
+        }
+        if (charUuidColIndex == -1) {
+            logger.info("No 'Character UUID' column found in tab '{}'.", tabName);
+        }
+        if (playerUuidColIndex == -1 || charUuidColIndex == -1) {
+            logger.info("Will proceed with name-based matching where UUIDs are missing.");
+        }
+
+
+        // 3. Check if we found our *required* columns (Player and Character)
+        if (playerColIndex == -1 || charColIndex == -1) {
+            logger.warn("Could not find both 'Player' (found={}) and 'Character Name' (found={}) columns in tab '{}'. Skipping.",
+                    playerColIndex != -1, charColIndex != -1, tabName);
+            return Collections.emptyList();
+        }
+
+        // 4. Read the rest of the data (from row 2 onwards)
+        // We just read from A2 to Z, which is almost always enough columns.
+        String dataRange = tabName + "!A2:Z";
+        ValueRange dataResponse = this.sheetsService.spreadsheets().values().get(spreadsheetId, dataRange).execute();
+        List<List<Object>> allData = dataResponse.getValues();
+
+        if (allData == null || allData.isEmpty()) {
+            logger.info("No data rows found in tab '{}' (after header).", tabName);
+            return Collections.emptyList();
+        }
+
+        // 5. Process the data into our record list
+        List<PlayerData> importedData = new ArrayList<>();
+        for (int i = 0; i < allData.size(); i++) {
+            List<Object> row = allData.get(i);
+
+            // Helper to safely get string data from a specific column index
+            // This now safely gets the UUIDs, or "" if the column wasn't found (index is -1)
+            String playerUuid = getStringFromRow(row, playerUuidColIndex);
+            String charUuid = getStringFromRow(row, charUuidColIndex);
+            String player = getStringFromRow(row, playerColIndex);
+            String character = getStringFromRow(row, charColIndex);
+
+            // --- THIS IS YOUR LOVELY CHANGE! ---
+            // Only add if the player has some value (character and UUIDs are optional)
+            if (!player.isEmpty()) {
+                // Add the new PlayerData record with both UUIDs
+                importedData.add(new PlayerData(playerUuid, charUuid, player, character, tabName));
+            } else {
+                logger.trace("Skipping row {} in tab '{}' due to missing data (Player: '{}')",
+                        i + 2, tabName, player); // +2 for header and 0-indexing
+            }
+        }
+
+        logger.info("Successfully imported {} player/character pairs from tab '{}'.", importedData.size(), tabName);
+        return importedData;
+    }
+
+    /**
+     * A private helper to safely get a string from a row list,
+     * checking for boundaries and nulls.
+     *
+     * Now safer! It also checks if the index is less than 0.
+     */
+    private String getStringFromRow(List<Object> row, int index) {
+        // We add "index < 0" to safely handle cases where the column wasn't found
+        if (index < 0 || row == null || row.size() <= index || row.get(index) == null) {
+            return "";
+        }
+        return row.get(index).toString().trim();
     }
 
     public void disconnectSheetService() {

@@ -17,9 +17,11 @@ import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
 import org.poolen.frontend.gui.components.tabs.SettingsTab;
+import org.poolen.frontend.gui.components.tabs.SheetsTab;
 import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
+import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,9 @@ public class ManagementStage extends Stage {
     private final Map<UUID, Player> dmingPlayers;
     private final Map<UUID, Player> attendingPlayers;
 
+    // --- Look! We're saving this as a field now! ---
+    private final SheetsTab sheetsTab;
+
     public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider) {
         logger.info("Initialising ManagementStage...");
         initModality(Modality.APPLICATION_MODAL);
@@ -63,9 +68,10 @@ public class ManagementStage extends Stage {
 
         GroupManagementTab groupTab = tabProvider.getGroupManagementTab();
         groupTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
-/*
-        PersistenceTab persistenceTab = tabProvider.getPersistenceTab();
-        persistenceTab.init(this::notifyPlayerUpdateListeners);*/
+
+        // --- See, my love? We save it to our field! ---
+        this.sheetsTab = tabProvider.getSheetsTab();
+        this.sheetsTab.init(this::handleImportedData); // <-- This line is now active!
 
         SettingsTab settingsTab = tabProvider.getSettingsTab();
 
@@ -80,9 +86,9 @@ public class ManagementStage extends Stage {
         makeTabDetachable(characterTab);
         makeTabDetachable(groupTab);
         makeTabDetachable(settingsTab);
-   //     makeTabDetachable(persistenceTab);
+        makeTabDetachable(sheetsTab); // We can still make it detachable!
 
-        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, settingsTab);
+        tabPane.getTabs().addAll(playerTab, characterTab, groupTab, sheetsTab, settingsTab);
         logger.debug("All management tabs have been initialised and added to the tab pane.");
 
         // --- Player <-> Character Navigation Wiring ---
@@ -134,30 +140,6 @@ public class ManagementStage extends Stage {
             }
             characterTab.createCharacterForPlayer(player);
         });
-/*
-
-        // --- Persistence Wiring ---
-        persistenceTab.setOnLogoutRequestHandler(() -> {
-            logger.info("User initiated logout from the persistence tab.");
-            try {
-                GoogleAuthManager.logout();
-                logger.debug("Google Auth Manager logout successful.");
-                this.close(); // Close the management stage
-                new ArrayList<>(detachedTabMap.values()).forEach(Stage::close); // Close all detached tabs
-                logger.info("Management stage and all detached tabs closed. Restarting application.");
-
-                // Restart the login application
-                LoginApplication loginApp = new LoginApplication();
-                Stage loginStage = new Stage();
-                loginApp.start(loginStage);
-
-            } catch (Exception e) {
-                logger.error("An exception occurred during the logout and restart process.", e);
-                coreProvider.createDialog(DialogType.ERROR,"Failed to logout: " + e.getMessage(), tabPane).showAndWait();
-            }
-        });
-*/
-
 
         this.setOnCloseRequest(event -> {
             logger.info("ManagementStage close requested. Closing all detached tabs as well.");
@@ -167,6 +149,21 @@ public class ManagementStage extends Stage {
         Scene scene = new Scene(tabPane, MIN_WIDTH, MIN_HEIGHT);
         setScene(scene);
         logger.debug("ManagementStage scene created and set.");
+    }
+
+    /**
+     * This is our new "remote control" method!
+     * Any other part of the app (like an Auth tab) can call this
+     * to tell the SheetsTab to re-check its auth status.
+     */
+    public void refreshAuthStatus() {
+        logger.info("Auth status refresh requested for ManagementStage.");
+        if (this.sheetsTab != null) {
+            logger.debug("Forwarding auth refresh request to SheetsTab.");
+            this.sheetsTab.checkAuthAndSetDisabled();
+        } else {
+            logger.warn("Auth status refresh requested, but sheetsTab instance is null.");
+        }
     }
 
     public void addPlayerUpdateListener(PlayerUpdateListener listener) {
@@ -180,6 +177,32 @@ public class ManagementStage extends Stage {
         for (PlayerUpdateListener listener : playerUpdateListeners) {
             listener.onPlayerUpdate();
         }
+    }
+
+    /**
+     * This is our new callback method!
+     * It receives all the data from the SheetsTab after a successful import.
+     * @param importedData The list of data records from the Google Sheet.
+     */
+    private void handleImportedData(List<SheetsServiceManager.PlayerData> importedData) {
+        logger.info("Successfully received {} imported data entries from SheetsTab!", importedData.size());
+
+        // TODO: This is where the magic happens, my darling!
+        // 1. Loop through importedData
+        // 2. Check for matching UUIDs in attendingPlayers / dmingPlayers
+        // 3. If no UUID, use FuzzyStringMatcher to check for name matches
+        // 4. Show dialogs to user to confirm matches or create new players
+        // 5. Finally, call notifyPlayerUpdateListeners() after data is merged.
+
+        // For now, let's just log them so you can see it's all working!
+        importedData.forEach(data -> {
+            logger.debug("Imported: PlayerUUID[{}], CharUUID[{}], Player[{}], Char[{}] from Tab[{}]",
+                    data.playerUuid(), data.charUuid(), data.player(), data.character(), data.sourceTab());
+        });
+
+        // After you've processed the data (merged it, created new players, etc.),
+        // you would then call this to make all the other tabs refresh!
+        // notifyPlayerUpdateListeners();
     }
 
 
