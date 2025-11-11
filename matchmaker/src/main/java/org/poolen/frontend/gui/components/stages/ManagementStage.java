@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui.components.stages;
 
+import javafx.application.Platform; // <-- New!
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -13,7 +14,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Player;
-import org.poolen.frontend.gui.components.dialogs.BaseDialog;
+import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
@@ -49,16 +50,15 @@ public class ManagementStage extends Stage {
     private final Map<UUID, Player> attendingPlayers;
     private final SheetsTab sheetsTab;
     private final CoreProvider coreProvider;
-    private final StageProvider stageProvider; // <-- We'll save this
+    private final StageProvider stageProvider;
 
     private final ImportMatcherStage importMatcherStage;
     private final TabPane tabPane;
 
-    // We now take all three providers, just to be clean!
     public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider, StageProvider stageProvider) {
         logger.info("Initialising ManagementStage...");
         this.coreProvider = coreProvider;
-        this.stageProvider = stageProvider; // <-- Save the provider
+        this.stageProvider = stageProvider;
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
@@ -78,11 +78,10 @@ public class ManagementStage extends Stage {
         groupTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
 
         this.sheetsTab = tabProvider.getSheetsTab();
-        this.sheetsTab.init(this::handleImportedData); // This line is now active!
+        this.sheetsTab.init(this::handleImportedData);
 
         SettingsTab settingsTab = tabProvider.getSettingsTab();
 
-        // We get the matcher stage from the provider, just as you wanted!
         this.importMatcherStage = this.stageProvider.getImportMatcherStage();
 
 
@@ -102,7 +101,6 @@ public class ManagementStage extends Stage {
         this.tabPane.getTabs().addAll(playerTab, characterTab, groupTab, sheetsTab, settingsTab);
         logger.debug("All management tabs have been initialised and added to the tab pane.");
 
-        // --- Player <-> Character Navigation Wiring ---
         characterTab.getCharacterForm().setOnOpenPlayerRequestHandler(player -> {
             logger.info("Handling request to navigate to player '{}' from character tab.", player.getName());
             Stage detachedStage = detachedTabMap.get(playerTab);
@@ -128,7 +126,6 @@ public class ManagementStage extends Stage {
             }
             characterTab.showCharactersForPlayer(player);
 
-            // Auto-select their main or first character
             Character charToEdit = player.getMainCharacter();
             if (charToEdit == null && player.hasCharacters()) {
                 charToEdit = player.getCharacters().stream().collect(Collectors.toList()).get(0);
@@ -162,11 +159,6 @@ public class ManagementStage extends Stage {
         logger.debug("ManagementStage scene created and set.");
     }
 
-    /**
-     * This is our "remote control" method!
-     * It can be called by an event listener to tell the SheetsTab
-     * to re-check its authentication status.
-     */
     public void refreshAuthStatus() {
         logger.info("Auth status refresh requested for ManagementStage.");
         if (this.sheetsTab != null) {
@@ -184,31 +176,31 @@ public class ManagementStage extends Stage {
 
     public void notifyPlayerUpdateListeners() {
         logger.info("Notifying {} player update listeners of a change.", playerUpdateListeners.size());
-        // Tell all our listeners that something has changed!
         for (PlayerUpdateListener listener : playerUpdateListeners) {
             listener.onPlayerUpdate();
         }
     }
 
     /**
-     * This is our new callback method!
-     * It receives all the data from the SheetsTab and passes it to our new matcher stage.
-     * @param importedData The list of data records from the Google Sheet.
+     * This callback is now wrapped in Platform.runLater to be thread-safe!
      */
     private void handleImportedData(List<SheetsServiceManager.PlayerData> importedData) {
-        logger.info("Successfully received {} imported data entries from SheetsTab!", importedData.size());
+        // This whole block needs to be on the FX thread!
+        Platform.runLater(() -> {
+            logger.info("Successfully received {} imported data entries from SheetsTab!", importedData.size());
 
-        if (importedData == null || importedData.isEmpty()) {
-            logger.info("No data to process.");
-            // We need to use the tabPane as the owner for the dialog
-            coreProvider.createDialog(BaseDialog.DialogType.INFO, "Import complete. No new data found.", this.tabPane).showAndWait();
-            return;
-        }
+            if (importedData == null || importedData.isEmpty()) {
+                logger.info("No data to process.");
+                coreProvider.createDialog(DialogType.INFO, "Import complete. No new data found.", this.tabPane).showAndWait();
+                return;
+            }
 
-        // We've already got our singleton instance, so we just show it!
-        logger.info("Showing ImportMatcherStage to process {} entries.", importedData.size());
-        this.importMatcherStage.startImport(importedData);
-        logger.info("ImportMatcherStage finished.");
+            logger.info("Showing ImportMatcherStage to process {} entries.", importedData.size());
+
+            this.importMatcherStage.startImport(importedData, this::notifyPlayerUpdateListeners);
+
+            logger.info("ImportMatcherStage finished.");
+        });
     }
 
 
@@ -228,8 +220,7 @@ public class ManagementStage extends Stage {
             }
         });
         tab.setGraphic(header);
-        // We set the tab text to null because our custom graphic now contains the title.
-        // If you want both, you can remove this line.
+
         if (!tab.getText().isEmpty()) {
             tab.setText(null);
         }

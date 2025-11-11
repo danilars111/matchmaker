@@ -174,7 +174,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         if (this.importMatcherStage == null) {
             logger.info("Creating singleton instance of ImportMatcherStage.");
             // We pass it all the things it needs, which this factory has!
-            this.importMatcherStage = new ImportMatcherStage(this, store, playerFactory, characterFactory);
+            this.importMatcherStage = new ImportMatcherStage(this, store, playerFactory, characterFactory,
+                    uiPersistenceService, uiTaskExecutor, sheetsServiceManager);
         }
         return this.importMatcherStage;
     }
