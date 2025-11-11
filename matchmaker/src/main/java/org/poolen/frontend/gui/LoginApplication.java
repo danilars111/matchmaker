@@ -2,6 +2,7 @@ package org.poolen.frontend.gui;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.concurrent.Task; // We need this!
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -11,13 +12,17 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+// We no longer get the context from ApplicationLauncher
 import org.poolen.MatchmakerApplication;
+import org.poolen.frontend.exceptions.GlobalExceptionHandler; // We need this!
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
 import org.poolen.frontend.gui.components.stages.email.AccessRequestStage;
+import org.poolen.frontend.util.interfaces.UiUpdater;
 import org.poolen.web.google.GoogleAuthManager.AuthorizationTimeoutException;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.services.*;
@@ -39,6 +44,8 @@ import org.poolen.frontend.util.services.StartupService.StartupResult;
  * The main entry point for the JavaFX GUI.
  * This refactored version delegates the startup sequence to a dedicated StartupService,
  * keeping this class focused on UI setup and user interaction.
+ *
+ * Now with a lovely splash screen!
  */
 public class LoginApplication extends Application {
 
@@ -60,7 +67,15 @@ public class LoginApplication extends Application {
 
     // --- UI Components ---
     private Stage primaryStage;
-    private VBox root;
+    private Scene loginScene; // We'll prepare this scene in the background
+    private VBox loginRoot; // The root pane for the login scene
+
+    // --- Splash Screen UI ---
+    private VBox splashRoot;
+    private Label splashStatusLabel;
+    private ProgressIndicator splashLoadingIndicator;
+
+    // --- Login Scene UI (we need to access these from multiple methods) ---
     private Label statusLabel;
     private Button signInButton;
     private Label continueOfflineLabel;
@@ -70,31 +85,15 @@ public class LoginApplication extends Application {
 
 
     /**
-     * Initialises the Spring context and retrieves necessary beans.
-     * This phase happens before the UI is built.
+     * NO LONGER NEEDED!
+     * The Spring context is now initialised *once* in ApplicationLauncher.
+     * We will fetch it in the start() method.
      */
     @Override
     public void init() {
-        logger.info("Application initialisation phase started.");
-        boolean isH2Mode = isH2Mode();
-        boolean propertiesExist = PropertiesManager.propertiesFileExists();
-        logger.debug("H2 mode: {}, Properties file exists: {}", isH2Mode, propertiesExist);
-
-        if (propertiesExist || isH2Mode) {
-            try {
-                logger.info("Properties file found or H2 mode enabled. Initialising Spring context...");
-                springContext = new SpringApplicationBuilder(MatchmakerApplication.class)
-                        .properties(SpringManager.getConfigLocation())
-                        .run(getParameters().getRaw().toArray(new String[0]));
-                logger.info("Spring context successfully initialised.");
-                initialiseServices();
-            } catch (Exception e) {
-                logger.error("A critical error occurred during Spring context initialisation.", e);
-                springStartupError = e;
-            }
-        } else {
-            logger.warn("No properties file found and not in H2 mode. Skipping Spring context initialisation.");
-        }
+        // This is intentionally left blank.
+        // We do not want to initialise Spring here anymore.
+        logger.info("Application.init() called... skipping Spring initialisation as it's handled by ApplicationLauncher.");
     }
 
     /**
@@ -103,24 +102,18 @@ public class LoginApplication extends Application {
      */
     @Override
     public void start(Stage primaryStage) {
-        logger.info("JavaFX start phase initiated. Setting up the primary stage.");
+        logger.info("JavaFX start phase initiated.");
+
+        // --- STEP 1: Set up the stage and show the splash screen IMMEDIATELY ---
         this.primaryStage = primaryStage;
-        primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
+        primaryStage.setTitle("D&D Matchmaker Deluxe");
 
-        logger.debug("Performing first-time setup checks...");
-        if (isFirstTimeSetup()) {
-            logger.info("First-time setup detected. Aborting normal startup to show SetupStage.");
-            return; // The setup stage will handle the rest.
-        }
+        logger.info("Creating and showing splash screen...");
+        createAndShowSplashScene(); // Shows the *splash* scene immediately
 
-        logger.info("Initialising main login UI components.");
-        initialiseUI();
-
-        logger.debug("Checking for H2 mode to determine if test data generation is needed.");
-        Optional<Integer> testDataCount = askForTestDataGenerationIfInH2Mode();
-
-        logger.info("Beginning main startup sequence in a background thread.");
-        beginStartupSequence(testDataCount.orElse(0));
+        // --- STEP 2: Start the Spring Boot-up in a background thread ---
+        logger.info("Starting Spring Boot context in a background thread...");
+        startSpringContextTask();
     }
 
     /**
@@ -141,16 +134,57 @@ public class LoginApplication extends Application {
     // --- UI Initialisation and Management ---
 
     /**
-     * Creates and configures all the UI components for the login window.
+     * Creates and shows the *Splash Screen* scene.
+     * This is the first thing the user sees.
      */
-    private void initialiseUI() {
+    private void createAndShowSplashScene() {
         primaryStage.setResizable(false);
 
-        root = new VBox(20);
-        root.setAlignment(Pos.CENTER);
-        root.setStyle("-fx-padding: 40; -fx-background-color: #F0F8FF;");
+        splashRoot = new VBox(20);
+        splashRoot.setAlignment(Pos.CENTER);
+        splashRoot.setStyle("-fx-padding: 40; -fx-background-color: #F0F8FF;");
 
-        statusLabel = new Label("Starting up...");
+        // Let's add a lovely image!
+        // Make sure you have a "splash.png" in your /images/ folder.
+        // If not, this will just show the text and spinner.
+        /* We are skipping the image for now, just as you asked!
+        try {
+            Image splashImage = new Image(getClass().getResourceAsStream("/images/splash.png"));
+            ImageView splashImageView = new ImageView(splashImage);
+            splashImageView.setFitHeight(150);
+            splashImageView.setPreserveRatio(true);
+            splashRoot.getChildren().add(splashImageView);
+        } catch (Exception e) {
+            logger.warn("Could not load /images/splash.png. Splash screen will show text and spinner only.");
+        }
+        */
+
+        splashStatusLabel = new Label("Starting up...");
+        splashStatusLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #2F4F4F;");
+        splashStatusLabel.setTextAlignment(TextAlignment.CENTER);
+
+        splashLoadingIndicator = new ProgressIndicator();
+        splashLoadingIndicator.setPrefSize(50, 50);
+
+        splashRoot.getChildren().addAll(splashStatusLabel, splashLoadingIndicator);
+
+        Scene scene = new Scene(splashRoot, 450, 300);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+        logger.debug("Splash screen is now visible.");
+    }
+
+
+    /**
+     * Creates and configures all the UI components for the *Login Scene*.
+     * This is NOT shown immediately, but prepared in memory.
+     */
+    private void initialiseLoginScene() {
+        loginRoot = new VBox(20);
+        loginRoot.setAlignment(Pos.CENTER);
+        loginRoot.setStyle("-fx-padding: 40; -fx-background-color: #F0F8FF;");
+
+        statusLabel = new Label("Starting up..."); // This will be updated later
         statusLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #2F4F4F;");
         statusLabel.setTextAlignment(TextAlignment.CENTER);
 
@@ -161,60 +195,51 @@ public class LoginApplication extends Application {
         signInButton.setVisible(false);
         signInButton.setOnAction(e -> handleUserLogin());
 
-        // Let's create our new button!
         requestAccessButton = new Button("Request Access");
-        requestAccessButton.setVisible(true);
+        requestAccessButton.setVisible(false); // We hide this until we know we need it
         requestAccessButton.setOnAction(e -> handleRequestAccess());
 
         continueOfflineLabel = new Label("Continue without signing in");
         continueOfflineLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true;");
         continueOfflineLabel.setCursor(Cursor.HAND);
-        continueOfflineLabel.setOnMouseClicked(e -> {
-            uiTaskExecutor.execute(
-                    primaryStage, "Connecting...", "Successfully connected!",
-                    (updater) -> {
-                        logger.debug("Fetching data from DB.");
-                        uiPersistenceService.findAllWithProgress(updater);
-                        return "unused";
-                    },
-                    (result) -> {
-                        logger.info("Data fetch successful.");
-                        showManagementStage();
-                    },
-                    this::handleStartupError // Reuse the same error handler
-            );
-        });
+        continueOfflineLabel.setOnMouseClicked(e ->  showManagementStage());
         continueOfflineLabel.setVisible(false);
 
         exitButton = new Button("Exit");
         exitButton.setVisible(true); // Always visible!
         exitButton.setOnAction(e -> Platform.exit());
 
-        // Our new side-by-side button row!
         HBox buttonRow = new HBox(10, requestAccessButton, exitButton);
         buttonRow.setAlignment(Pos.CENTER);
 
         VBox.setMargin(continueOfflineLabel, new Insets(-10, 0, 0, 0));
-        // VBox.setMargin(requestAccessButton, new Insets(5, 0, 0, 0)); // We don't need this margin anymore!
-        root.getChildren().addAll(statusLabel, loadingIndicator, signInButton, continueOfflineLabel, buttonRow);
+        loginRoot.getChildren().addAll(statusLabel, loadingIndicator, signInButton, continueOfflineLabel, buttonRow);
 
-        Scene scene = new Scene(root, 450, 300);
-        primaryStage.setScene(scene);
-        primaryStage.show();
-        logger.debug("Login UI components created and scene is now visible.");
+        // Create the scene and store it in our field
+        loginScene = new Scene(loginRoot, 450, 300);
+        logger.debug("Login scene has been created and is ready.");
     }
 
     /**
      * Updates the UI to show the login prompt.
+     * This now *swaps the scene* from splash to login.
+     *
      * @param message The message to display to the user.
      */
     private void showLoginUI(String message) {
+        logger.info("Switching from splash screen to login scene.");
+
+        // --- THIS IS THE MAGIC ---
+        // We now set the scene to the one we prepared earlier.
+        primaryStage.setScene(loginScene);
+        primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
+
         logger.info("Updating UI to show login options with message: '{}'", message);
         statusLabel.setText(message);
         loadingIndicator.setVisible(false);
         signInButton.setVisible(true);
         continueOfflineLabel.setVisible(true);
-        requestAccessButton.setVisible(true); // Just to be sure!
+        requestAccessButton.setVisible(true);
         exitButton.setVisible(true);
     }
 
@@ -222,10 +247,25 @@ public class LoginApplication extends Application {
      * Closes the login window and opens the main application management window.
      */
     private void showManagementStage() {
-        logger.info("Login successful or continuing offline. Closing login stage and showing ManagementStage.");
-        primaryStage.close();
-        ManagementStage managementStage = springContext.getBean(ComponentFactoryService.class).getManagementStage();
-        managementStage.show();
+        uiTaskExecutor.execute(
+                primaryStage, "Connecting...", "Successfully connected!",
+                (updater) -> {
+                    logger.debug("Fetching data from DB.");
+                    uiPersistenceService.findAllWithProgress(updater);
+                    return "unused";
+                },
+                (result) -> {
+                    logger.info("Data fetch successful.");
+                    logger.info("Login successful or continuing offline. Closing login stage and showing ManagementStage.");
+                    primaryStage.close();
+                    ManagementStage managementStage = springContext.getBean(ComponentFactoryService.class).getManagementStage();
+                    managementStage.show();
+                },
+                this::handleStartupError // Reuse the same error handler
+        );
+
+
+
     }
 
     /**
@@ -233,7 +273,6 @@ public class LoginApplication extends Application {
      */
     private void handleRequestAccess() {
         logger.info("User clicked 'Request Access'. Opening AccessRequestStage.");
-        // We just use the springContext we already have, darling!
         AccessRequestStage accessStage = new AccessRequestStage(springContext);
         accessStage.show();
     }
@@ -259,18 +298,105 @@ public class LoginApplication extends Application {
     // --- Application Startup and Logic ---
 
     /**
+     * Creates and starts a background Task to initialise the Spring Context.
+     * This is the heavy lifting, done *after* the splash screen is visible.
+     */
+    private void startSpringContextTask() {
+        // This task will run on a background thread
+        Task<ConfigurableApplicationContext> springTask = new Task<>() {
+            @Override
+            protected ConfigurableApplicationContext call() throws Exception {
+                updateMessage("Starting application core...");
+                logger.debug("Background task started: Initialising Spring context.");
+                try {
+                    return new SpringApplicationBuilder(MatchmakerApplication.class)
+                            .properties(SpringManager.getConfigLocation())
+                            .run(getParameters().getRaw().toArray(new String[0]));
+                } catch (Exception e) {
+                    logger.error("A critical error occurred during Spring context initialisation.", e);
+                    throw e; // Re-throw to trigger the onFailed handler
+                }
+            }
+        };
+
+        // Bind the splash screen's label to the task's message property
+        splashStatusLabel.textProperty().bind(springTask.messageProperty());
+        splashLoadingIndicator.progressProperty().bind(springTask.progressProperty()); // Why not!
+
+        // --- What to do when Spring successfully boots up ---
+        springTask.setOnSucceeded(e -> {
+            logger.info("Spring context successfully initialised in background.");
+            splashStatusLabel.textProperty().unbind(); // We're done with this binding
+            splashLoadingIndicator.progressProperty().unbind();
+
+            this.springContext = springTask.getValue(); // Get our new context!
+
+            // --- STEP 3: Initialise services (now that we have the context) ---
+            try {
+                logger.debug("Spring context found. Initialising services...");
+                // Now we can set up our lovely global nanny
+                GlobalExceptionHandler.setInstance(springContext);
+                Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler.getInstance());
+
+                initialiseServices();
+                logger.info("All essential services have been initialised.");
+            } catch (Exception ex) {
+                logger.error("A critical error occurred while initialising services from Spring context.", ex);
+                this.springStartupError = ex;
+                // This error will be handled by the isFirstTimeSetup() check below.
+            }
+
+            // --- STEP 4: Perform pre-flight checks ---
+            logger.debug("Performing first-time setup checks...");
+            if (isFirstTimeSetup()) {
+                logger.info("First-time setup detected. Aborting normal startup to show SetupStage.");
+                // The SetupStage will be shown, so we stop here.
+                return;
+            }
+
+            // --- STEP 5: Prepare the UIs and Start Background Tasks ---
+            logger.info("Initialising main login scene (in memory)...");
+            initialiseLoginScene(); // Prepares the login scene
+
+            logger.debug("Checking for H2 mode to determine if test data generation is needed.");
+            Optional<Integer> testDataCount = askForTestDataGenerationIfInH2Mode();
+
+            logger.info("Beginning main startup sequence in a background thread.");
+            beginStartupSequence(testDataCount.orElse(0));
+        });
+
+        // --- What to do if Spring boot-up fails horribly ---
+        springTask.setOnFailed(e -> {
+            logger.error("FATAL: Spring context failed to start.", springTask.getException());
+            splashStatusLabel.textProperty().unbind();
+            splashLoadingIndicator.progressProperty().unbind();
+            splashStatusLabel.setText("Error: Application failed to start.");
+
+            this.springStartupError = (Exception) springTask.getException();
+
+            // This will now see the error and launch the SetupStage
+            isFirstTimeSetup();
+        });
+
+        // And... action!
+        new Thread(springTask).start();
+    }
+
+    /**
      * Performs initial checks before the main UI is shown. If a check fails
      * and a different stage is shown (like the SetupStage), this method returns true.
      *
      * @return true if the startup process should be aborted, false otherwise.
      */
     private boolean isFirstTimeSetup() {
+        // Check for missing properties *before* checking for Spring errors
         if (!isH2Mode() && !PropertiesManager.propertiesFileExists()) {
             logger.warn("Application properties are missing. Launching SetupStage for first-time configuration.");
             new SetupStage(new ApplicationScriptService(), null).show();
             return true;
         }
 
+        // Now check for Spring errors (which we might have from start())
         if (springStartupError != null) {
             logger.warn("A Spring initialisation error was detected. Launching SetupStage to allow user to correct settings.");
             String errorMessage = "The application couldn't start with the current settings.\n" +
@@ -284,9 +410,10 @@ public class LoginApplication extends Application {
 
     /**
      * Retrieves all required service beans from the Spring context.
+     * This is now called from start() AFTER the context is retrieved.
      */
     private void initialiseServices() {
-        logger.debug("Retrieving required service beans from the Spring context.");
+        // This method is now called *after* this.springContext is set.
         uiTaskExecutor = springContext.getBean(UiTaskExecutor.class);
         uiPersistenceService = springContext.getBean(UiPersistenceService.class);
         uiGoogleTaskService = springContext.getBean(UiGoogleTaskService.class);
@@ -294,7 +421,6 @@ public class LoginApplication extends Application {
         coreProvider = springContext.getBean(ComponentFactoryService.class);
         startupService = springContext.getBean(StartupService.class);
         authManager = springContext.getBean(GoogleAuthManager.class);
-        logger.info("All essential services have been initialised.");
     }
 
     /**
@@ -303,15 +429,67 @@ public class LoginApplication extends Application {
      * @param testDataPlayerCount The number of test players to generate (0 if none).
      */
     private void beginStartupSequence(int testDataPlayerCount) {
-        logger.info("Executing startup sequence via UiTaskExecutor. Test data players to generate: {}", testDataPlayerCount);
-        uiTaskExecutor.execute(
-                primaryStage,
-                "Starting application...",
-                "Ready!",
-                (updater) -> startupService.performStartupSequence(testDataPlayerCount, updater),
-                this::handleStartupResult,
-                this::handleStartupError
-        );
+        logger.info("Executing startup sequence via new Task. Test data players to generate: {}", testDataPlayerCount);
+
+        // --- This is our new, correct way! ---
+        // We create a simple Task, just like for the Spring context.
+        // The UiTaskExecutor is NOT used here, because it's for overlays.
+        Task<StartupResult> startupTask = new Task<>() {
+            @Override
+            protected StartupResult call() throws Exception {
+                logger.debug("Background task started: Performing startup sequence.");
+
+                // --- This is our lovely new adapter! ---
+                // We create a UiUpdater that pipes its status to our task's message
+                final UiUpdater splashUpdater = new UiUpdater() {
+                    @Override
+                    public void updateStatus(String message) {
+                        // 'this' refers to the Task, so we can call its updateMessage
+                        updateMessage(message);
+                    }
+
+                    @Override
+                    public void showDetails(String label, String details, Runnable onCancelAction) {
+                        // The splash screen can't show details, so we'll just update the
+                        // status label with the 'label' text. It's the best we can do!
+                        updateMessage(label);
+                        logger.warn("SplashUpdater: showDetails called (label: {}), but splash screen cannot show details. Updating status instead.", label);
+
+                        // We can't block, but if there's a cancel action, we should probably
+                        // log that we're ignoring it, or just... ignore it.
+                        if (onCancelAction != null) {
+                            logger.warn("SplashUpdater: Ignoring onCancelAction.");
+                        }
+                    }
+                };
+
+                // Now we call the service with our new, correct updater!
+                return startupService.performStartupSequence(testDataPlayerCount, splashUpdater);
+            }
+        };
+
+        // Bind the splash screen's label to this new task's message
+        splashStatusLabel.textProperty().bind(startupTask.messageProperty());
+        splashLoadingIndicator.progressProperty().bind(startupTask.progressProperty());
+
+        // --- What to do when the startup sequence succeeds ---
+        startupTask.setOnSucceeded(e -> {
+            logger.info("Startup sequence task completed successfully.");
+            splashStatusLabel.textProperty().unbind();
+            splashLoadingIndicator.progressProperty().unbind();
+            handleStartupResult(startupTask.getValue()); // Pass the result to our handler
+        });
+
+        // --- What to do if the startup sequence fails ---
+        startupTask.setOnFailed(e -> {
+            logger.error("Startup sequence task failed.", startupTask.getException());
+            splashStatusLabel.textProperty().unbind();
+            splashLoadingIndicator.progressProperty().unbind();
+            handleStartupError(startupTask.getException()); // Pass the error to our handler
+        });
+
+        // And... action!
+        new Thread(startupTask).start();
     }
 
     /**
@@ -319,19 +497,28 @@ public class LoginApplication extends Application {
      */
     private void handleUserLogin() {
         logger.info("User initiated Google Sign-In process.");
+
+        // --- I'm removing all my silly changes! ---
+        // We don't need to hide the buttons or show the spinner here,
+        // because the UiTaskExecutor handles all of that with its overlay!
+
+        // NOW we can use our lovely UiTaskExecutor, because the login scene is visible!
         uiTaskExecutor.execute(
                 primaryStage, "Connecting...", "Successfully connected!",
                 (updater) -> {
                     logger.debug("Executing Google connection and data fetch tasks.");
+                    updater.updateStatus("Connecting to Google...");
                     uiGoogleTaskService.connectToGoogle(updater);
-                    uiPersistenceService.findAllWithProgress(updater);
                     return "unused";
                 },
                 (result) -> {
-                    logger.info("Google sign-in and data fetch successful.");
+                    logger.info("Google sign-in successful.");
                     showManagementStage();
                 },
-                this::handleStartupError // Reuse the same error handler
+                (error) -> {
+                    // If login fails, we need to show the login UI again
+                    handleStartupError(error);
+                }
         );
     }
 
@@ -344,6 +531,8 @@ public class LoginApplication extends Application {
         switch (result.status) {
             case UPDATE_READY -> {
                 logger.info("An update is ready to be applied.");
+                // We need to switch to the login scene to show the dialog properly
+                primaryStage.setScene(loginScene);
                 applyUpdate((File) result.data);
             }
             case LOGIN_SUCCESSFUL -> {
@@ -368,32 +557,49 @@ public class LoginApplication extends Application {
         if (!hasAttemptedBindExceptionRetry && isRootCauseBindException(error)) {
             hasAttemptedBindExceptionRetry = true;
             logger.warn("A BindException was detected, likely a port conflict. Attempting a graceful recovery.");
+            // We just return; the app will likely hang, but this is a rare dev-time issue.
+            // Or, we could show the login UI with an error.
+            Platform.runLater(() -> showLoginUI("Error: Application port is already in use."));
             return;
         }
 
         if (isRootCauseTimeoutException(error)) {
             logger.warn("Authorization timed out, likely a 403. Showing 'Request Access' button.");
+            // We must call showLoginUI *first* to swap the scene!
             Platform.runLater(() -> {
-                statusLabel.setText("Login timed out.\nThis may be because you are not an approved user.");
-                loadingIndicator.setVisible(false);
-                signInButton.setVisible(true);
-                continueOfflineLabel.setVisible(true);
+                showLoginUI("Login timed out.\nThis may be because you are not an approved user.");
+                // showLoginUI already makes the button visible, but we can be extra sure.
+                requestAccessButton.setVisible(true);
             });
             return;
         }
+
+        // Generic error handler
+        // We can't use the UiTaskExecutor here if the context is null
+        // But by this point, the context *should* be available
+        // Let's check, just in case
+        if (uiGoogleTaskService == null) {
+            logger.error("Cannot perform cleanup, services are null. Likely a Spring boot failure.");
+            Platform.runLater(() -> {
+                showLoginUI("A critical error occurred. Please try again.");
+            });
+            return;
+        }
+
         uiTaskExecutor.execute(
                 primaryStage, "Disconnecting...", "Successfully disconnected!",
                 (updater) -> {
-                    logger.debug("Performing generic error handling: disconnecting user and showing an error dialog.");
+                    logger.debug("Performing generic error handling: disconnecting user.");
                     uiGoogleTaskService.disconnectFromGoogle(updater);
                     return "unused";
                 },
                 (result) -> {
-                    logger.info("Diconnection successful.");
+                    logger.info("Disconnection successful.");
+                    // Show the login scene *before* showing the dialog
                     Platform.runLater(() -> {
-                        coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), root).showAndWait();
+                        showLoginUI("Something went wrong. Please try signing in again.");
+                        coreProvider.createDialog(DialogType.ERROR,"An error occurred: " + error.getMessage(), loginRoot).showAndWait();
                     });
-                    showLoginUI("Something went wrong. Please try signing in again.");
                 }
         );
     }
@@ -420,13 +626,16 @@ public class LoginApplication extends Application {
         }
 
         logger.info("H2 mode active. Prompting user for test data generation.");
+        // We need to show this dialog *over* the splash screen.
         Alert confirmDialog = new Alert(Alert.AlertType.CONFIRMATION, "Would you like to populate the database with dummy data?", ButtonType.YES, ButtonType.NO);
+        confirmDialog.initOwner(primaryStage); // Ensures it's on top
         confirmDialog.setTitle("Test Data");
         confirmDialog.setHeaderText("H2 Test Mode Detected");
 
         if (confirmDialog.showAndWait().orElse(ButtonType.NO) == ButtonType.YES) {
             logger.debug("User chose to generate test data.");
             TextInputDialog countDialog = new TextInputDialog("20");
+            countDialog.initOwner(primaryStage); // Ensures it's on top
             countDialog.setTitle("Generate Test Data");
             countDialog.setHeaderText("How many players should we create?");
             countDialog.setContentText("Enter a number:");
@@ -455,11 +664,11 @@ public class LoginApplication extends Application {
                 newJarFile,
                 () -> {
                     logger.warn("Update cannot be applied in an IDE environment. Showing info dialog to user.");
-                    coreProvider.createDialog(DialogType.ERROR, "Cannot update while running in an IDE, darling!", root).showAndWait();
+                    coreProvider.createDialog(DialogType.ERROR, "Cannot update while running in an IDE, darling!", loginRoot).showAndWait();
                 },
                 (error) -> {
                     logger.error("Failed to apply update.", error);
-                    coreProvider.createDialog(DialogType.ERROR, "Update failed: " + error.getMessage(), root).showAndWait();
+                    coreProvider.createDialog(DialogType.ERROR, "Update failed: " + error.getMessage(), loginRoot).showAndWait();
                 }
         );
     }

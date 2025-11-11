@@ -2,20 +2,20 @@ package org.poolen;
 
 import com.google.ortools.Loader;
 import javafx.application.Application;
-import org.poolen.frontend.exceptions.GlobalExceptionHandler;
+// We no longer need Spring or the GlobalExceptionHandler here!
 import org.poolen.frontend.gui.LoginApplication;
 import org.poolen.util.LoggingManager;
 import org.poolen.util.SpringManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.builder.SpringApplicationBuilder;
+// No Spring imports needed
 import org.springframework.context.ConfigurableApplicationContext;
 
 import static org.poolen.util.SpringManager.setupSpringProperties;
 
 public class ApplicationLauncher {
 
-    private static ConfigurableApplicationContext springContext;
+    // We no longer need a static SpringContext here
     private static final Logger logger = LoggerFactory.getLogger(ApplicationLauncher.class);
 
     public static void main(String[] args) {
@@ -29,24 +29,12 @@ public class ApplicationLauncher {
             // This is your existing method, let's keep it!
             setupSpringProperties(args);
 
-            // 1. We MUST build and run Spring *first*!
-            // We point it to your @SpringBootApplication class
-            logger.info("Starting Spring context...");
-            springContext = new SpringApplicationBuilder(MatchmakerApplication.class)
-                    .headless(false) // Tell Spring it's okay to have a GUI
-                    .properties(SpringManager.getConfigLocation())
-                    .run(args);
-
-            logger.info("Spring context loaded. Setting global exception handler.");
-
-            // 2. Now that Spring is alive, we create our nanny and tell her to watch all threads
-            GlobalExceptionHandler.setInstance(springContext);
-            Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler.getInstance());
-
-            // 3. Load your other libraries
+            // 1. We NO LONGER build Spring first.
+            // We'll load our other libraries
             Loader.loadNativeLibraries();
 
-            // 4. And *now* we launch the JavaFX app
+            // 2. And *now* we launch the JavaFX app IMMEDIATELY!
+            // Spring will be started *by* the LoginApplication.
             logger.info("Launching JavaFX application...");
             Application.launch(LoginApplication.class, args);
 
@@ -58,11 +46,6 @@ public class ApplicationLauncher {
         }
     }
 
-    /**
-     * A lovely little helper so our JavaFX app can find the Spring beans!
-     * @return The running Spring application context.
-     */
-    public static ConfigurableApplicationContext getSpringContext() {
-        return springContext;
-    }
+    // This method is no longer needed, as LoginApplication will manage the context.
+    // public static ConfigurableApplicationContext getSpringContext() { ... }
 }

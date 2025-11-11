@@ -104,9 +104,6 @@ public class StartupService {
             // We just try to connect. This will throw an exception if it fails.
             uiGoogleTaskService.connectWithStoredCredentials(updater);
 
-            // If we get here, it worked! We're logged in.
-            logger.info("Successfully connected with stored credentials.");
-            uiPersistenceService.findAllWithProgress(updater);
             logger.info("Returning LOGIN_SUCCESSFUL status.");
             return new StartupResult(StartupResult.Status.LOGIN_SUCCESSFUL);
 
