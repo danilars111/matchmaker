@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui.components.views.tables.rosters;
 
+import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Pos;
@@ -11,6 +12,11 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.store.PlayerStore;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -97,9 +103,65 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
 
     @Override
     public void updateRoster() {
-        sourceItems.setAll(playerStore.getAllPlayers());
-        applyFilter();
+
+        // 2. Get the current UI list
+        // We still make a copy, as we'll be modifying the 'sourceItems' live
+        List<Player> currentPlayers = new ArrayList<>(sourceItems);
+
+        // 3. Make our lookup map for the *current* players
+        Map<UUID, Player> currentPlayerMap = currentPlayers.stream()
+                .collect(Collectors.toMap(Player::getUuid, player -> player));
+
+        // 4. Find players to REMOVE
+        // (Loop current players, check if they are missing from the new map)
+        List<Player> playersToRemove = currentPlayers.stream()
+                .filter(player -> !playerStore.hasPlayer(player))
+                .collect(Collectors.toList());
+
+        // 5. Find players to ADD
+        // (Loop new players, check if they are missing from the current map)
+        List<Player> playersToAdd = playerStore.getAllPlayers().stream()
+                .filter(player -> !currentPlayerMap.containsKey(player.getUuid()))
+                .collect(Collectors.toList());
+
+        // 6. Find players to UPDATE
+        // (Loop new players, check if they existed before AND have changed)
+        List<Player> playersToUpdate_RemoveOld = new ArrayList<>();
+        List<Player> playersToUpdate_AddNew = new ArrayList<>();
+
+        for (Player newPlayer : playerStore.getAllPlayers()) {
+            UUID id = newPlayer.getUuid();
+
+            // Check if this player *already* exists in our table
+            if (currentPlayerMap.containsKey(id)) {
+                Player oldPlayer = currentPlayerMap.get(id);
+
+                // Now we check if the data is different!
+                // (Again, this needs a good .equals() method in your Player class)
+                if (!newPlayer.equals(oldPlayer)) {
+                    // The data changed! We schedule a swap.
+                    playersToUpdate_RemoveOld.add(oldPlayer);
+                    playersToUpdate_AddNew.add(newPlayer);
+                }
+                // If they are .equals(), we do nothing! They're perfect.
+            }
+        }
+
+        // 7. Apply all changes to the *real* UI list
+        // We do all removes first...
+        if(playersToRemove.size() > 0 || playersToUpdate_RemoveOld.size() > 0) {
+            sourceItems.removeAll(playersToRemove);
+            sourceItems.removeAll(playersToUpdate_RemoveOld);
+        }
+        // ...then all adds!
+        if(playersToAdd.size() > 0 || playersToUpdate_AddNew.size() > 0) {
+            sourceItems.addAll(playersToAdd);
+            sourceItems.addAll(playersToUpdate_AddNew);
+        }
+        // And that's it! Absolutely no flicker, no jank, no lost state.
+        // Just pure, clean, efficient UI.
     }
+
 
     // --- Blacklisting Methods ---
 
@@ -157,7 +219,7 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
                     dmingPlayers.put(player.getUuid(), player);
                     if (!attendingPlayers.containsKey(player.getUuid())) {
                         attendingPlayers.put(player.getUuid(), player);
-                        table.refresh();
+                        //table.refresh();
                     }
                 } else {
                     dmingPlayers.remove(player.getUuid());

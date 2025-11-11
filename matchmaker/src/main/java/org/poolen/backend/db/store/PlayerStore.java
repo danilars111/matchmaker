@@ -63,5 +63,6 @@ public class PlayerStore {
         this.playerMap.remove(player.getUuid());
     }
 
+    public boolean hasPlayer(Player player) { return this.playerMap.containsKey(player.getUuid()); }
     public void clear() { this.playerMap.clear(); }
 }
