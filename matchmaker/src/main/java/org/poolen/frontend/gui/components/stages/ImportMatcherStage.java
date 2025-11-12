@@ -54,10 +54,12 @@ import java.util.function.Consumer;
  * A modal stage that guides the user through matching imported sheet data
  * with existing database entries.
  *
- * REFACTORED: Now uses a Pagination control for page navigation.
+ * Uses a Pagination control for page navigation.
  * Supports re-processing of already completed or skipped items with "undo" logic.
  * Includes filtering to hide processed items.
- * Completion screen is now the final page of the Pagination control.
+ * Completion screen is the final page of the Pagination control.
+ * Added Save/Cancel confirmation logic.
+ * "Export/Sync" logic is merged into "Save & Close".
  */
 public class ImportMatcherStage extends Stage {
 
@@ -77,6 +79,7 @@ public class ImportMatcherStage extends Stage {
     private List<ImportMatchTask> filteredProcessingQueue; // Holds items for pagination
     private int currentIndex; // Index in the FULL list
     private Runnable onFinishedCallback;
+    private boolean isCancelling = false; // Flag to prevent close-loop
 
     private BorderPane root;
     private Label titleLabel;
@@ -103,9 +106,12 @@ public class ImportMatcherStage extends Stage {
     private Button btnCancelCreate;
 
     private VBox completionBox;
-    private Button btnSave;
-    private Button btnExport;
-    private Button btnClose;
+    private Button btnSaveAndClose;
+    private Button btnCancel;
+    private VBox finalConfirmationBox;
+    private Label finalConfirmationLabel;
+    private Button btnConfirmFinal;
+    private Button btnCancelFinal;
 
     private StackPane centerContainer;
     private Pagination pagination;
@@ -176,6 +182,21 @@ public class ImportMatcherStage extends Stage {
         setTitle("Import Data Matcher");
 
         buildUi();
+
+        // Handle the 'X' button press
+        this.setOnCloseRequest(event -> {
+            if (isCancelling) {
+                // This close was triggered by our performCancel() method.
+                logger.debug("Programmatic close detected, allowing window to close.");
+                return;
+            }
+
+            // This is a user-initiated 'X' press.
+            event.consume();
+
+            logger.debug("User 'X' press intercepted. Triggering handleCancel().");
+            handleCancel();
+        });
     }
 
     private void buildUi() {
@@ -186,19 +207,17 @@ public class ImportMatcherStage extends Stage {
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 18));
         progressLabel = new Label("Item 0 of 0");
         filterCheckBox = new CheckBox("Hide Processed Items");
-        filterCheckBox.setSelected(false); // Default to showing all
+        filterCheckBox.setSelected(false);
         VBox titleBox = new VBox(10, titleLabel, progressLabel, filterCheckBox);
         titleBox.setAlignment(Pos.CENTER);
         root.setTop(titleBox);
 
-        // --- New Center Layout ---
         centerContainer = new StackPane();
         pagination = new Pagination();
         pagination.setStyle("-fx-page-information-visible: false;");
-        centerContainer.getChildren().add(pagination); // Only pagination is in the StackPane
+        centerContainer.getChildren().add(pagination);
         root.setCenter(centerContainer);
 
-        // --- Page Content (re-used) ---
         pageContentContainer = new VBox(20);
         pageContentContainer.setAlignment(Pos.CENTER_LEFT);
         pageContentContainer.setPadding(new Insets(20, 0, 20, 0));
@@ -254,22 +273,32 @@ public class ImportMatcherStage extends Stage {
 
         pageContentContainer.getChildren().addAll(importBox, matchingBox, bottomButtonBox);
 
-        // --- Completion Screen (Now returned by Page Factory) ---
-        btnSave = new Button("Save Changes to DB");
-        btnExport = new Button("Export UUIDs & Names to Sheet");
-        btnClose = new Button("Close");
-        btnSave.setStyle("-fx-background-color: #34A853; -fx-text-fill: white;");
-        btnExport.setStyle("-fx-background-color: #4285F4; -fx-text-fill: white;");
-        completionBox = new VBox(10, new Label("Matching complete! What's next?"), btnSave, btnExport, btnClose);
+        btnSaveAndClose = new Button("Save, Sync & Close");
+        btnCancel = new Button("Cancel & Undo All");
+        btnSaveAndClose.setStyle("-fx-background-color: #34A853; -fx-text-fill: white;");
+        btnCancel.setStyle("-fx-background-color: #EA4335; -fx-text-fill: white;");
+
+        finalConfirmationLabel = new Label("Are you sure?");
+        finalConfirmationLabel.setWrapText(true);
+        btnConfirmFinal = new Button("Yes");
+        btnCancelFinal = new Button("No, Go Back");
+        HBox finalConfirmButtons = new HBox(10, btnConfirmFinal, btnCancelFinal);
+        finalConfirmButtons.setAlignment(Pos.CENTER_LEFT);
+        finalConfirmationBox = new VBox(10, finalConfirmationLabel, finalConfirmButtons);
+        finalConfirmationBox.setVisible(false); // Hidden by default
+
+        HBox finalActionButtons = new HBox(10, btnSaveAndClose, btnCancel);
+        finalActionButtons.setAlignment(Pos.CENTER_LEFT);
+
+        completionBox = new VBox(15, new Label("Matching complete! What's next?"), finalActionButtons, finalConfirmationBox);
         completionBox.setAlignment(Pos.CENTER_LEFT);
         completionBox.setPadding(new Insets(20));
         completionBox.setMaxWidth(400);
-        completionBox.setVisible(true); // Is visible by default
+        completionBox.setVisible(true);
         completionBox.setManaged(true);
 
 
-        // --- Actions ---
-        filterCheckBox.setOnAction(e -> updatePagination(true)); // MODIFIED
+        filterCheckBox.setOnAction(e -> updatePagination(true));
 
         btnSkip.setOnAction(e -> {
             fullProcessingQueue.get(currentIndex).setStatus(ImportMatchTask.Status.SKIPPED);
@@ -278,9 +307,10 @@ public class ImportMatcherStage extends Stage {
 
         btnUndo.setOnAction(e -> handleUndo());
 
-        btnClose.setOnAction(e -> this.close());
-        btnSave.setOnAction(e -> handleSave());
-        btnExport.setOnAction(e -> handleExport());
+        btnSaveAndClose.setOnAction(e -> handleSaveAndClose());
+        btnCancel.setOnAction(e -> handleCancel());
+        btnCancelFinal.setOnAction(e -> finalConfirmationBox.setVisible(false));
+
         btnUseSelected.disableProperty().bind(choiceListView.getSelectionModel().selectedItemProperty().isNull());
 
         setScene(new Scene(this.root, 600, 600));
@@ -288,26 +318,22 @@ public class ImportMatcherStage extends Stage {
 
     /**
      * The Page Factory for the Pagination control.
-     * This is called whenever a new page is navigated to.
      */
     private Node createPage(int pageIndex) {
-        // --- NEW: Check if this is the completion page ---
+        // Check if this is the completion page
         if (pageIndex == filteredProcessingQueue.size()) {
             logger.debug("Creating completion page.");
-            // It is! Configure and return the completion box.
             long completeCount = fullProcessingQueue.stream().filter(t -> t.getStatus() == ImportMatchTask.Status.COMPLETED).count();
             long skippedCount = fullProcessingQueue.stream().filter(t -> t.getStatus() == ImportMatchTask.Status.SKIPPED).count();
             progressLabel.setText(String.format("Processing Complete! (%d completed, %d skipped)", completeCount, skippedCount));
             titleLabel.setText("Processing Complete!");
+            finalConfirmationBox.setVisible(false);
             return completionBox;
         }
 
-        // --- It's a normal item page ---
         logger.debug("Creating page for filtered index: {}", pageIndex);
 
-        // Reset title/progress in case we came from completion page
         titleLabel.setText("Processing Imported Data");
-        // (progressLabel will be set in configurePageForItem)
 
         if (pageIndex >= filteredProcessingQueue.size()) {
             logger.warn("Page factory requested index {} which is out of bounds for filtered list.", pageIndex);
@@ -322,22 +348,19 @@ public class ImportMatcherStage extends Stage {
             return pageContentContainer;
         }
 
-        configurePageForItem(currentTask); // Set up the UI for this item
+        configurePageForItem(currentTask);
 
-        // Only auto-process if it's pending
         if (currentTask.getStatus() == ImportMatchTask.Status.PENDING) {
             processPlayer(currentTask);
         }
 
-        return pageContentContainer; // Return the re-usable container
+        return pageContentContainer;
     }
 
     /**
      * Configures the shared UI components for the given task.
-     * This is the logic from the old `showItem` method.
      */
     private void configurePageForItem(ImportMatchTask currentTask) {
-        // Update labels
         PlayerData item = currentTask.getOriginalData();
         progressLabel.setText(String.format("Item %d of %d (Full List)", currentIndex + 1, fullProcessingQueue.size()));
         importPlayerLabel.setText(String.format("Player: '%s' (UUID: %s)", item.player(), item.playerUuid().isEmpty() ? "N/A" : item.playerUuid()));
@@ -346,7 +369,6 @@ public class ImportMatcherStage extends Stage {
                 item.charUuid().isEmpty() ? "N/A" : item.charUuid(),
                 item.house()));
 
-        // --- NEW: Status-based UI switching ---
         ImportMatchTask.Status status = currentTask.getStatus();
         statusLabel.setText("Status: " + status.name());
 
@@ -382,18 +404,17 @@ public class ImportMatcherStage extends Stage {
     }
 
     /**
-     * NEW: Undoes a completed/skipped item, resetting it to PENDING.
+     * Undoes a completed/skipped item, resetting it to PENDING.
      */
     private void handleUndo() {
         ImportMatchTask currentTask = fullProcessingQueue.get(currentIndex);
         if (currentTask.getStatus() == ImportMatchTask.Status.PENDING) {
-            return; // Should not happen
+            return;
         }
 
         logger.info("User initiated UNDO for item {}. Resetting status from {} to PENDING.",
                 currentIndex + 1, currentTask.getStatus());
 
-        // --- CRITICAL: Undo creation in correct order ---
         if (currentTask.wasCharacterCreated() && currentTask.getResolvedCharacter() != null) {
             logger.debug("Undoing character creation for: {}", currentTask.getResolvedCharacter().getName());
             characterStore.removeCharacter(currentTask.getResolvedCharacter());
@@ -402,23 +423,17 @@ public class ImportMatcherStage extends Stage {
             logger.debug("Undoing player creation for: {}", currentTask.getResolvedPlayer().getName());
             playerStore.removePlayer(currentTask.getResolvedPlayer());
         }
-        // --- END CRITICAL ---
 
-        // Reset task state
         currentTask.setStatus(ImportMatchTask.Status.PENDING);
         currentTask.setResolvedPlayer(null);
         currentTask.setResolvedCharacter(null);
         currentTask.setFinalPlayerName(currentTask.getOriginalData().player());
         currentTask.setFinalCharName(currentTask.getOriginalData().character());
-        currentTask.setWasPlayerCreated(false); // Reset flags
-        currentTask.setWasCharacterCreated(false); // Reset flags
+        currentTask.setWasPlayerCreated(false);
+        currentTask.setWasCharacterCreated(false);
 
-        // Refresh the filter (if it's on, this item will now be visible)
-        updatePagination(true); // MODIFIED
+        updatePagination(true);
 
-        // Re-configure the page, which will now show as PENDING
-        // This will be triggered by updatePagination setting the page factory
-        // or by us setting the current page index.
         int currentPage = pagination.getCurrentPageIndex();
         if (currentPage == filteredProcessingQueue.size()) { // Was on completion page
             pagination.setCurrentPageIndex(currentPage - 1);
@@ -437,11 +452,8 @@ public class ImportMatcherStage extends Stage {
         boolean filterWasOn = filterCheckBox.isSelected();
         int oldFilteredSize = filteredProcessingQueue.size();
 
-        // Re-build the filtered list (the item we just completed might disappear)
-        updatePagination(false); // MODIFIED: Tell it NOT to restore the page index
+        updatePagination(false); // Tell it NOT to restore the page index
 
-        // If updatePagination found we are done, it will set page count to 1
-        // (completion page) and we don't need to do anything else.
         if (pagination.getPageCount() == 1 && filteredProcessingQueue.isEmpty()) {
             logger.debug("goToNextPage: All items processed, showing completion page.");
             pagination.setCurrentPageIndex(0); // Go to completion page
@@ -450,33 +462,17 @@ public class ImportMatcherStage extends Stage {
 
         int newPageIndex;
         if (filterWasOn) {
-            // Filter is ON. The next item (or completion page) is at the *same* index.
             newPageIndex = Math.min(oldFilteredPageIndex, filteredProcessingQueue.size()); // .size() is completion page
         } else {
-            // Filter is OFF. The next item is at the *next* index.
             newPageIndex = Math.min(oldFilteredPageIndex + 1, filteredProcessingQueue.size()); // .size() is completion page
         }
 
         pagination.setCurrentPageIndex(newPageIndex);
 
-        // If the index *didn't* change (e.g. filter on, but not last item), force reload.
-        // --- MODIFIED: This check was the problem! ---
-        // We now force a reload if the filter was on AND the lists are different
         if (newPageIndex == oldFilteredPageIndex && filteredProcessingQueue.size() != oldFilteredSize) {
             createPage(newPageIndex);
         }
-
-        // --- DELETED ---
-        // if (newPageIndex == oldFilteredPageIndex && filteredProcessingQueue.size() != oldFilteredSize) {
-        //    createPage(newPageIndex);
-        // }
     }
-
-    /**
-     * Toggles visibility between the Pagination and Completion screen.
-     * -- NO LONGER NEEDED --
-     */
-    // private void showPagination(boolean show) { ... }
 
     private void showChoiceUI(boolean show) {
         choiceBox.setVisible(show);
@@ -500,24 +496,27 @@ public class ImportMatcherStage extends Stage {
         logger.info("Starting import matching process for {} items.", data.size());
         this.onFinishedCallback = onFinished;
         this.currentIndex = 0;
-        this.fullProcessingQueue = preProcessAndFilterData(data); // Load full list
+        this.fullProcessingQueue = preProcessAndFilterData(data);
 
-        // If the full queue is empty, no review is needed.
         if (fullProcessingQueue.isEmpty()) {
-            logger.info("No items require review. Closing matcher.");
             if (data.isEmpty()) {
+                // Case 1: No data was ever imported.
+                logger.info("No items require review because no data was imported. Closing matcher.");
                 Platform.runLater(() -> {
                     coreProvider.createDialog(BaseDialog.DialogType.INFO,
                             "No data was imported to process.",
                             root).showAndWait();
                 });
+                Platform.runLater(this::close);
+                return; // Exit here.
+            } else {
+                // Case 2: All items were perfect matches.
+                // The dialog was shown in preProcess. Proceed to show completion page.
+                logger.info("No items require review. Proceeding to completion page for sync options.");
             }
-            Platform.runLater(this::close);
-            return;
         }
 
-        // Initial pagination setup
-        updatePagination(true); // MODIFIED
+        updatePagination(true);
 
         if (!this.isShowing()) {
             this.showAndWait();
@@ -528,9 +527,9 @@ public class ImportMatcherStage extends Stage {
     }
 
     /**
-     * NEW: Re-builds the filtered list and resets the pagination control
+     * Re-builds the filtered list and resets the pagination control
      */
-    private void updatePagination(boolean restorePageIndex) { // MODIFIED
+    private void updatePagination(boolean restorePageIndex) {
         int oldPage = pagination.getCurrentPageIndex();
 
         if (filterCheckBox.isSelected()) {
@@ -557,8 +556,7 @@ public class ImportMatcherStage extends Stage {
         pagination.setPageCount(newPageCount);
         pagination.setPageFactory(this::createPage);
 
-        if (restorePageIndex) { // <-- NEW Check
-            // Try to stay on the same page
+        if (restorePageIndex) {
             if (oldPage < newPageCount) {
                 pagination.setCurrentPageIndex(oldPage);
             } else {
@@ -569,12 +567,11 @@ public class ImportMatcherStage extends Stage {
 
     @Override
     public void showAndWait() {
-        // The Pagination control will automatically call createPage(0) when it's shown.
         super.showAndWait();
     }
 
     /**
-     * NEW: Pre-filters the data list to remove items that are already "perfect matches".
+     * Pre-filters the data list to remove items that are already "perfect matches".
      */
     private List<ImportMatchTask> preProcessAndFilterData(List<PlayerData> data) {
         List<ImportMatchTask> tasksThatNeedReview = new ArrayList<>();
@@ -623,7 +620,7 @@ public class ImportMatcherStage extends Stage {
             int finalPerfectMatchCount = perfectMatchCount;
             Platform.runLater(() -> {
                 coreProvider.createDialog(BaseDialog.DialogType.INFO,
-                        "All " + finalPerfectMatchCount + " imported items were perfect matches and have been skipped. No review is needed.",
+                        "All " + finalPerfectMatchCount + " imported items were perfect matches and have been skipped. You can now sync if needed.",
                         root).showAndWait();
             });
         }
@@ -785,21 +782,53 @@ public class ImportMatcherStage extends Stage {
     }
 
     /**
-     * Handles the "Save All" button click.
+     * Handles the "Save, Sync & Close" button click.
      */
-    private void handleSave() {
-        logger.info("User initiated 'Save All' from matcher stage.");
+    private void handleSaveAndClose() {
+        logger.info("User initiated 'Save & Close'.");
+        finalConfirmationBox.setVisible(false);
+
+        long pendingCount = fullProcessingQueue.stream()
+                .filter(t -> t.getStatus() == ImportMatchTask.Status.PENDING)
+                .count();
+
+        if (pendingCount > 0) {
+            finalConfirmationLabel.setText(String.format(
+                    "You still have %d pending item(s). If you save now, they will be skipped. Save and close anyway?",
+                    pendingCount));
+            finalConfirmationBox.setVisible(true);
+            btnConfirmFinal.setOnAction(e -> {
+                finalConfirmationBox.setVisible(false);
+                performSaveAndSyncAndClose();
+            });
+        } else {
+            performSaveAndSyncAndClose();
+        }
+    }
+
+    /**
+     * Performs the actual save, then sync, and closes the window on completion.
+     */
+    private void performSaveAndSyncAndClose() {
+        logger.info("Calling saveAll service...");
+
+        Runnable onSaveFinishedCallback = () -> {
+            logger.info("Database save complete. Starting sheet sync.");
+            performExportAndClose();
+        };
+
         uiPersistenceService.saveAll(
                 this.getScene().getWindow(),
-                onFinishedCallback
+                onSaveFinishedCallback
         );
     }
 
     /**
-     * Handles the "Export" button click.
+     * Performs the export/sync logic and closes the window.
+     * This runs *after* the save is successful.
      */
-    private void handleExport() {
-        logger.info("User initiated 'Export' from matcher stage.");
+    private void performExportAndClose() {
+        logger.info("Starting 'Export & Sync' as part of save process.");
 
         String localSheetId;
         try {
@@ -809,11 +838,18 @@ public class ImportMatcherStage extends Stage {
             }
         } catch (Exception e) {
             logger.error("Failed to get SHEETS_ID from settings!", e);
-            coreProvider.createDialog(BaseDialog.DialogType.ERROR, "Could not get Sheet ID from settings. Cannot export.", root).showAndWait();
+            coreProvider.createDialog(BaseDialog.DialogType.ERROR, "DB save was successful, but could not get Sheet ID from settings. Cannot sync.", root).showAndWait();
+            if (onFinishedCallback != null) {
+                onFinishedCallback.run();
+            }
+            Platform.runLater(() -> {
+                isCancelling = true;
+                this.close();
+            });
             return;
         }
 
-        List<SheetsServiceManager.ExportData> exportDataList = fullProcessingQueue.stream() // Use FULL list
+        List<SheetsServiceManager.ExportData> exportDataList = fullProcessingQueue.stream()
                 .filter(t -> t.getStatus() == ImportMatchTask.Status.COMPLETED)
                 .map(t -> new SheetsServiceManager.ExportData(
                         t.getOriginalData().row(),
@@ -825,30 +861,97 @@ public class ImportMatcherStage extends Stage {
                 ))
                 .collect(Collectors.toList());
 
+        // We check this *after* getting the sheet ID, but before the task.
         if (exportDataList.isEmpty()) {
-            coreProvider.createDialog(BaseDialog.DialogType.INFO, "No completed items to export.", root).showAndWait();
+            logger.info("No completed items to export. Skipping sheet sync.");
+            if (onFinishedCallback != null) {
+                onFinishedCallback.run();
+            }
+            Platform.runLater(() -> {
+                isCancelling = true;
+                this.close();
+            });
             return;
         }
 
         uiTaskExecutor.execute(
                 this.getScene().getWindow(),
-                "Exporting matched data...",
-                "Successfully exported data to Google Sheets!",
+                "Syncing to Sheet...",
+                "Successfully saved and synced to sheet!",
                 (updater) -> {
-                    updater.updateStatus("Updating sheet with new names and UUIDs...");
+                    updater.updateStatus("Step 1/2: Updating sheet with new names and UUIDs...");
                     sheetsServiceManager.exportMatchedData(localSheetId, exportDataList, settingsStore);
+
+                    updater.updateStatus("Step 2/2: Syncing all DB characters back to sheet...");
+                    List<Character> allCharacters = new ArrayList<>(characterStore.getAllCharacters());
+                    sheetsServiceManager.appendMissingCharactersToSheet(localSheetId, allCharacters, settingsStore);
+
                     return "unused";
                 },
                 (result) -> {
-                    logger.info("Export complete.");
+                    logger.info("Export and Sync complete.");
+                    if (onFinishedCallback != null) {
+                        onFinishedCallback.run();
+                    }
+                    Platform.runLater(() -> {
+                        isCancelling = true;
+                        this.close();
+                    });
                 },
                 (error) -> {
-                    logger.error("Export failed!", error);
+                    logger.error("Export and Sync failed!", error);
+                    Platform.runLater(() -> {
+                        coreProvider.createDialog(BaseDialog.DialogType.ERROR,
+                                "Database save was SUCCESSFUL, but sheet sync failed: " + error.getMessage(),
+                                root).showAndWait();
+
+                        if (onFinishedCallback != null) {
+                            onFinishedCallback.run();
+                        }
+                        isCancelling = true;
+                        this.close();
+                    });
                 }
         );
     }
 
-    // --- Helper Methods ---
+
+    /**
+     * Handles the "Cancel" button click.
+     */
+    private void handleCancel() {
+        logger.info("User initiated 'Cancel & Undo All'.");
+        finalConfirmationBox.setVisible(false);
+
+        finalConfirmationLabel.setText("Are you sure you want to cancel? All new players and characters created in this session will be undone.");
+        finalConfirmationBox.setVisible(true);
+        btnConfirmFinal.setOnAction(e -> {
+            finalConfirmationBox.setVisible(false);
+            performCancel();
+        });
+    }
+
+    /**
+     * Performs the actual cancel logic (undo all) and closes.
+     */
+    private void performCancel() {
+        logger.warn("User confirmed cancel. Undoing all creations...");
+
+        for (ImportMatchTask task : fullProcessingQueue) {
+            if (task.wasCharacterCreated() && task.getResolvedCharacter() != null) {
+                logger.debug("Undoing character creation for: {}", task.getResolvedCharacter().getName());
+                characterStore.removeCharacter(task.getResolvedCharacter());
+            }
+            if (task.wasPlayerCreated() && task.getResolvedPlayer() != null) {
+                logger.debug("Undoing player creation for: {}", task.getResolvedPlayer().getName());
+                playerStore.removePlayer(task.getResolvedPlayer());
+            }
+        }
+
+        logger.info("Undo complete. Closing window.");
+        isCancelling = true;
+        this.close(); // Close without saving
+    }
 
     private static class MatchWrapper<T> implements Comparable<MatchWrapper<T>> {
         final T item;
@@ -957,7 +1060,7 @@ public class ImportMatcherStage extends Stage {
             btnCancelCreate.setOnAction(e -> {
                 showConfirmationUI(false);
                 actionLabel.setText(originalListHeader);
-                showChoiceUI(true); // Fixed typo here (was s showChoiceUI)
+                showChoiceUI(true);
             });
         });
     }
