@@ -2,33 +2,43 @@ package org.poolen.frontend.gui;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.concurrent.Task; // We need this!
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
-// We no longer get the context from ApplicationLauncher
 import org.poolen.MatchmakerApplication;
-import org.poolen.frontend.exceptions.GlobalExceptionHandler; // We need this!
+import org.poolen.frontend.exceptions.GlobalExceptionHandler;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
 import org.poolen.frontend.gui.components.stages.ManagementStage;
 import org.poolen.frontend.gui.components.stages.SetupStage;
 import org.poolen.frontend.gui.components.stages.email.AccessRequestStage;
 import org.poolen.frontend.util.interfaces.UiUpdater;
-import org.poolen.web.google.GoogleAuthManager.AuthorizationTimeoutException;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
-import org.poolen.frontend.util.services.*;
+import org.poolen.frontend.util.services.ApplicationScriptService;
+import org.poolen.frontend.util.services.ComponentFactoryService;
+import org.poolen.frontend.util.services.StartupService;
+import org.poolen.frontend.util.services.StartupService.StartupResult;
+import org.poolen.frontend.util.services.UiGithubTaskService;
+import org.poolen.frontend.util.services.UiGoogleTaskService;
+import org.poolen.frontend.util.services.UiPersistenceService;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.util.PropertiesManager;
 import org.poolen.util.SpringManager;
 import org.poolen.web.google.GoogleAuthManager;
+import org.poolen.web.google.GoogleAuthManager.AuthorizationTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -37,7 +47,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import java.io.File;
 import java.net.BindException;
 import java.util.Optional;
-import org.poolen.frontend.util.services.StartupService.StartupResult;
 
 
 /**
