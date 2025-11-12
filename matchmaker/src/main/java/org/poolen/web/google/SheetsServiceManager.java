@@ -11,7 +11,6 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
 import org.poolen.backend.db.store.Store;
 import org.poolen.backend.util.FuzzyStringMatcher;
-// import org.poolen.frontend.gui.components.stages.ImportMatcherStage.ImportMatchTask; // <-- GONE! So much cleaner!
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,10 +22,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,13 +42,11 @@ public class SheetsServiceManager {
 
     private final Map<String, Integer> sheetIdCache = new HashMap<>();
 
-    // --- NEW: Centralised Colour Definitions ---
     private static final Color COLOR_LIGHT_GRAY = new Color().setRed(0.9f).setGreen(0.9f).setBlue(0.9f);
     private static final Color COLOR_WHITE = new Color().setRed(1f).setGreen(1f).setBlue(1f);
     private static final Color COLOR_BLACK = new Color().setRed(0f).setGreen(0f).setBlue(0f);
     private static final Color COLOR_LIGHT_RED = new Color().setRed(1f).setGreen(0.8f).setBlue(0.8f);
     private static final Color COLOR_DARKER_RED = new Color().setRed(0.95f).setGreen(0.75f).setBlue(0.75f);
-    // --- END NEW ---
 
     public SheetsServiceManager(SheetDataMapper sheetDataMapper, Store store, GoogleAuthManager googleAuthManager) {
         this.sheetDataMapper = sheetDataMapper;
@@ -118,7 +113,7 @@ public class SheetsServiceManager {
                 .execute();
 
         logger.info("Successfully appended {} rows of data. Updated range: {}", valuesToAppend.size(), appendResponse.getUpdates().getUpdatedRange());
-        this.reformatGroupSheet(spreadsheetId, recapSheetName, appendResponse); // This still uses its own special formatting
+        this.reformatGroupSheet(spreadsheetId, recapSheetName, appendResponse);
     }
 
     private void reformatGroupSheet(String spreadsheetId, String sheetName, AppendValuesResponse appendResponse) throws IOException {
@@ -140,20 +135,18 @@ public class SheetsServiceManager {
 
         List<Request> requests = new ArrayList<>();
 
-        // --- Use instance colours ---
         CellFormat grayFormat = new CellFormat().setBackgroundColor(COLOR_LIGHT_GRAY);
         CellFormat whiteFormat = new CellFormat().setBackgroundColor(COLOR_WHITE);
         CellFormat lightRedFormat = new CellFormat().setBackgroundColor(COLOR_LIGHT_RED);
         CellFormat darkerRedFormat = new CellFormat().setBackgroundColor(COLOR_DARKER_RED);
         Border solidBorder = new Border().setStyle("SOLID").setColor(COLOR_BLACK);
-        // --- End ---
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         LocalDate today = LocalDate.now();
 
         for (int i = 1; i < totalRows; i++) {
             GridRange rowRange = new GridRange().setSheetId(sheetId).setStartRowIndex(i).setEndRowIndex(i + 1);
-            CellFormat format = (i % 2 == 0) ? grayFormat : whiteFormat; // This logic is correct: row 2 (i=1) is white, row 3 (i=2) is gray
+            CellFormat format = (i % 2 == 0) ? grayFormat : whiteFormat; // row 2 (i=1) is white, row 3 (i=2) is gray
 
             List<Object> row = allValues.get(i);
             if (row.size() > 6) {
@@ -176,7 +169,6 @@ public class SheetsServiceManager {
                     .setFields("userEnteredFormat.backgroundColor")));
         }
 
-        // --- RE-ADDED: Top Border logic for new appends ---
         String updatedRange = appendResponse.getUpdates().getUpdatedRange();
         if (updatedRange != null) {
             Matcher matcher = Pattern.compile("(\\d+):").matcher(updatedRange.split("!")[1]);
@@ -186,7 +178,6 @@ public class SheetsServiceManager {
                 requests.add(new Request().setUpdateBorders(new UpdateBordersRequest().setRange(topBorderRange).setTop(solidBorder)));
             }
         }
-        // --- END RE-ADDED ---
 
         GridRange allCellsRange = new GridRange().setSheetId(sheetId).setStartRowIndex(1).setEndRowIndex(totalRows).setStartColumnIndex(0).setEndColumnIndex(totalCols);
         requests.add(new Request().setRepeatCell(new RepeatCellRequest().setRange(allCellsRange).setCell(new CellData().setUserEnteredFormat(new CellFormat().setBorders(new Borders().setRight(solidBorder)))).setFields("userEnteredFormat.borders.right")));
@@ -245,8 +236,7 @@ public class SheetsServiceManager {
     public record PlayerData(int row, House house, String playerUuid, String charUuid, String player, String character) {}
 
     /**
-     * A new, clean record to hold the *results* of the matching process for export.
-     * This ensures our service layer is totally decoupled from the UI!
+     * A clean record to hold the *results* of the matching process for export.
      */
     public record ExportData(
             int row,
@@ -350,7 +340,6 @@ public class SheetsServiceManager {
 
     /**
      * Exports the matched data back to the sheet.
-     * This now uses our clean ExportData record!
      */
     public void exportMatchedData(String spreadsheetId, List<ExportData> tasks, SettingsStore settingsStore) throws IOException {
         if (this.sheetsService == null) {
@@ -390,22 +379,15 @@ public class SheetsServiceManager {
             for (ExportData task : entry.getValue()) {
                 int row = task.row() - 1; // API is 0-indexed!
 
-                // 1. Update Player Name
                 if (playerCol != -1 && task.finalPlayerName() != null) {
                     allRequests.add(createCellUpdateRequest(sheetId, row, playerCol, task.finalPlayerName()));
                 }
-
-                // 2. Update Player UUID
                 if (playerUuidCol != -1 && task.finalPlayerUuid() != null) {
                     allRequests.add(createCellUpdateRequest(sheetId, row, playerUuidCol, task.finalPlayerUuid()));
                 }
-
-                // 3. Update Character Name
                 if (charCol != -1 && task.finalCharName() != null) {
                     allRequests.add(createCellUpdateRequest(sheetId, row, charCol, task.finalCharName()));
                 }
-
-                // 4. Update Character UUID
                 if (charUuidCol != -1 && task.finalCharUuid() != null) {
                     allRequests.add(createCellUpdateRequest(sheetId, row, charUuidCol, task.finalCharUuid()));
                 }
@@ -475,23 +457,27 @@ public class SheetsServiceManager {
     }
 
     /**
-     * NEW: Appends characters (and their players) that exist in the DB
-     * but not on the sheet. This is for syncing *back* to the sheet.
+     * Helper record for storing sheet data against a UUID.
+     */
+    private record SheetRowData(int row, String playerName, String charName) {}
+
+    /**
+     * Appends characters (and their players) that exist in the DB
+     * but not on the sheet. Also updates existing entries if names mismatch.
      */
     public void appendMissingCharactersToSheet(String spreadsheetId, List<Character> characters, SettingsStore settingsStore) throws IOException {
         if (this.sheetsService == null) {
-            logger.error("Cannot append characters: Sheets service is not initialised.");
+            logger.error("Cannot append/update characters: Sheets service is not initialised.");
             throw new IllegalStateException("Not connected to Google Sheets.");
         }
 
         if (characters == null || characters.isEmpty()) {
-            logger.info("No missing characters to append. Aborting.");
+            logger.info("No characters provided to sync. Aborting.");
             return;
         }
 
-        logger.info("Starting append process for {} missing characters.", characters.size());
+        logger.info("Starting sync process for {} DB characters.", characters.size());
 
-        // Get House -> Tab Name mapping (same as export)
         Map<House, String> houseToTabName = Map.of(
                 House.GARNET, (String) settingsStore.getSetting(Settings.PersistenceSettings.GARNET_SHEET_NAME).getSettingValue(),
                 House.AMBER, (String) settingsStore.getSetting(Settings.PersistenceSettings.AMBER_SHEET_NAME).getSettingValue(),
@@ -499,21 +485,19 @@ public class SheetsServiceManager {
                 House.OPAL, (String) settingsStore.getSetting(Settings.PersistenceSettings.OPAL_SHEET_NAME).getSettingValue()
         );
 
-        // Group characters by their house
         Map<House, List<Character>> charsByHouse = characters.stream()
-                .filter(c -> c.getPlayer() != null) // Safety check
+                .filter(c -> c.getPlayer() != null)
                 .collect(Collectors.groupingBy(Character::getHouse));
 
-        List<Request> allAppendRequests = new ArrayList<>();
+        List<Request> allRequests = new ArrayList<>();
 
         for (Map.Entry<House, List<Character>> entry : charsByHouse.entrySet()) {
             String tabName = houseToTabName.get(entry.getKey());
             if (tabName == null || tabName.isEmpty()) {
-                logger.warn("No tab name found for House {}, skipping append for {} characters.", entry.getKey(), entry.getValue().size());
+                logger.warn("No tab name found for House {}, skipping sync for {} characters.", entry.getKey(), entry.getValue().size());
                 continue;
             }
 
-            // 1. Find the column indices for this tab
             Map<String, Integer> colIndices = findHeaderIndices(spreadsheetId, tabName);
             int sheetId = getSheetId(spreadsheetId, tabName);
 
@@ -522,84 +506,104 @@ public class SheetsServiceManager {
             int charCol = colIndices.getOrDefault("charCol", -1);
             int charUuidCol = colIndices.getOrDefault("charUuidCol", -1);
 
-            // --- NEW: Read existing UUIDs to prevent duplicates ---
-            Set<String> existingCharUuids = new HashSet<>();
-            if (charUuidCol != -1) {
-                String colLetter = getColumnLetter(charUuidCol);
-                String uuidDataRange = tabName + "!" + colLetter + "2:" + colLetter;
-                logger.debug("Reading existing UUIDs from range: {}", uuidDataRange);
+            if (charUuidCol == -1) {
+                logger.warn("Cannot sync with tab '{}': No 'Character UUID' column found. Skipping house.", tabName);
+                continue;
+            }
 
-                ValueRange uuidResponse = this.sheetsService.spreadsheets().values().get(spreadsheetId, uuidDataRange).execute();
-                List<List<Object>> uuidValues = uuidResponse.getValues();
+            Map<String, SheetRowData> uuidToSheetDataMap = new HashMap<>();
+            String fullDataRange = tabName + "!A2:Z";
+            ValueRange fullDataResponse = this.sheetsService.spreadsheets().values().get(spreadsheetId, fullDataRange).execute();
+            List<List<Object>> allData = fullDataResponse.getValues();
 
-                if (uuidValues != null) {
-                    for (List<Object> row : uuidValues) {
-                        if (row != null && !row.isEmpty() && row.get(0) != null) {
-                            existingCharUuids.add(row.get(0).toString().trim());
-                        }
+            if (allData != null) {
+                for (int i = 0; i < allData.size(); i++) {
+                    List<Object> row = allData.get(i);
+                    int rowNum = i + 2; // Sheet rows are 1-based, and we started at A2
+                    String uuid = getStringFromRow(row, charUuidCol);
+                    if (!uuid.isEmpty()) {
+                        String player = getStringFromRow(row, playerCol);
+                        String charName = getStringFromRow(row, charCol);
+                        uuidToSheetDataMap.put(uuid, new SheetRowData(rowNum, player, charName));
                     }
                 }
             }
-            logger.debug("Found {} existing character UUIDs in tab '{}'.", existingCharUuids.size(), tabName);
+            logger.debug("Found {} existing, UUID-tagged characters in tab '{}'.", uuidToSheetDataMap.size(), tabName);
 
-            // NEW: Filter the list of characters for this house
-            List<Character> charactersToAppend = entry.getValue().stream()
-                    .filter(c -> !existingCharUuids.contains(c.getUuid().toString()))
-                    .collect(Collectors.toList());
+            List<Character> charactersToAppend = new ArrayList<>();
 
-            if (charactersToAppend.isEmpty()) {
-                logger.info("No new characters to append for tab '{}' (all {} already exist).", tabName, entry.getValue().size());
-                continue; // Skip to the next house
-            }
-            // --- END NEW ---
-
-            logger.info("Preparing append requests for tab '{}' ({} new characters)", tabName, charactersToAppend.size());
-
-            // 2. Find the next empty row for this tab
-            String dataRange = tabName + "!A2:A"; // Only need to check one column (e.g., A) to find the last row
-            ValueRange dataResponse = this.sheetsService.spreadsheets().values().get(spreadsheetId, dataRange).execute();
-            List<List<Object>> allData = dataResponse.getValues();
-            int startRowIndex = (allData == null ? 0 : allData.size()) + 1; // 0-based index
-
-            logger.debug("Found next empty row for tab '{}' at index {}", tabName, startRowIndex + 1); // +1 for 1-based logging
-
-            int currentRowIndex = startRowIndex; // Use a new var to loop
-            // 3. Create requests for each character
-            for (Character character : charactersToAppend) { // MODIFIED: Use filtered list
+            for (Character character : entry.getValue()) {
                 Player player = character.getPlayer();
                 if (player == null) {
                     logger.warn("Skipping character '{}' as it has no player.", character.getName());
                     continue;
                 }
 
-                if (playerCol != -1) {
-                    allAppendRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, playerCol, player.getName()));
-                }
-                if (playerUuidCol != -1) {
-                    allAppendRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, playerUuidCol, player.getUuid().toString()));
-                }
-                if (charCol != -1) {
-                    allAppendRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, charCol, character.getName()));
-                }
-                if (charUuidCol != -1) {
-                    allAppendRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, charUuidCol, character.getUuid().toString()));
-                }
+                String dbUuid = character.getUuid().toString();
+                String dbPlayerName = player.getName();
+                String dbCharName = character.getName();
 
-                currentRowIndex++; // Move to the next row for the next character
+                if (uuidToSheetDataMap.containsKey(dbUuid)) {
+                    SheetRowData sheetData = uuidToSheetDataMap.get(dbUuid);
+                    boolean playerMismatch = playerCol != -1 && !dbPlayerName.equals(sheetData.playerName());
+                    boolean charMismatch = charCol != -1 && !dbCharName.equals(sheetData.charName());
+
+                    if (playerMismatch || charMismatch) {
+                        logger.info("Mismatch found for UUID {}. Sheet: (P: '{}', C: '{}'), DB: (P: '{}', C: '{}'). Queueing update.",
+                                dbUuid, sheetData.playerName(), sheetData.charName(), dbPlayerName, dbCharName);
+
+                        int apiRowIndex = sheetData.row() - 1; // API is 0-indexed
+                        if (playerMismatch) {
+                            allRequests.add(createCellUpdateRequest(sheetId, apiRowIndex, playerCol, dbPlayerName));
+                        }
+                        if (charMismatch) {
+                            allRequests.add(createCellUpdateRequest(sheetId, apiRowIndex, charCol, dbCharName));
+                        }
+                    }
+                } else {
+                    charactersToAppend.add(character);
+                }
+            }
+
+            if (charactersToAppend.isEmpty()) {
+                logger.info("No new characters to append for tab '{}'.", tabName);
+            } else {
+                logger.info("Preparing append requests for tab '{}' ({} new characters)", tabName, charactersToAppend.size());
+
+                int startRowIndex = (allData == null ? 0 : allData.size()) + 1; // 0-based index
+                logger.debug("Found next empty row for tab '{}' at index {}", tabName, startRowIndex + 1);
+
+                int currentRowIndex = startRowIndex;
+                for (Character character : charactersToAppend) {
+                    Player player = character.getPlayer();
+
+                    if (playerCol != -1) {
+                        allRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, playerCol, player.getName()));
+                    }
+                    if (playerUuidCol != -1) {
+                        allRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, playerUuidCol, player.getUuid().toString()));
+                    }
+                    if (charCol != -1) {
+                        allRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, charCol, character.getName()));
+                    }
+                    if (charUuidCol != -1) {
+                        allRequests.add(createCellUpdateRequest(sheetId, currentRowIndex, charUuidCol, character.getUuid().toString()));
+                    }
+
+                    currentRowIndex++;
+                }
             }
         }
 
-        if (allAppendRequests.isEmpty()) {
-            logger.info("No cell updates to perform for appending characters.");
-            // We still want to reformat, so we don't return here
+        if (allRequests.isEmpty()) {
+            logger.info("No cell updates or appends to perform for any tab.");
         } else {
-            logger.info("Executing batch update with {} total cell update requests to append characters.", allAppendRequests.size());
-            BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest().setRequests(allAppendRequests);
+            logger.info("Executing batch update with {} total cell updates/appends.", allRequests.size());
+            BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest().setRequests(allRequests);
             this.sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdate).execute();
-            logger.info("Successfully appended all missing characters back to Google Sheets!");
+            logger.info("Successfully synced all character updates/appends back to Google Sheets!");
         }
 
-        // --- NEW: After appending, reformat the *entire* character sheet for every house ---
         logger.info("Triggering full reformat of character sheets...");
         for (House house : charsByHouse.keySet()) {
             String tabName = houseToTabName.get(house);
@@ -614,8 +618,7 @@ public class SheetsServiceManager {
     }
 
     /**
-     * NEW: Reformats an *entire* character sheet with zebra stripes and borders.
-     * This is separate from reformatGroupSheet, which has special logic.
+     * Reformats an *entire* character sheet with zebra stripes and borders.
      */
     public void reformatCharacterSheet(String spreadsheetId, String tabName) throws IOException {
         logger.info("Applying full reformat to character sheet: {}", tabName);
@@ -626,18 +629,16 @@ public class SheetsServiceManager {
             return;
         }
 
-        // 1. Get total rows
-        String dataRange = tabName + "!A:A"; // Check column A
+        String dataRange = tabName + "!A:A";
         ValueRange dataResponse = this.sheetsService.spreadsheets().values().get(spreadsheetId, dataRange).execute();
         List<List<Object>> allData = dataResponse.getValues();
-        int totalRows = (allData == null ? 0 : allData.size()); // This is the total row count
+        int totalRows = (allData == null ? 0 : allData.size());
 
         if (totalRows <= 1) {
             logger.info("No data rows to format in sheet '{}'.", tabName);
-            return; // Nothing to do
+            return;
         }
 
-        // 2. Get total columns
         Map<String, Integer> colIndices = findHeaderIndices(spreadsheetId, tabName);
         int totalCols = colIndices.values().stream().max(Integer::compareTo).orElse(-1) + 1;
         if (totalCols == 0) {
@@ -645,7 +646,6 @@ public class SheetsServiceManager {
             return;
         }
 
-        // 3. Create formatting requests for the *entire* sheet (skipping header)
         List<Request> requests = createZebraStripeAndBorderRequests(sheetId, 1, totalRows, totalCols);
 
         if (requests.isEmpty()) {
@@ -653,7 +653,6 @@ public class SheetsServiceManager {
             return;
         }
 
-        // 4. Execute the batch update
         logger.debug("Applying {} formatting requests to entire sheet '{}' (rows 2-{})", requests.size(), tabName, totalRows);
         BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest().setRequests(requests);
         this.sheetsService.spreadsheets().batchUpdate(spreadsheetId, batchUpdate).execute();
@@ -662,24 +661,17 @@ public class SheetsServiceManager {
 
 
     /**
-     * MODIFIED: Creates simple zebra striping and border requests for a range of rows.
-     * Signature changed to no longer take updatedRange.
+     * Creates simple zebra striping and border requests for a range of rows.
      */
     private List<Request> createZebraStripeAndBorderRequests(int sheetId, int startRowIndex, int endRowIndex, int totalCols) {
         List<Request> requests = new ArrayList<>();
 
-        // 1. Define colors and formats (now using instance variables)
         CellFormat grayFormat = new CellFormat().setBackgroundColor(COLOR_LIGHT_GRAY);
         CellFormat whiteFormat = new CellFormat().setBackgroundColor(COLOR_WHITE);
         Border solidBorder = new Border().setStyle("SOLID").setColor(COLOR_BLACK);
 
-        // 2. Apply zebra striping
-        // Note: startRowIndex is the 0-based index.
-        // Row 2 is index 1. (1 % 2 != 0) -> white
-        // Row 3 is index 2. (2 % 2 == 0) -> gray
         for (int i = startRowIndex; i < endRowIndex; i++) {
             GridRange rowRange = new GridRange().setSheetId(sheetId).setStartRowIndex(i).setEndRowIndex(i + 1);
-            // This logic is consistent with reformatGroupSheet
             CellFormat format = (i % 2 == 0) ? grayFormat : whiteFormat;
 
             requests.add(new Request().setRepeatCell(new RepeatCellRequest()
@@ -688,9 +680,6 @@ public class SheetsServiceManager {
                     .setFields("userEnteredFormat.backgroundColor")));
         }
 
-        // --- REMOVED: Top Border logic ---
-
-        // 3. Add right-side border for all new cells (was 4)
         GridRange allCellsRange = new GridRange().setSheetId(sheetId).setStartRowIndex(startRowIndex).setEndRowIndex(endRowIndex).setStartColumnIndex(0).setEndColumnIndex(totalCols);
         requests.add(new Request().setRepeatCell(new RepeatCellRequest()
                 .setRange(allCellsRange)
@@ -699,20 +688,5 @@ public class SheetsServiceManager {
                 .setFields("userEnteredFormat.borders.right")));
 
         return requests;
-    }
-
-    /**
-     * NEW: Helper to convert a 0-based column index to its A1 notation letter.
-     * 0 -> A, 1 -> B, 26 -> AA
-     */
-    private String getColumnLetter(int colIndex) {
-        int dividend = colIndex + 1;
-        String colName = "";
-        while (dividend > 0) {
-            int modulo = (dividend - 1) % 26;
-            colName = (char) (65 + modulo) + colName;
-            dividend = (dividend - modulo) / 26;
-        }
-        return colName;
     }
 }

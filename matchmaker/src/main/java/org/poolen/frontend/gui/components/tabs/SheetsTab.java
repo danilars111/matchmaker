@@ -93,9 +93,10 @@ public class SheetsTab extends Tab {
      * Builds the basic UI components for the tab.
      */
     private void buildUi() {
-        importButton = new Button("Import All Data from Sheets");
+        importButton = new Button("Sync with Google Sheets");
         importButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4285F4; -fx-text-fill: white;");
         importButton.setPrefWidth(300);
+        setText("Sheets");
 
         statusLabel = new Label("Checking sign-in status...");
         progressIndicator = new ProgressIndicator();
@@ -146,12 +147,10 @@ public class SheetsTab extends Tab {
 
                 if (isSignedIn) {
                     statusLabel.setText("Status: Signed In. Ready to import.");
-                    setText("Sheets");
                     loadSheetSettings();
                     importButton.setDisable(false);
                 } else {
                     statusLabel.setText("Please sign in via the 'Auth' tab to enable Sheets import.");
-                    setText("Sheets (Signed Out)");
                 }
             }
 
@@ -160,7 +159,6 @@ public class SheetsTab extends Tab {
                 logger.error("Failed to check for stored credentials.", getException());
                 progressIndicator.setVisible(false);
                 statusLabel.setText("Status: Error checking credentials. Tab disabled.");
-                setText("Sheets (Error)");
                 setDisable(true);
             }
         };

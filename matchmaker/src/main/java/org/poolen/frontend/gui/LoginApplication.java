@@ -106,7 +106,7 @@ public class LoginApplication extends Application {
 
         // --- STEP 1: Set up the stage and show the splash screen IMMEDIATELY ---
         this.primaryStage = primaryStage;
-        primaryStage.setTitle("D&D Matchmaker Deluxe");
+        primaryStage.setTitle("Rollspelspoolen Matchmaker");
 
         logger.info("Creating and showing splash screen...");
         createAndShowSplashScene(); // Shows the *splash* scene immediately
