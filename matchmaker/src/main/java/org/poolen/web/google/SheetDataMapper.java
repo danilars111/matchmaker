@@ -71,6 +71,7 @@ public class SheetDataMapper {
                     .collect(Collectors.joining(", "));
             row.add(playerNames);
             row.add("");
+            row.add("");
             row.add(sessionDate.format(DATE_FORMATTER));
             row.add("");
             row.add("");

@@ -131,7 +131,26 @@ public class SheetsServiceManager {
             return;
         }
         int totalRows = allValues.size();
+
+        // Use the existing constant for total columns
         int totalCols = SheetDataMapper.GROUPS_HEADER.size();
+
+        // Dynamically find indices based on headers in the first row
+        int deadlineColIndex = -1;
+        int recapColIndex = -1;
+
+        List<Object> headerRow = allValues.get(0);
+        for (int i = 0; i < headerRow.size(); i++) {
+            String header = headerRow.get(i).toString();
+            // Using fuzzy matching to find "Deadline" and "Adventure Description/Recap" columns
+            if (FuzzyStringMatcher.areStringsSimilar(header, "Deadline", HEADER_THRESHOLD)) {
+                deadlineColIndex = i;
+                logger.debug("Found 'Deadline' column at index {}", i);
+            } else if (FuzzyStringMatcher.areStringsSimilar(header, "Adventure Description/Recap", HEADER_THRESHOLD)) {
+                recapColIndex = i;
+                logger.debug("Found 'Adventure Description/Recap' column at index {}", i);
+            }
+        }
 
         List<Request> requests = new ArrayList<>();
 
@@ -149,15 +168,23 @@ public class SheetsServiceManager {
             CellFormat format = (i % 2 == 0) ? grayFormat : whiteFormat; // row 2 (i=1) is white, row 3 (i=2) is gray
 
             List<Object> row = allValues.get(i);
-            if (row.size() > 6) {
-                try {
-                    LocalDate deadline = LocalDate.parse(row.get(6).toString(), formatter);
-                    boolean recapIsEmpty = row.size() <= 2 || row.get(2) == null || row.get(2).toString().trim().isEmpty();
-                    boolean isOverdue = deadline.isBefore(today);
 
-                    logger.trace("Processing row {}. Deadline: {}. Recap empty: {}. Overdue: {}", i, deadline, recapIsEmpty, isOverdue);
-                    if (isOverdue && recapIsEmpty) {
-                        format = (i % 2 == 0) ? darkerRedFormat : lightRedFormat;
+            // Only perform logic if we successfully found the columns
+            if (deadlineColIndex != -1 && recapColIndex != -1 && row.size() > deadlineColIndex) {
+                try {
+                    Object deadlineObj = row.get(deadlineColIndex);
+                    // Safe retrieval of recap cell
+                    Object recapObj = (row.size() > recapColIndex) ? row.get(recapColIndex) : null;
+
+                    if (deadlineObj != null && !deadlineObj.toString().isEmpty()) {
+                        LocalDate deadline = LocalDate.parse(deadlineObj.toString(), formatter);
+                        boolean recapIsEmpty = recapObj == null || recapObj.toString().trim().isEmpty();
+                        boolean isOverdue = deadline.isBefore(today);
+
+                        logger.trace("Processing row {}. Deadline: {}. Recap empty: {}. Overdue: {}", i, deadline, recapIsEmpty, isOverdue);
+                        if (isOverdue && recapIsEmpty) {
+                            format = (i % 2 == 0) ? darkerRedFormat : lightRedFormat;
+                        }
                     }
                 } catch (Exception e) {
                     logger.warn("Could not parse deadline for row {}. Skipping overdue check.", i, e);
