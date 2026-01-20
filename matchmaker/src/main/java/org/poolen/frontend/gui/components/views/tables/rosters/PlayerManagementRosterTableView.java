@@ -11,7 +11,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
+import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +39,8 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
     private TableColumn<Player, Boolean> attendingColumn;
     private TableColumn<Player, Boolean> dmingColumn;
 
-    public PlayerManagementRosterTableView(PlayerStoreProvider storeProvider) {
-        super();
+    public PlayerManagementRosterTableView(PlayerStoreProvider storeProvider, StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
+        super(storePersistenceService, uiTaskExecutor);
         this.playerStore = storeProvider.getPlayerStore();
         setupTableColumns();
         setupFilters();

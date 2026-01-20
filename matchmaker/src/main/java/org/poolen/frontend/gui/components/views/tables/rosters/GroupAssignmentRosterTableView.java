@@ -11,7 +11,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +38,8 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
     private CheckBox selectedFilterCheckbox;
     private CheckBox availableOnlyCheckbox;
 
-    public GroupAssignmentRosterTableView() {
-        super();
+    public GroupAssignmentRosterTableView(StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
+        super(storePersistenceService, uiTaskExecutor);
         setupTableColumns();
         setupFilters();
         updateRoster();

@@ -30,7 +30,7 @@ public class CharacterStore {
         return INSTANCE;
     }
     public void init(Set<Character> characters) {
-       characters.forEach(this::addCharacter);
+        characters.forEach(this::addCharacter);
     }
 
     public List<Character> getCharactersByHouse(House house) {

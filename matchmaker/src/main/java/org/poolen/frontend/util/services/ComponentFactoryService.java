@@ -3,6 +3,7 @@ package org.poolen.frontend.util.services;
 import javafx.scene.Node;
 import org.poolen.backend.db.factories.CharacterFactory;
 import org.poolen.backend.db.factories.PlayerFactory;
+import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.backend.db.store.Store;
 import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog;
@@ -58,6 +59,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final GoogleAuthManager authManager;
     private final UiGoogleTaskService uiGoogleTaskService;
     private final UiTaskExecutor uiTaskExecutor;
+    private final StorePersistenceService storePersistenceService;
 
     // Singleton components
     private ManagementStage managementStage;
@@ -86,6 +88,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
                                    GoogleAuthManager authManager,
                                    UiGoogleTaskService uiGoogleTaskService,
                                    UiTaskExecutor uiTaskExecutor,
+                                   StorePersistenceService storePersistenceService,
                                    ConfigurableApplicationContext springContext) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
@@ -97,6 +100,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         this.authManager = authManager;
         this.uiGoogleTaskService = uiGoogleTaskService;
         this.uiTaskExecutor = uiTaskExecutor;
+        this.storePersistenceService = storePersistenceService;
         this.springContext = springContext;
         logger.info("ComponentFactoryService initialised with all required beans.");
     }
@@ -248,21 +252,21 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public CharacterRosterTableView getCharacterRosterTableView() {
         if (this.characterRosterTableView == null) {
             logger.info("Creating singleton instance of CharacterRosterTableView.");
-            this.characterRosterTableView = new CharacterRosterTableView(store);
+            this.characterRosterTableView = new CharacterRosterTableView(store, storePersistenceService, uiTaskExecutor);
         }
         return this.characterRosterTableView;
     }
     public GroupAssignmentRosterTableView getGroupAssignmentRosterTableView() {
         if (this.groupAssignmentRosterTableView == null) {
             logger.info("Creating singleton instance of GroupAssignmentRosterTableView.");
-            this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView();
+            this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView(storePersistenceService, uiTaskExecutor);
         }
         return this.groupAssignmentRosterTableView;
     }
     public PlayerManagementRosterTableView getPlayerManagementRosterTableView() {
         if (this.playerManagementRosterTableView == null) {
             logger.info("Creating singleton instance of PlayerManagementRosterTableView.");
-            this.playerManagementRosterTableView = new PlayerManagementRosterTableView(store);
+            this.playerManagementRosterTableView = new PlayerManagementRosterTableView(store, storePersistenceService, uiTaskExecutor);
         }
         return this.playerManagementRosterTableView;
     }

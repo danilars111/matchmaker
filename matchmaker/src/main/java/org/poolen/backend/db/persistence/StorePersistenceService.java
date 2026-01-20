@@ -4,6 +4,7 @@ import org.poolen.backend.db.jpa.services.CharacterService;
 import org.poolen.backend.db.jpa.services.PlayerService;
 import org.poolen.backend.db.jpa.services.SettingService;
 import org.poolen.backend.db.store.Store;
+import org.poolen.frontend.util.interfaces.UiUpdater;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,9 +32,13 @@ public class StorePersistenceService {
     }
 
     public void findAll() {
+        store.getCharacterStore().clear();
+        store.getPlayerStore().clear();
+        store.getSettingsStore().clear();
         findSettings();
         findPlayers();
         findCharacters();
+
     }
 
     public void findSettings() {

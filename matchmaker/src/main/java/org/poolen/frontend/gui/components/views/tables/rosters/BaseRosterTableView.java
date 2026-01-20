@@ -17,8 +17,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 import javafx.util.Callback;
 import org.poolen.backend.db.constants.House;
+import org.poolen.backend.db.persistence.StorePersistenceService;
+import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -41,8 +44,10 @@ public abstract class BaseRosterTableView<T> extends VBox {
 
     private int rowsPerPage = 15;
     private Consumer<T> onItemDoubleClickHandler;
+    private StorePersistenceService storePersistenceService;
+    private UiTaskExecutor uiTaskExecutor;
 
-    public BaseRosterTableView() {
+    public BaseRosterTableView(StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
         super(10);
         setPadding(new Insets(10));
 
@@ -52,6 +57,8 @@ public abstract class BaseRosterTableView<T> extends VBox {
         this.topFilterBar = new HBox(10);
         this.houseFilterBox = new ComboBox<>();
         this.refreshButton = new Button("🔄");
+        this.storePersistenceService = storePersistenceService;
+        this.uiTaskExecutor = uiTaskExecutor;
 
         this.sourceItems = FXCollections.observableArrayList();
         this.filteredData = new FilteredList<>(sourceItems, p -> true);
@@ -103,7 +110,15 @@ public abstract class BaseRosterTableView<T> extends VBox {
         houseFilterBox.setPromptText("Filter by House");
         houseFilterBox.valueProperty().addListener((obs, old, val) -> applyFilter());
 
-        refreshButton.setOnAction(e -> updateRoster());
+        refreshButton.setOnAction(e ->
+            uiTaskExecutor.execute(this.getParent().getScene().getWindow(), "Refreshing Roster...",
+                    "Roster Successfully Refreshed",
+                    (updater) -> {
+                            storePersistenceService.findAll();
+                            return null;
+                        },
+                    (result) -> updateRoster()
+            ));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
