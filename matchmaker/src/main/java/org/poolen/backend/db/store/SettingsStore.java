@@ -78,6 +78,11 @@ public class SettingsStore {
         existingSetting.setSettingValue(value);
     }
 
+    public void clear() {
+        this.settingsMap.clear();
+        setDefaultSettings();
+    }
+
 
     public void setDefaultSettings() {
         List<House> amberPriorities = new ArrayList<>(List.of(House.GARNET, House.OPAL, House.AVENTURINE));

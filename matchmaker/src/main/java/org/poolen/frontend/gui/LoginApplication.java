@@ -229,8 +229,6 @@ public class LoginApplication extends Application {
     private void showLoginUI(String message) {
         logger.info("Switching from splash screen to login scene.");
 
-        // --- THIS IS THE MAGIC ---
-        // We now set the scene to the one we prepared earlier.
         primaryStage.setScene(loginScene);
         primaryStage.setTitle("D&D Matchmaker Deluxe - Sign In");
 
