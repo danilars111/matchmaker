@@ -23,8 +23,16 @@ public class Group {
     private LocalDate date;
     private String location;
 
+    public Group() {
+
+    }
+
     public Group(Player dungeonMaster, List<House> houses, LocalDate date, String location) {
-        this.uuid = UUID.randomUUID();
+        this(null, dungeonMaster, houses, date, location);
+    }
+
+    public Group(UUID uuid, Player dungeonMaster, List<House> houses, LocalDate date, String location) {
+        this.uuid = uuid != null ? uuid : UUID.randomUUID();
         this.dungeonMaster = dungeonMaster;
         this.houses = new ArrayList<>(houses); // Create a mutable copy
         this.date = date;
@@ -144,6 +152,10 @@ public class Group {
 
     public void setDate(LocalDate date) {
         this.date = date;
+    }
+
+    public void setUuid(UUID uuid) {
+        this.uuid = uuid;
     }
 
     public UUID getUuid() {

@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
 public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     private static final Logger logger = LoggerFactory.getLogger(GroupManagementTab.class);
-    private static final GroupFactory groupFactory = GroupFactory.getInstance();
+    private final GroupFactory groupFactory;
 
     private GroupFormView groupForm;
     private SplitPane root;
@@ -72,7 +72,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
     public GroupManagementTab(CoreProvider coreProvider, ViewProvider viewProvider, StageProvider stageProvider,
                               SheetsServiceManager sheetsServiceManager, UiTaskExecutor uiTaskExecutor,
-                              Matchmaker matchmaker) {
+                              Matchmaker matchmaker, GroupFactory groupFactory) {
         super("Group Management");
 
         this.sheetsServiceManager = sheetsServiceManager;
@@ -80,6 +80,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.stageProvider = stageProvider;
         this.coreProvider = coreProvider;
         this.uiTaskExecutor = uiTaskExecutor;
+        this.groupFactory = groupFactory;
 
         this.root = new SplitPane();
         this.groupForm = viewProvider.getGroupFormView();
@@ -328,7 +329,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         logger.info("Creating {} suggested groups based on themes.", themes.size());
         for (House theme : themes) {
             // Passing null for location as it's not specified in this context
-            groups.add(groupFactory.create(null, List.of(theme), eventDate, null, new ArrayList<>()));
+            groups.add(groupFactory.create(null, null, List.of(theme), eventDate, null, new ArrayList<>()));
         }
         cleanUp();
     }
@@ -350,7 +351,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 if (source != null) source.removePartyMember(player);
             });
             // Use the factory method that includes location
-            groups.add(groupFactory.create(selectedDm, groupForm.getSelectedHouses(), eventDate, selectedLocation, new ArrayList<>(newPartyMap.values())));
+            groups.add(groupFactory.create(null, selectedDm, groupForm.getSelectedHouses(), eventDate, selectedLocation, new ArrayList<>(newPartyMap.values())));
         } else {
             logger.info("Updating existing group '{}'.", groupToEdit.getUuid());
             // Logic for applying pending changes during update

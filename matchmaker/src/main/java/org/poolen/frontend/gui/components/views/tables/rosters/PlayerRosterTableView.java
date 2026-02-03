@@ -32,7 +32,7 @@ public abstract class PlayerRosterTableView extends BaseRosterTableView<Player>{
     /**
      * This beautiful logic for colouring the rows is now neatly contained in its own
      * override, keeping it separate from the double-click logic which now lives
-     * in the parent class. So much tidier, my love!
+     * in the parent class.
      */
     @Override
     protected void styleRow(TableRow<Player> row, Player player, boolean empty) {

@@ -5,33 +5,27 @@ import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * A factory for creating Group objects, ensuring consistent creation logic.
  * This follows the Singleton pattern.
  */
+@Service
 public class GroupFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(GroupFactory.class);
-    private static final GroupFactory INSTANCE = new GroupFactory();
 
     // Private constructor to enforce the singleton pattern
     private GroupFactory() {
         logger.info("GroupFactory initialised (singleton).");
-    }
-
-    /**
-     * Gets the single instance of the GroupFactory.
-     * @return The singleton instance.
-     */
-    public static GroupFactory getInstance() {
-        return INSTANCE;
     }
 
     /**
@@ -73,7 +67,7 @@ public class GroupFactory {
         String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
         logger.info("Creating new group for DM '{}' with {} houses and {} party members for the upcoming Friday.",
                 dmName, houses.size(), party.size());
-        return create(dungeonMaster, houses, getNextFriday(), location, party);
+        return create(null, dungeonMaster, houses, getNextFriday(), location, party);
     }
 
     /**
@@ -86,7 +80,7 @@ public class GroupFactory {
      * @return The newly created Group object.
      * @throws IllegalArgumentException if the DM is also in the party list.
      */
-    public Group create(Player dungeonMaster, List<House> houses, LocalDate date, String location, List<Player> party) {
+    public Group create(UUID uuid, Player dungeonMaster, List<House> houses, LocalDate date, String location, List<Player> party) {
         String dmName = (dungeonMaster != null) ? dungeonMaster.getName() : "None";
         logger.debug("Creating new group (DM: '{}', Houses: [{}], Date: {}, Party Size: {})",
                 dmName, houses.stream().map(House::name).collect(Collectors.joining(", ")), date, party.size());
@@ -97,7 +91,7 @@ public class GroupFactory {
             throw new IllegalArgumentException(errorMsg);
         }
 
-        Group newGroup = new Group(dungeonMaster, houses, date, location);
+        Group newGroup = new Group(uuid, dungeonMaster, houses, date, location);
         party.forEach(newGroup::addPartyMember);
 
         logger.info("Successfully created new group with UUID {} for DM '{}'.", newGroup.getUuid(), dmName);

@@ -1,14 +1,16 @@
 package org.poolen.frontend.gui.components.views;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TitledPane;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.FlowPane; // Import FlowPane
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -17,8 +19,10 @@ import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.views.tables.GroupTableView;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
+import org.poolen.frontend.util.services.GroupPersistenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
@@ -68,9 +73,13 @@ public class GroupDisplayView extends BorderPane {
     private Set<Player> allAssignedDms;
     private final List<GroupTableView> groupCards = new ArrayList<>();
     private static final double CARD_WIDTH = 450.0; // A fixed, reasonable width for our cards
+    private final GroupPersistenceService persistenceService;
 
-    public GroupDisplayView() {
+    public GroupDisplayView(GroupPersistenceService persistenceService) {
         super();
+
+        this.persistenceService = persistenceService;
+
         // --- Replaced GridPane with FlowPane ---
         this.groupFlowPane = new FlowPane(10, 10); // Set HGap and VGap to 10
         groupFlowPane.setPadding(new Insets(10));
@@ -164,10 +173,51 @@ public class GroupDisplayView extends BorderPane {
         this.setBottom(footer);
 
         logger.info("GroupDisplayView initialised.");
+
+        // --- Recovery Check ---
+        // We check for the file immediately. If it exists, we load it into memory
+        // to prevent race conditions (in case the controller updates/wipes the file before the user answers).
+        if (this.persistenceService.hasSaveFile()) {
+            List<Group> recoveredGroups = this.persistenceService.loadGroups();
+
+            if (recoveredGroups != null && !recoveredGroups.isEmpty()) {
+                Platform.runLater(() -> {
+                    ConfirmationDialog dialog = new ConfirmationDialog(
+                            "I found an unsaved session from a previous run! Do you want to recover it?",
+                            this
+                    );
+
+                    dialog.showAndWait().ifPresent(response -> {
+                        if (response == ButtonType.YES) {
+                            logger.info("User confirmed recovery. Restoring {} groups.", recoveredGroups.size());
+
+                            // Try to guess the date from the first group, fallback to today
+                            LocalDate date = recoveredGroups.get(0).getDate();
+                            if (date == null) date = LocalDate.now();
+
+                            // Update the groups (this will also trigger a save, confirming the recovery)
+                            // We pass 'this.dmingPlayers' in case the controller has initialized them in the background.
+                            updateGroups(recoveredGroups, this.dmingPlayers, this.allAssignedDms, date);
+                        } else {
+                            logger.info("User declined recovery.");
+                        }
+                    });
+                });
+            }
+        }
     }
 
     public void updateGroups(List<Group> groups, Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms, LocalDate eventDate) {
         logger.info("Updating group display. Number of groups: {}. Event date: {}", groups.size(), eventDate);
+
+        // --- Save the updated state to disk ASYNC ---
+        // We create a shallow copy of the list here on the main thread to ensure the
+        // structure doesn't change before the background thread picks it up.
+        if (groups != null) {
+            List<Group> groupsToSave = new ArrayList<>(groups);
+            CompletableFuture.runAsync(() -> this.persistenceService.saveGroups(groupsToSave));
+        }
+
         this.currentGroups = groups;
         this.dmingPlayers = dmingPlayers;
         this.allAssignedDms = allAssignedDms;

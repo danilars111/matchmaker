@@ -33,12 +33,8 @@ public class CrashReportStage extends BaseEmailFormStage {
 
     public CrashReportStage(Throwable e, ConfigurableApplicationContext context) {
         // Pass the context to the parent constructor
-        super(context); // This will call createFormContent()
+        super(context);
 
-        // --- OUR FIX, MY LOVE! ---
-        // The super() constructor has run, and createFormContent() has
-        // created our stackTraceArea, but it's empty.
-        // NOW, we can safely set our field and update the text area!
         this.exception = e;
         if (stackTraceArea != null) {
             stackTraceArea.setText(getStackTraceAsString(this.exception));

@@ -2,6 +2,7 @@ package org.poolen.frontend.util.services;
 
 import javafx.scene.Node;
 import org.poolen.backend.db.factories.CharacterFactory;
+import org.poolen.backend.db.factories.GroupFactory;
 import org.poolen.backend.db.factories.PlayerFactory;
 import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.backend.db.store.Store;
@@ -53,6 +54,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final UiPersistenceService uiPersistenceService;
     private final CharacterFactory characterFactory;
     private final PlayerFactory playerFactory;
+    private final GroupFactory groupFactory;
     private final SheetsServiceManager sheetsServiceManager;
     private final Matchmaker matchmaker;
     private final ApplicationScriptService applicationScriptService;
@@ -60,6 +62,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final UiGoogleTaskService uiGoogleTaskService;
     private final UiTaskExecutor uiTaskExecutor;
     private final StorePersistenceService storePersistenceService;
+    private final GroupPersistenceService groupPersistenceService;
 
     // Singleton components
     private ManagementStage managementStage;
@@ -83,17 +86,20 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     @Autowired
     public ComponentFactoryService(Store store, UiPersistenceService uiPersistenceService,
                                    CharacterFactory characterFactory, PlayerFactory playerFactory,
+                                   GroupFactory groupFactory,
                                    SheetsServiceManager sheetsServiceManager, Matchmaker matchmaker,
                                    ApplicationScriptService applicationScriptService,
                                    GoogleAuthManager authManager,
                                    UiGoogleTaskService uiGoogleTaskService,
                                    UiTaskExecutor uiTaskExecutor,
                                    StorePersistenceService storePersistenceService,
+                                   GroupPersistenceService groupPersistenceService,
                                    ConfigurableApplicationContext springContext) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
         this.characterFactory = characterFactory;
         this.playerFactory = playerFactory;
+        this.groupFactory = groupFactory;
         this.sheetsServiceManager = sheetsServiceManager;
         this.matchmaker = matchmaker;
         this.applicationScriptService = applicationScriptService;
@@ -101,6 +107,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         this.uiGoogleTaskService = uiGoogleTaskService;
         this.uiTaskExecutor = uiTaskExecutor;
         this.storePersistenceService = storePersistenceService;
+        this.groupPersistenceService = groupPersistenceService;
         this.springContext = springContext;
         logger.info("ComponentFactoryService initialised with all required beans.");
     }
@@ -199,7 +206,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         if (this.groupManagementTab == null) {
             logger.info("Creating singleton instance of GroupManagementTab.");
             this.groupManagementTab = new GroupManagementTab(this,this, this,
-                    sheetsServiceManager, uiTaskExecutor,matchmaker);
+                    sheetsServiceManager, uiTaskExecutor, matchmaker, groupFactory);
         }
         return this.groupManagementTab;
     }
@@ -280,7 +287,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public GroupDisplayView getGroupDisplayView() {
         if (this.groupDisplayView == null) {
             logger.info("Creating singleton instance of GroupDisplayView.");
-            this.groupDisplayView = new GroupDisplayView();
+            this.groupDisplayView = new GroupDisplayView(groupPersistenceService);
         }
         return this.groupDisplayView;
     }
