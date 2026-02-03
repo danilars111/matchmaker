@@ -19,6 +19,8 @@ import javafx.scene.layout.VBox;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.views.tables.GroupTableView;
 import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
@@ -74,11 +76,13 @@ public class GroupDisplayView extends BorderPane {
     private final List<GroupTableView> groupCards = new ArrayList<>();
     private static final double CARD_WIDTH = 450.0; // A fixed, reasonable width for our cards
     private final GroupPersistenceService persistenceService;
+    private final PlayerStore playerStore;
 
-    public GroupDisplayView(GroupPersistenceService persistenceService) {
+    public GroupDisplayView(GroupPersistenceService persistenceService, PlayerStoreProvider playerStoreProvider) {
         super();
 
         this.persistenceService = persistenceService;
+        this.playerStore = playerStoreProvider.getPlayerStore();
 
         // --- Replaced GridPane with FlowPane ---
         this.groupFlowPane = new FlowPane(10, 10); // Set HGap and VGap to 10
@@ -197,7 +201,7 @@ public class GroupDisplayView extends BorderPane {
 
                             // Update the groups (this will also trigger a save, confirming the recovery)
                             // We pass 'this.dmingPlayers' in case the controller has initialized them in the background.
-                            updateGroups(recoveredGroups, this.dmingPlayers, this.allAssignedDms, date);
+                            updateGroups(recoveredGroups, this.allAssignedDms, date);
                         } else {
                             logger.info("User declined recovery.");
                         }
@@ -207,7 +211,7 @@ public class GroupDisplayView extends BorderPane {
         }
     }
 
-    public void updateGroups(List<Group> groups, Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms, LocalDate eventDate) {
+    public void updateGroups(List<Group> groups, Set<Player> allAssignedDms, LocalDate eventDate) {
         logger.info("Updating group display. Number of groups: {}. Event date: {}", groups.size(), eventDate);
 
         // --- Save the updated state to disk ASYNC ---
@@ -219,7 +223,6 @@ public class GroupDisplayView extends BorderPane {
         }
 
         this.currentGroups = groups;
-        this.dmingPlayers = dmingPlayers;
         this.allAssignedDms = allAssignedDms;
         this.datePicker.setValue(eventDate);
 

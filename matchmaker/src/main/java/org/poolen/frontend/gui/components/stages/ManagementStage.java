@@ -46,8 +46,6 @@ public class ManagementStage extends Stage {
 
     private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
-    private final Map<UUID, Player> dmingPlayers;
-    private final Map<UUID, Player> attendingPlayers;
     private final SheetsTab sheetsTab;
     private final CoreProvider coreProvider;
     private final StageProvider stageProvider;
@@ -65,17 +63,14 @@ public class ManagementStage extends Stage {
         this.setMinWidth(MIN_WIDTH);
         this.setMinHeight(MIN_HEIGHT);
 
-        this.dmingPlayers = new HashMap<>();
-        this.attendingPlayers = new HashMap<>();
-
         PlayerManagementTab playerTab = tabProvider.getPlayerManagementTab();
-        playerTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
+        playerTab.init(this::notifyPlayerUpdateListeners);
 
         CharacterManagementTab characterTab = tabProvider.getCharacterManagementTab();
         characterTab.init(this::notifyPlayerUpdateListeners);
 
         GroupManagementTab groupTab = tabProvider.getGroupManagementTab();
-        groupTab.init(attendingPlayers, dmingPlayers, this::notifyPlayerUpdateListeners);
+        groupTab.init(this::notifyPlayerUpdateListeners);
 
         this.sheetsTab = tabProvider.getSheetsTab();
         this.sheetsTab.init(this::handleImportedData);

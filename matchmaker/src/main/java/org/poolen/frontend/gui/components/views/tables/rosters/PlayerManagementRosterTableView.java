@@ -92,7 +92,7 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
                     player.getUuid().toString().toLowerCase().contains(searchText);
 
             boolean dmMatch = !dmsOnly || player.isDungeonMaster();
-            boolean attendingMatch = !attendingOnly || attendingPlayers.containsKey(player.getUuid());
+            boolean attendingMatch = !attendingOnly || playerStore.getAttendingPlayers().containsKey(player.getUuid());
 
             if (selectedHouse != null) {
                 boolean houseMatch = player.getCharacters().stream().anyMatch(c -> c.getHouse() == selectedHouse);
@@ -185,15 +185,13 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
         TableColumn<Player, Boolean> col = new TableColumn<>("Attending");
         col.setCellValueFactory(cellData -> {
             Player player = cellData.getValue();
-            SimpleBooleanProperty property = new SimpleBooleanProperty(attendingPlayers.containsKey(player.getUuid()));
+            SimpleBooleanProperty property = new SimpleBooleanProperty(playerStore.getAttendingPlayers().containsKey(player.getUuid()));
             property.addListener((obs, was, isNow) -> {
-                if (isNow) {
-                    attendingPlayers.put(player.getUuid(), player);
-                } else {
-                    attendingPlayers.remove(player.getUuid());
-                    if (dmingPlayers.containsKey(player.getUuid())) {
-                        dmingPlayers.remove(player.getUuid());
-                    }
+
+                player.isAttending(isNow);
+                if(!isNow && playerStore.getDmingPlayers().containsKey(player.getUuid())) {
+                    player.isAttending(false);
+                        player.isDming(false);
                 }
                 onPlayerListChanged.run();
             });
@@ -207,18 +205,14 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
         TableColumn<Player, Boolean> col = new TableColumn<>("DMing");
         col.setCellValueFactory(cellData -> {
             Player player = cellData.getValue();
-            SimpleBooleanProperty property = new SimpleBooleanProperty(dmingPlayers.containsKey(player.getUuid()));
+            SimpleBooleanProperty property = new SimpleBooleanProperty(playerStore.getDmingPlayers()
+                    .containsKey(player.getUuid()));
             property.addListener((obs, was, isNow) -> {
-                if (isNow) {
-                    dmingPlayers.put(player.getUuid(), player);
-                    if (!attendingPlayers.containsKey(player.getUuid())) {
-                        attendingPlayers.put(player.getUuid(), player);
-                        //table.refresh();
-                    }
-                } else {
-                    dmingPlayers.remove(player.getUuid());
-                }
-                onPlayerListChanged.run();
+            player.isDming(isNow);
+            if (isNow && !player.isAttending()) {
+                player.isAttending(true);
+            }
+            onPlayerListChanged.run();
             });
             return property;
         });

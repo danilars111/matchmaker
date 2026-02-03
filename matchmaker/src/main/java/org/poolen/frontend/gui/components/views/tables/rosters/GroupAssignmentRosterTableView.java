@@ -11,7 +11,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.persistence.StorePersistenceService;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 
@@ -32,14 +34,17 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
     private Player dmForNewGroup;
     private List<Group> allGroups = new ArrayList<>();
     private PlayerAddRequestHandler onPlayerAddRequestHandler;
+    private PlayerStore playerStore;
 
     // --- Filter Controls ---
     private CheckBox dmFilterCheckBox;
     private CheckBox selectedFilterCheckbox;
     private CheckBox availableOnlyCheckbox;
 
-    public GroupAssignmentRosterTableView(StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
+    public GroupAssignmentRosterTableView(StorePersistenceService storePersistenceService,
+                                          PlayerStoreProvider storeProvider, UiTaskExecutor uiTaskExecutor) {
         super(storePersistenceService, uiTaskExecutor);
+        this.playerStore = storeProvider.getPlayerStore();
         setupTableColumns();
         setupFilters();
         updateRoster();
@@ -96,7 +101,7 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
             }
 
             // --- The complex logic specific to group assignment ---
-            if (dmingPlayers != null && dmingPlayers.containsKey(player.getUuid())) {
+            if (playerStore.getDmingPlayers() != null && playerStore.getDmingPlayers().containsKey(player.getUuid())) {
                 return false;
             }
             Player dmToExclude = (currentGroup != null) ? currentGroup.getDungeonMaster() : dmForNewGroup;
@@ -119,8 +124,8 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
 
     @Override
     public void updateRoster() {
-        if(attendingPlayers != null) {
-            sourceItems.setAll(attendingPlayers.values());
+        if(playerStore.getAttendingPlayers() != null) {
+            sourceItems.setAll(playerStore.getAttendingPlayers().values());
             applyFilter();
         }
     }

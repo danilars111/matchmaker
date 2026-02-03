@@ -205,8 +205,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public GroupManagementTab getGroupManagementTab() {
         if (this.groupManagementTab == null) {
             logger.info("Creating singleton instance of GroupManagementTab.");
-            this.groupManagementTab = new GroupManagementTab(this,this, this,
-                    sheetsServiceManager, uiTaskExecutor, matchmaker, groupFactory);
+            this.groupManagementTab = new GroupManagementTab(this,this, this, store,
+                    uiTaskExecutor, matchmaker, groupFactory);
         }
         return this.groupManagementTab;
     }
@@ -245,7 +245,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public GroupFormView getGroupFormView() {
         if (this.groupFormView == null) {
             logger.info("Creating singleton instance of GroupFormView.");
-            this.groupFormView = new GroupFormView();
+            this.groupFormView = new GroupFormView(store);
         }
         return this.groupFormView;
     }
@@ -266,7 +266,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public GroupAssignmentRosterTableView getGroupAssignmentRosterTableView() {
         if (this.groupAssignmentRosterTableView == null) {
             logger.info("Creating singleton instance of GroupAssignmentRosterTableView.");
-            this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView(storePersistenceService, uiTaskExecutor);
+            this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView(storePersistenceService, store,
+                    uiTaskExecutor);
         }
         return this.groupAssignmentRosterTableView;
     }
@@ -287,7 +288,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public GroupDisplayView getGroupDisplayView() {
         if (this.groupDisplayView == null) {
             logger.info("Creating singleton instance of GroupDisplayView.");
-            this.groupDisplayView = new GroupDisplayView(groupPersistenceService);
+            this.groupDisplayView = new GroupDisplayView(groupPersistenceService, store);
         }
         return this.groupDisplayView;
     }

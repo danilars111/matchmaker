@@ -14,17 +14,13 @@ import java.util.UUID;
  * implementation details (like columns, filters, and styling) to its children.
  */
 public abstract class PlayerRosterTableView extends BaseRosterTableView<Player>{
-    protected Map<UUID, Player> attendingPlayers;
-    protected Map<UUID, Player> dmingPlayers;
     protected Runnable onPlayerListChanged;
 
     public PlayerRosterTableView(StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
         super(storePersistenceService, uiTaskExecutor);
         this.searchField.setPromptText("Search by name or UUID...");
     }
-    public void init(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
-        this.attendingPlayers = attendingPlayers;
-        this.dmingPlayers = dmingPlayers;
+    public void init(Runnable onPlayerListChanged) {
         this.onPlayerListChanged = onPlayerListChanged;
 
     }

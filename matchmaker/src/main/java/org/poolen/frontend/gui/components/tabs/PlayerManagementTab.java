@@ -34,8 +34,6 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
     private PlayerManagementRosterTableView rosterView;
     private final SplitPane root;
     private Runnable onPlayerListChanged;
-    private Map<UUID, Player> attendingPlayers;
-    private Map<UUID, Player> dmingPlayers;
     private final PlayerStore playerStore;
     private final PlayerFactory playerFactory;
     private boolean isShowingBlacklist = false;
@@ -54,15 +52,14 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
         this.playerForm = viewProvider.getPlayerFormView();
         this.rosterView = viewProvider.getPlayerManagementRosterTableView();
     }
-    public void init(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
-        this.attendingPlayers = attendingPlayers;
-        this.dmingPlayers = dmingPlayers;
+    public void init(Runnable onPlayerListChanged) {
         this.onPlayerListChanged = onPlayerListChanged;
-        this.rosterView.init(attendingPlayers, dmingPlayers, onPlayerListChanged);
+        this.rosterView.init(onPlayerListChanged);
     }
 
     public void start() {
-        if(attendingPlayers == null || dmingPlayers == null || onPlayerListChanged == null) {
+        if(playerStore.getAttendingPlayers() == null || playerStore.getDmingPlayers() == null
+                || onPlayerListChanged == null) {
             logger.error("PlayerManagementTab.start() called before init(). Tab cannot be initialised.");
             throw new IllegalStateException("%s has not been initialized".formatted(this.getClass().getSimpleName()));
         }
@@ -223,13 +220,5 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
 
     public void setOnPlayerListChanged(Runnable onPlayerListChanged) {
         this.onPlayerListChanged = onPlayerListChanged;
-    }
-
-    public Map<UUID, Player> getAttendingPlayers() {
-        return attendingPlayers;
-    }
-
-    public Map<UUID, Player> getDmingPlayers() {
-        return dmingPlayers;
     }
 }

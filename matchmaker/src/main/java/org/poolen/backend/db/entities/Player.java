@@ -23,6 +23,8 @@ public class Player {
 
     private boolean isDungeonMaster;
     private LocalDate lastSeen;
+    private boolean attending = false;
+    private boolean dming = false;
 
 
     public Player(String name, boolean isDungeonMaster) {
@@ -152,6 +154,21 @@ public class Player {
 
     public void setLastSeen(LocalDate lastSeen) {
         this.lastSeen = lastSeen;
+    }
+
+    public void isAttending(boolean attending) {
+        this.attending = attending;
+    }
+    public boolean isAttending() {
+        return this.attending;
+    }
+
+    public void isDming(boolean dming) {
+        this.dming = dming;
+    }
+
+    public boolean isDming() {
+        return this.dming;
     }
 
     public boolean hasCharacters() {

@@ -8,6 +8,8 @@ import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.factories.GroupFactory;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.backend.engine.GroupSuggester;
 import org.poolen.backend.engine.Matchmaker;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog;
@@ -53,10 +55,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private boolean isPlayerRosterVisible = false;
 
     private Map<UUID, Player> newPartyMap;
-    private  Map<UUID, Player> attendingPlayers;
-    private  Map<UUID, Player> dmingPlayers;
     private  Runnable onPlayerListChanged;
-    private SheetsServiceManager sheetsServiceManager;
     private List<Group> groups = new ArrayList<>();
     private GroupDisplayView groupDisplayView;
     private LocalDate eventDate;
@@ -67,17 +66,18 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final Matchmaker matchmaker;
     private final StageProvider stageProvider;
     private final CoreProvider coreProvider;
+    private final PlayerStore playerStore;
     private final UiTaskExecutor uiTaskExecutor;
 
 
     public GroupManagementTab(CoreProvider coreProvider, ViewProvider viewProvider, StageProvider stageProvider,
-                              SheetsServiceManager sheetsServiceManager, UiTaskExecutor uiTaskExecutor,
+                              PlayerStoreProvider playerStoreProvider, UiTaskExecutor uiTaskExecutor,
                               Matchmaker matchmaker, GroupFactory groupFactory) {
         super("Group Management");
 
-        this.sheetsServiceManager = sheetsServiceManager;
         this.matchmaker = matchmaker;
         this.stageProvider = stageProvider;
+        this.playerStore = playerStoreProvider.getPlayerStore();
         this.coreProvider = coreProvider;
         this.uiTaskExecutor = uiTaskExecutor;
         this.groupFactory = groupFactory;
@@ -87,15 +87,13 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.groupDisplayView = viewProvider.getGroupDisplayView();
         this.rosterView = viewProvider.getGroupAssignmentRosterTableView();
     }
-    public void init(Map<UUID, Player> attendingPlayers, Map<UUID, Player> dmingPlayers, Runnable onPlayerListChanged) {
-        this.attendingPlayers = attendingPlayers;
-        this.dmingPlayers = dmingPlayers;
+    public void init(Runnable onPlayerListChanged) {
         this.onPlayerListChanged = onPlayerListChanged;
-        rosterView.init(attendingPlayers, dmingPlayers, onPlayerListChanged);
+        rosterView.init(onPlayerListChanged);
     }
 
     public void start() {
-        if(attendingPlayers == null || dmingPlayers == null || onPlayerListChanged == null) {
+        if(onPlayerListChanged == null) {
             logger.error("GroupManagementTab.start() called before init(). Tab cannot be initialised.");
             throw new IllegalStateException("%s has not been initialized".formatted(this.getClass().getSimpleName()));
         }
@@ -133,7 +131,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
 
         groupDisplayView.setOnSuggestionRequest(() -> {
             logger.debug("User requested group theme suggestions.");
-            GroupSuggester suggester = new GroupSuggester(attendingPlayers.values(), dmingPlayers.values());
+            GroupSuggester suggester = new GroupSuggester(playerStore.getAttendingPlayers().values(),
+                    playerStore.getDmingPlayers().values());
 
             Window parentWindow = (getTabPane() != null && getTabPane().getScene() != null)
                     ? getTabPane().getScene().getWindow()
@@ -266,7 +265,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 unavailablePlayers.add(group.getDungeonMaster());
             }
         }
-        groupForm.updateDmList(dmingPlayers, unavailablePlayers);
+        groupForm.updateDmList(unavailablePlayers);
     }
 
     private void toggleRosterView() {
@@ -300,8 +299,8 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 for (Group group : groups) {
                     new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
                 }
-                matchmaker.setPlayers(attendingPlayers.values().stream().filter(
-                        player -> !dmingPlayers.containsKey(player.getUuid())).collect(Collectors.toList()));
+                matchmaker.setPlayers(playerStore.getAttendingPlayers().values().stream().filter(
+                        player -> !playerStore.getDmingPlayers().containsKey(player.getUuid())).collect(Collectors.toList()));
                 matchmaker.setGroups(groups);
 
                 Window parentWindow = (getTabPane() != null && getTabPane().getScene() != null)
@@ -381,7 +380,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             logger.info("Moving player '{}' from group '{}' to group '{}'.", playerToMove.getName(), sourceGroup.getUuid(), targetGroup.getUuid());
             sourceGroup.removePartyMember(playerToMove);
             targetGroup.addPartyMember(playerToMove);
-            groupDisplayView.updateGroups(groups, dmingPlayers, getAllAssignedDms(), eventDate);
+            groupDisplayView.updateGroups(groups, getAllAssignedDms(), eventDate);
             rosterView.setAllGroups(groups);
         } else {
             logger.warn("Attempted to move a non-existent player with UUID: {} from group {}", playerUuid, sourceGroupUuid);
@@ -458,7 +457,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 if (targetGroup != null) {
                     playerSourceGroup.movePlayerTo(player, targetGroup);
                     rosterView.updateRoster();
-                    groupDisplayView.updateGroups(groups, dmingPlayers, getAllAssignedDms(), eventDate);
+                    groupDisplayView.updateGroups(groups, getAllAssignedDms(), eventDate);
                 } else {
                     newPartyMap.put(player.getUuid(), player);
                 }
@@ -595,7 +594,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
         rosterView.setAllGroups(groups);
-        groupDisplayView.updateGroups(groups, dmingPlayers, getAllAssignedDms(), eventDate);
+        groupDisplayView.updateGroups(groups, getAllAssignedDms(), eventDate);
         updateDmList();
     }
 
@@ -605,12 +604,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         updateDmList();
         rosterView.updateRoster();
     }
-    public Map<UUID, Player> getAttendingPlayers() {
-        return attendingPlayers;
-    }
-    public Map<UUID, Player> getDmingPlayers() {
-        return dmingPlayers;
-    }
+
     public Runnable getOnPlayerListChanged() {
         return onPlayerListChanged;
     }

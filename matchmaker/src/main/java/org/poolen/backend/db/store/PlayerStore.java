@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class PlayerStore {
@@ -40,6 +41,16 @@ public class PlayerStore {
         return this.playerMap.values().stream()
                 .filter(Player::isDungeonMaster)
                 .collect(Collectors.toList());
+    }
+
+    public Map<UUID, Player> getAttendingPlayers() {
+        return this.playerMap.values().stream()
+                .filter(Player::isAttending).collect(Collectors.toMap(Player::getUuid, Function.identity()));
+    }
+
+    public Map<UUID, Player> getDmingPlayers() {
+        return this.playerMap.values().stream()
+                .filter(Player::isDming).collect(Collectors.toMap(Player::getUuid, Function.identity()));
     }
 
     public Set<Player> getAllPlayers() {

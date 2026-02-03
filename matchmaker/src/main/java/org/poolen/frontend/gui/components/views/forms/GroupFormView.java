@@ -22,6 +22,8 @@ import javafx.util.Callback;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
+import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
+import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.interfaces.DmSelectRequestHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,9 +49,11 @@ public class GroupFormView extends BaseFormView<Group> {
     private DmSelectRequestHandler dmSelectRequestHandler;
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
     private boolean isRevertingDmSelection = false;
+    private final PlayerStore playerStore;
 
-    public GroupFormView() {
+    public GroupFormView(PlayerStoreProvider playerStoreProvider) {
         super();
+        this.playerStore = playerStoreProvider.getPlayerStore();
         setupFormControls();
         clearForm(); // Set initial state
         logger.info("GroupFormView initialised.");
@@ -207,13 +211,14 @@ public class GroupFormView extends BaseFormView<Group> {
         this.dmSelectRequestHandler = handler;
     }
 
-    public void updateDmList(Map<UUID, Player> dmingPlayers, Set<Player> unavailablePlayers) {
-        logger.debug("Updating DM list. Total DMs: {}, Unavailable DMs in other groups: {}.", dmingPlayers.size(), unavailablePlayers.size());
+    public void updateDmList(Set<Player> unavailablePlayers) {
+        logger.debug("Updating DM list. Total DMs: {}, Unavailable DMs in other groups: {}.",
+                playerStore.getDmingPlayers().size(), unavailablePlayers.size());
         Object selectedDm = dmComboBox.getValue();
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
 
-        List<Player> allDms = dmingPlayers.values().stream()
+        List<Player> allDms = playerStore.getDmingPlayers().values().stream()
                 .sorted(Comparator.comparing(Player::getName))
                 .toList();
 
