@@ -206,7 +206,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         if (this.groupManagementTab == null) {
             logger.info("Creating singleton instance of GroupManagementTab.");
             this.groupManagementTab = new GroupManagementTab(this,this, this, store,
-                    uiTaskExecutor, matchmaker, groupFactory);
+                    uiTaskExecutor, matchmaker, groupFactory, groupPersistenceService);
         }
         return this.groupManagementTab;
     }

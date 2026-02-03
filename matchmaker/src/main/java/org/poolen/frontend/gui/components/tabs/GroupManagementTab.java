@@ -1,5 +1,6 @@
 package org.poolen.frontend.gui.components.tabs;
 
+import javafx.application.Platform;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -23,6 +24,7 @@ import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.interfaces.providers.ViewProvider;
+import org.poolen.frontend.util.services.GroupPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
@@ -68,11 +70,12 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     private final CoreProvider coreProvider;
     private final PlayerStore playerStore;
     private final UiTaskExecutor uiTaskExecutor;
+    private final GroupPersistenceService groupPersistenceService;
 
 
     public GroupManagementTab(CoreProvider coreProvider, ViewProvider viewProvider, StageProvider stageProvider,
                               PlayerStoreProvider playerStoreProvider, UiTaskExecutor uiTaskExecutor,
-                              Matchmaker matchmaker, GroupFactory groupFactory) {
+                              Matchmaker matchmaker, GroupFactory groupFactory, GroupPersistenceService groupPersistenceService) {
         super("Group Management");
 
         this.matchmaker = matchmaker;
@@ -81,6 +84,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.coreProvider = coreProvider;
         this.uiTaskExecutor = uiTaskExecutor;
         this.groupFactory = groupFactory;
+        this.groupPersistenceService = groupPersistenceService;
 
         this.root = new SplitPane();
         this.groupForm = viewProvider.getGroupFormView();
@@ -105,6 +109,35 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         // Default the event date to the nearest upcoming Friday.
         this.eventDate = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
         logger.debug("Default event date set to: {}", eventDate);
+
+        // --- Recovery Check ---
+        // We check for the file immediately. If it exists, we load it into memory
+        // to prevent race conditions (in case the controller updates/wipes the file before the user answers).
+        if (groupPersistenceService.hasSaveFile()) {
+            groups = this.groupPersistenceService.loadGroups();
+
+            if (groups != null && !groups.isEmpty()) {
+                Platform.runLater(() -> {
+                    ConfirmationDialog dialog = new ConfirmationDialog(
+                            "Unpublished Session found! Do you want to recover it?",
+                            this.groupDisplayView
+                    );
+
+                    dialog.showAndWait().ifPresent(response -> {
+                        if (response == ButtonType.YES) {
+                            logger.info("User confirmed recovery. Restoring {} groups.", groups.size());
+
+                            // Try to guess the date from the first group, fallback to today
+                            LocalDate date = groups.get(0).getDate();
+                            if (date == null) date = LocalDate.now();
+                        } else {
+                            logger.info("User declined recovery.");
+                        }
+                    });
+                });
+            }
+        }
+
 
         cleanUp();
 
@@ -380,7 +413,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
             logger.info("Moving player '{}' from group '{}' to group '{}'.", playerToMove.getName(), sourceGroup.getUuid(), targetGroup.getUuid());
             sourceGroup.removePartyMember(playerToMove);
             targetGroup.addPartyMember(playerToMove);
-            groupDisplayView.updateGroups(groups, getAllAssignedDms(), eventDate);
+            groupDisplayView.updateGroups(groups, eventDate);
             rosterView.setAllGroups(groups);
         } else {
             logger.warn("Attempted to move a non-existent player with UUID: {} from group {}", playerUuid, sourceGroupUuid);
@@ -457,7 +490,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                 if (targetGroup != null) {
                     playerSourceGroup.movePlayerTo(player, targetGroup);
                     rosterView.updateRoster();
-                    groupDisplayView.updateGroups(groups, getAllAssignedDms(), eventDate);
+                    groupDisplayView.updateGroups(groups, eventDate);
                 } else {
                     newPartyMap.put(player.getUuid(), player);
                 }
@@ -574,13 +607,6 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
     }
 
-    private Set<Player> getAllAssignedDms() {
-        return groups.stream()
-                .map(Group::getDungeonMaster)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
-    }
-
     private void cleanUp() {
         logger.debug("Running cleanup operation: clearing form, resetting selections, and updating views.");
         if (isPlayerRosterVisible) {
@@ -594,7 +620,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         rosterView.setPartyForNewGroup(newPartyMap);
         rosterView.setDmForNewGroup(null);
         rosterView.setAllGroups(groups);
-        groupDisplayView.updateGroups(groups, getAllAssignedDms(), eventDate);
+        groupDisplayView.updateGroups(groups, eventDate);
         updateDmList();
     }
 

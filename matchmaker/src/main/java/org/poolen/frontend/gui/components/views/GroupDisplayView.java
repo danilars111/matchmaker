@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * A reusable view component that displays multiple groups or a suggestion prompt.
@@ -71,7 +72,6 @@ public class GroupDisplayView extends BorderPane {
     private Consumer<LocalDate> onDateSelectedHandler;
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
-    private Map<UUID, Player> dmingPlayers;
     private Set<Player> allAssignedDms;
     private final List<GroupTableView> groupCards = new ArrayList<>();
     private static final double CARD_WIDTH = 450.0; // A fixed, reasonable width for our cards
@@ -177,41 +177,9 @@ public class GroupDisplayView extends BorderPane {
         this.setBottom(footer);
 
         logger.info("GroupDisplayView initialised.");
-
-        // --- Recovery Check ---
-        // We check for the file immediately. If it exists, we load it into memory
-        // to prevent race conditions (in case the controller updates/wipes the file before the user answers).
-        if (this.persistenceService.hasSaveFile()) {
-            List<Group> recoveredGroups = this.persistenceService.loadGroups();
-
-            if (recoveredGroups != null && !recoveredGroups.isEmpty()) {
-                Platform.runLater(() -> {
-                    ConfirmationDialog dialog = new ConfirmationDialog(
-                            "I found an unsaved session from a previous run! Do you want to recover it?",
-                            this
-                    );
-
-                    dialog.showAndWait().ifPresent(response -> {
-                        if (response == ButtonType.YES) {
-                            logger.info("User confirmed recovery. Restoring {} groups.", recoveredGroups.size());
-
-                            // Try to guess the date from the first group, fallback to today
-                            LocalDate date = recoveredGroups.get(0).getDate();
-                            if (date == null) date = LocalDate.now();
-
-                            // Update the groups (this will also trigger a save, confirming the recovery)
-                            // We pass 'this.dmingPlayers' in case the controller has initialized them in the background.
-                            updateGroups(recoveredGroups, this.allAssignedDms, date);
-                        } else {
-                            logger.info("User declined recovery.");
-                        }
-                    });
-                });
-            }
-        }
     }
 
-    public void updateGroups(List<Group> groups, Set<Player> allAssignedDms, LocalDate eventDate) {
+    public void updateGroups(List<Group> groups, LocalDate eventDate) {
         logger.info("Updating group display. Number of groups: {}. Event date: {}", groups.size(), eventDate);
 
         // --- Save the updated state to disk ASYNC ---
@@ -223,7 +191,7 @@ public class GroupDisplayView extends BorderPane {
         }
 
         this.currentGroups = groups;
-        this.allAssignedDms = allAssignedDms;
+        this.allAssignedDms = getAllAssignedDms(groups);
         this.datePicker.setValue(eventDate);
 
         if (groups.isEmpty()) {
@@ -315,6 +283,13 @@ public class GroupDisplayView extends BorderPane {
         this.onDmUpdateRequestHandler = handler;
     }
 
+    private Set<Player> getAllAssignedDms(List<Group> groups) {
+        return groups.stream()
+                .map(Group::getDungeonMaster)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
     /**
      * Rebuilds the group cards in the FlowPane.
      * This is much simpler than the old grid layout logic!
@@ -331,7 +306,7 @@ public class GroupDisplayView extends BorderPane {
             if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
             if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
             if (onLocationUpdateRequestHandler != null) groupCard.setOnLocationUpdate(onLocationUpdateRequestHandler);
-            if (dmingPlayers != null && allAssignedDms != null) groupCard.setDmList(dmingPlayers, allAssignedDms);
+            if (playerStore.getDmingPlayers() != null && allAssignedDms != null) groupCard.setDmList(playerStore.getDmingPlayers(), allAssignedDms);
 
             // --- This is the important part ---
             // We give the card a fixed preferred width, and the FlowPane handles the rest.
