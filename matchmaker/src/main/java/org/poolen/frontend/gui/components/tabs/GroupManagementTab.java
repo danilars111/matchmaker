@@ -435,6 +435,14 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         }
         this.groups = groups;
 
+        for(Group group : groups) {
+            group.getDungeonMaster().isAttending(true);
+            group.getDungeonMaster().isDming(true);
+            for(Player player : group.getParty().values()) {
+                player.isAttending(true);
+            }
+        }
+
         LocalDate date = groups.get(0).getDate();
         if (date == null) date = LocalDate.now();
         handleDateChange(date);

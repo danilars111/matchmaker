@@ -87,6 +87,7 @@ public class ManagementStage extends Stage {
 
         this.importMatcherStage = stageProvider.getImportMatcherStage();
 
+        restoreSession();
 
         this.tabPane = new TabPane();
         playerTab.start();
@@ -160,8 +161,6 @@ public class ManagementStage extends Stage {
         Scene scene = new Scene(this.tabPane, MIN_WIDTH, MIN_HEIGHT);
         setScene(scene);
         logger.debug("ManagementStage scene created and set.");
-
-        restoreSession();
     }
 
     public void refreshAuthStatus() {
@@ -275,8 +274,8 @@ public class ManagementStage extends Stage {
                 dialog.showAndWait().ifPresent(response -> {
                     if (response == ButtonType.YES) {
                         logger.debug("Restoring previous session.");
-                        groupTab.setGroups(groups);
                         playerPersistenceService.loadPlayers();
+                        groupTab.setGroups(groups);
                         notifyPlayerUpdateListeners();
                     }
                 });

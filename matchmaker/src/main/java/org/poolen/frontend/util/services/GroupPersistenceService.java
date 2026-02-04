@@ -140,10 +140,6 @@ public class GroupPersistenceService {
         Player dm = null;
         if (dto.dmUuid != null) {
             dm = store.getPlayerStore().getPlayerByUuid(dto.dmUuid);
-            if(dm != null) {
-                dm.isAttending(true);
-                dm.isDming(true);
-            }
             // If DM isn't in store, dm remains null, which is fine
         }
 
@@ -154,7 +150,6 @@ public class GroupPersistenceService {
                 Player player = store.getPlayerStore().getPlayerByUuid(playerUuid);
                 // "If the player does not exist in the store, we just skip adding that player"
                 if (player != null) {
-                    player.isAttending(true);
                     partyMembers.add(player);
                 }
             }
