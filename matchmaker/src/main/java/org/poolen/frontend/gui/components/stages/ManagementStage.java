@@ -277,6 +277,7 @@ public class ManagementStage extends Stage {
                         logger.debug("Restoring previous session.");
                         groupTab.setGroups(groups);
                         playerPersistenceService.loadPlayers();
+                        notifyPlayerUpdateListeners();
                     }
                 });
             });

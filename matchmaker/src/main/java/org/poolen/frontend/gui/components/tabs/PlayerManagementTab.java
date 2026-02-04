@@ -148,6 +148,7 @@ public class PlayerManagementTab extends Tab implements PlayerUpdateListener {
                 playerStore.removePlayer(player);
                 uiPersistenceService.deletePlayer(player, getTabPane().getScene().getWindow());
                 onPlayerListChanged.run();
+                rosterView.updateRoster();
                 playerForm.clearForm();
             } else {
                 logger.info("User cancelled deletion of player '{}'.", player.getName());

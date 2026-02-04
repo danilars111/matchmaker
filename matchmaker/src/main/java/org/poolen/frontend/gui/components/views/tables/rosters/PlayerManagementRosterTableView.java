@@ -130,35 +130,14 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
                 .filter(player -> !currentPlayerMap.containsKey(player.getUuid()))
                 .toList();
 
-        // 5. Find players to UPDATE
-        // (Loop new players, check if they existed before AND have changed)
-        List<Player> playersToUpdate_RemoveOld = new ArrayList<>();
-        List<Player> playersToUpdate_AddNew = new ArrayList<>();
 
-        for (Player newPlayer : playerStore.getAllPlayers()) {
-            UUID id = newPlayer.getUuid();
-
-            // Check if this player *already* exists in our table
-            if (currentPlayerMap.containsKey(id)) {
-                Player oldPlayer = currentPlayerMap.get(id);
-
-                // Now we check if the data is different!
-                if (!newPlayer.deepEquals(oldPlayer)) {
-                    // The data changed! We schedule a swap.
-                    playersToUpdate_RemoveOld.add(oldPlayer);
-                    playersToUpdate_AddNew.add(newPlayer);
-                }
-            }
-        }
-
-        if(!playersToRemove.isEmpty() || !playersToUpdate_RemoveOld.isEmpty()) {
+        if(!playersToRemove.isEmpty()) {
             sourceItems.removeAll(playersToRemove);
-            sourceItems.removeAll(playersToUpdate_RemoveOld);
         }
-        if(!playersToAdd.isEmpty() || !playersToUpdate_AddNew.isEmpty()) {
+        if(!playersToAdd.isEmpty()) {
             sourceItems.addAll(playersToAdd);
-            sourceItems.addAll(playersToUpdate_AddNew);
         }
+        table.refresh();
     }
 
 

@@ -202,6 +202,8 @@ public class Player {
                 Objects.equals(this.DmBlacklist, player.DmBlacklist) &&
                 Objects.equals(this.playerLog,player.playerLog) &&
                 Objects.equals(this.lastSeen, player.lastSeen) &&
+                this.attending == player.isAttending() &&
+                this.dming == player.dming &&
                 this.isDungeonMaster == player.isDungeonMaster;
     }
 
