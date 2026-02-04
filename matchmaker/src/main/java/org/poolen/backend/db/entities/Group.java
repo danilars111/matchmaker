@@ -21,23 +21,24 @@ public class Group {
     private Map<UUID, Player> party;
     private List<House> houses;
     private LocalDate date;
+    private Integer maxSize;
     private String location;
+    private boolean locked;
 
     public Group() {
 
     }
 
-    public Group(Player dungeonMaster, List<House> houses, LocalDate date, String location) {
-        this(null, dungeonMaster, houses, date, location);
-    }
-
-    public Group(UUID uuid, Player dungeonMaster, List<House> houses, LocalDate date, String location) {
+    public Group(UUID uuid, Player dungeonMaster, List<House> houses, LocalDate date,
+                 Integer maxSize, String location, boolean locked) {
         this.uuid = uuid != null ? uuid : UUID.randomUUID();
         this.dungeonMaster = dungeonMaster;
         this.houses = new ArrayList<>(houses); // Create a mutable copy
         this.date = date;
         this.location = location;
+        this.maxSize = maxSize;
         this.party = new HashMap<>();
+        this.locked = locked;
     }
 
     @Override
@@ -95,6 +96,13 @@ public class Group {
         return sb.toString();
     }
 
+    public Integer getMaxSize() {
+        return maxSize;
+    }
+
+    public void setMaxSize(Integer maxSize) {
+        this.maxSize = maxSize;
+    }
 
     public Player getDungeonMaster() {
         return dungeonMaster;
@@ -160,6 +168,14 @@ public class Group {
 
     public UUID getUuid() {
         return uuid;
+    }
+
+    public boolean isLocked() {
+        return this.locked;
+    }
+
+    public void isLocked(boolean locked) {
+        this.locked = locked;
     }
 
     public void movePlayerTo(Player player, Group group) {

@@ -170,7 +170,7 @@ public class GroupPersistenceService {
 
         // Use the Factory to create the group consistently
         try {
-            return groupFactory.create(dto.uuid, dm, houses, groupDate, dto.location, partyMembers);
+            return groupFactory.create(dto.uuid, dm, houses, groupDate, dto.maxSize, dto.location, dto.locked, partyMembers);
         } catch (IllegalArgumentException e) {
             logger.error("Failed to reconstruct group {}: {}", dto.uuid, e.getMessage());
             return null;
@@ -214,6 +214,8 @@ public class GroupPersistenceService {
         public List<House> houses;
         public String date; // Changed to String to avoid Jackson JSR310 dependency issues
         public String location;
+        public Integer maxSize;
+        public boolean locked;
 
         // Default constructor for Jackson
         public GroupDto() {}
@@ -230,6 +232,8 @@ public class GroupPersistenceService {
             // Manually convert date to string (ISO-8601 format: YYYY-MM-DD)
             this.date = group.getDate() != null ? group.getDate().toString() : null;
             this.location = group.getLocation();
+            this.maxSize = group.getMaxSize();
+            this.locked = group.isLocked();
         }
     }
 }

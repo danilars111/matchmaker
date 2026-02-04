@@ -5,18 +5,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.Separator;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableRow;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField; // Import TextField
-import javafx.scene.control.TitledPane;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
@@ -37,7 +26,7 @@ import org.poolen.frontend.gui.interfaces.PlayerMoveHandler;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects; // Import Objects
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -46,26 +35,30 @@ import java.util.stream.Collectors;
 
 /**
  * A beautiful, self-contained and collapsible "card" for displaying all the details of a single group.
+ * Updated to include a 'Locked' checkbox for quick group management.
  */
 public class GroupTableView extends TitledPane {
 
     private static final DataFormat PLAYER_TRANSFER_FORMAT = new DataFormat("application/x-player-transfer");
     private static final String UNASSIGNED_PLACEHOLDER = "Unassigned";
 
-    private final TableView<Player> partyTable = new TableView<>();;
+    private final TableView<Player> partyTable = new TableView<>();
     private final Button editButton;
     private final Button deleteButton;
     private Group currentGroup;
     private PlayerMoveHandler onPlayerMoveHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
-    private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler; // Handler for location
+    private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler;
+    private BiFunction<Group, Boolean, Boolean> onLockedUpdateRequestHandler; // Handler for lock status
 
     private final Label dmNameLabel;
     private final Label themesLabel;
     private final Label partySizeLabel;
     private final ComboBox<Object> dmComboBox;
-    private final TextField locationField; // Field for location
+    private final TextField locationField;
+    private final CheckBox lockedCheckBox; // CheckBox for group locking
     private boolean isUpdatingComboBox = false;
+    private boolean isUpdatingLocked = false;
 
     public GroupTableView() {
         super();
@@ -92,7 +85,7 @@ public class GroupTableView extends TitledPane {
         // --- Information Header ---
         dmComboBox = new ComboBox<>();
         dmComboBox.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(dmComboBox, Priority.ALWAYS); // Make it grow
+        HBox.setHgrow(dmComboBox, Priority.ALWAYS);
         setupDmComboBoxCellFactory();
 
         dmComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -112,30 +105,40 @@ public class GroupTableView extends TitledPane {
             }
         });
 
-        // --- Location Field ---
         locationField = new TextField();
         locationField.setPromptText("Location");
         locationField.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(locationField, Priority.ALWAYS); // Make it grow
+        HBox.setHgrow(locationField, Priority.ALWAYS);
 
-        // Add listeners to save on focus lost or "Enter"
         locationField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
-            if (!isFocused) { // Lost focus
+            if (!isFocused) {
                 saveLocation();
             }
         });
-        locationField.setOnAction(e -> { // Pressed Enter
+        locationField.setOnAction(e -> {
             saveLocation();
-            partyTable.requestFocus(); // Move focus away
+            partyTable.requestFocus();
         });
 
+        // --- Locked CheckBox ---
+        lockedCheckBox = new CheckBox("Locked");
+        lockedCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (isUpdatingLocked || currentGroup == null || onLockedUpdateRequestHandler == null || Objects.equals(oldVal, newVal)) return;
 
-        editButton = new Button("Edit"); // Changed from "Edit" to a pencil icon
-        //editButton.setStyle("-fx-font-size: 14px; -fx-padding: 3 8 3 8; -fx-background-color: #f0f0f0;"); // Added style for the icon button
+            boolean success = onLockedUpdateRequestHandler.apply(currentGroup, newVal);
+            if (!success) {
+                isUpdatingLocked = true;
+                Platform.runLater(() -> {
+                    lockedCheckBox.setSelected(oldVal);
+                    isUpdatingLocked = false;
+                });
+            }
+        });
+
+        editButton = new Button("Edit");
         Region headerSpacer = new Region();
-        // HBox.setHgrow(headerSpacer, Priority.ALWAYS); // <-- Removed this line!
-        // Add locationField to the info header HBox
-        HBox infoHeader = new HBox(5, dmComboBox, locationField, headerSpacer, editButton);
+
+        HBox infoHeader = new HBox(5, dmComboBox, locationField, lockedCheckBox, headerSpacer, editButton);
         infoHeader.setAlignment(Pos.CENTER_LEFT);
         infoHeader.setPadding(new Insets(5, 10, 0, 10));
 
@@ -172,26 +175,21 @@ public class GroupTableView extends TitledPane {
         this.setExpanded(true);
     }
 
-    /**
-     * Helper method to save the location field's value back to the group.
-     */
     private void saveLocation() {
         if (currentGroup == null || onLocationUpdateRequestHandler == null) return;
 
         String newLocation = locationField.getText();
         if (newLocation != null) newLocation = newLocation.trim();
-        if (newLocation != null && newLocation.isEmpty()) newLocation = null; // Treat empty string as null
+        if (newLocation != null && newLocation.isEmpty()) newLocation = null;
 
         String oldLocation = currentGroup.getLocation();
 
-        // Only fire the update if the value has actually changed
         if (Objects.equals(newLocation, oldLocation)) {
             return;
         }
 
         boolean success = onLocationUpdateRequestHandler.apply(currentGroup, newLocation);
         if (!success) {
-            // If the handler (e.g., in GroupManagementTab) reports failure, revert.
             locationField.setText(oldLocation);
         }
     }
@@ -214,12 +212,15 @@ public class GroupTableView extends TitledPane {
             dmComboBox.setValue(group.getDungeonMaster());
         }
 
-        // Populate the location field
         locationField.setText(group.getLocation() != null ? group.getLocation() : "");
+
+        isUpdatingLocked = true;
+        lockedCheckBox.setSelected(group.isLocked());
+        isUpdatingLocked = false;
     }
 
     public void setDmList(Map<UUID, Player> dmingPlayers, Set<Player> allAssignedDms) {
-        isUpdatingComboBox = true; // Add this flag
+        isUpdatingComboBox = true;
         Player currentDmForThisGroup = currentGroup != null ? currentGroup.getDungeonMaster() : null;
 
         Object selectedDm = dmComboBox.getValue();
@@ -252,7 +253,7 @@ public class GroupTableView extends TitledPane {
         } else {
             dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
         }
-        isUpdatingComboBox = false; // Release this flag
+        isUpdatingComboBox = false;
     }
 
     private void setupDmComboBoxCellFactory() {
@@ -277,10 +278,10 @@ public class GroupTableView extends TitledPane {
                     if (item.equals(UNASSIGNED_PLACEHOLDER)) {
                         setText(UNASSIGNED_PLACEHOLDER);
                         setFont(Font.font("System", FontPosture.ITALIC, 12));
-                    } else { // It must be a Player
+                    } else {
                         setText(((Player) item).getName());
                         setFont(Font.getDefault());
-                        setStyle(""); // Reset styles
+                        setStyle("");
                     }
                 }
             }
@@ -330,8 +331,6 @@ public class GroupTableView extends TitledPane {
         });
     }
 
-
-
     public void setOnEditAction(Consumer<Group> onEdit) {
         editButton.setOnAction(e -> {
             if (currentGroup != null) onEdit.accept(currentGroup);
@@ -352,12 +351,15 @@ public class GroupTableView extends TitledPane {
         this.onDmUpdateRequestHandler = handler;
     }
 
-    /**
-     * Sets the handler to be called when the location is updated.
-     * The handler receives the Group and the new location String, and should return true on success.
-     * @param handler The function to execute on location update.
-     */
     public void setOnLocationUpdate(BiFunction<Group, String, Boolean> handler) {
         this.onLocationUpdateRequestHandler = handler;
+    }
+
+    /**
+     * Sets the handler for when the group's locked status is updated.
+     * @param handler The function to execute on lock status update.
+     */
+    public void setOnLockedUpdate(BiFunction<Group, Boolean, Boolean> handler) {
+        this.onLockedUpdateRequestHandler = handler;
     }
 }

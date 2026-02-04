@@ -41,12 +41,13 @@ import java.util.stream.Collectors;
 
 /**
  * A reusable view component that displays multiple groups or a suggestion prompt.
+ * Updated to support quick-locking groups directly from their cards.
  */
 public class GroupDisplayView extends BorderPane {
 
     private static final Logger logger = LoggerFactory.getLogger(GroupDisplayView.class);
 
-    private final FlowPane groupFlowPane; // Replaced GridPane with FlowPane
+    private final FlowPane groupFlowPane;
     private final StackPane contentPane;
     private final Button suggestButton;
     private final Button createSuggestedButton;
@@ -60,6 +61,7 @@ public class GroupDisplayView extends BorderPane {
     private final HBox header;
     private final HBox footer;
     private final ScrollPane gridScrollPane;
+
     private Consumer<Group> onGroupEditHandler;
     private Consumer<Group> onGroupDeleteHandler;
     private PlayerMoveHandler onPlayerMoveHandler;
@@ -69,12 +71,14 @@ public class GroupDisplayView extends BorderPane {
     private Runnable onExportRequestHandler;
     private BiFunction<Group, Player, Boolean> onDmUpdateRequestHandler;
     private BiFunction<Group, String, Boolean> onLocationUpdateRequestHandler;
+    private BiFunction<Group, Boolean, Boolean> onLockedUpdateRequestHandler; // New handler for locking
     private Consumer<LocalDate> onDateSelectedHandler;
+
     private List<Group> currentGroups = new ArrayList<>();
     private List<House> currentSuggestions = new ArrayList<>();
     private Set<Player> allAssignedDms;
     private final List<GroupTableView> groupCards = new ArrayList<>();
-    private static final double CARD_WIDTH = 450.0; // A fixed, reasonable width for our cards
+    private static final double CARD_WIDTH = 450.0;
     private final GroupPersistenceService persistenceService;
     private final PlayerStore playerStore;
 
@@ -84,16 +88,14 @@ public class GroupDisplayView extends BorderPane {
         this.persistenceService = persistenceService;
         this.playerStore = playerStoreProvider.getPlayerStore();
 
-        // --- Replaced GridPane with FlowPane ---
-        this.groupFlowPane = new FlowPane(10, 10); // Set HGap and VGap to 10
+        this.groupFlowPane = new FlowPane(10, 10);
         groupFlowPane.setPadding(new Insets(10));
-        groupFlowPane.setAlignment(Pos.TOP_CENTER); // <-- This is the magic line!
+        groupFlowPane.setAlignment(Pos.TOP_CENTER);
 
         // --- Suggestion UI ---
         suggestButton = new Button("Suggest Groups");
         suggestButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         suggestButton.setOnAction(e -> {
-            logger.info("Suggest Groups button clicked.");
             if (onSuggestionRequestHandler != null) onSuggestionRequestHandler.run();
         });
 
@@ -102,10 +104,7 @@ public class GroupDisplayView extends BorderPane {
         createSuggestedButton.setVisible(false);
         createSuggestedButton.setOnAction(e -> {
             if (onSuggestedGroupsCreateHandler != null && !currentSuggestions.isEmpty()) {
-                logger.info("Create Suggested Groups button clicked with {} suggestions.", currentSuggestions.size());
                 onSuggestedGroupsCreateHandler.accept(currentSuggestions);
-            } else {
-                logger.warn("Create Suggested Groups button clicked, but handler was null or no suggestions were present.");
             }
         });
 
@@ -122,20 +121,14 @@ public class GroupDisplayView extends BorderPane {
         datePicker.getEditor().setOpacity(1.0);
         datePicker.valueProperty().addListener((obs, oldDate, newDate) -> {
             if (onDateSelectedHandler != null && newDate != null) {
-                logger.info("Date selected in DatePicker: {}", newDate);
                 onDateSelectedHandler.accept(newDate);
             }
         });
         expandAllButton = new Button("Expand All");
-        expandAllButton.setOnAction(e -> {
-            logger.info("Expand All button clicked.");
-            setAllCardsExpanded(true);
-        });
+        expandAllButton.setOnAction(e -> setAllCardsExpanded(true));
+
         collapseAllButton = new Button("Collapse All");
-        collapseAllButton.setOnAction(e -> {
-            logger.info("Collapse All button clicked.");
-            setAllCardsExpanded(false);
-        });
+        collapseAllButton.setOnAction(e -> setAllCardsExpanded(false));
 
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
@@ -143,20 +136,19 @@ public class GroupDisplayView extends BorderPane {
         header.setPadding(new Insets(10));
         header.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
 
-
         // --- Footer ---
         autoPopulateButton = new Button("Auto-Populate Groups");
         autoPopulateButton.setStyle("-fx-font-size: 14px; -fx-background-color: #f44336; -fx-text-fill: white;");
         autoPopulateButton.setOnAction(e -> {
-            logger.info("Auto-Populate Groups button clicked.");
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
+
         exportButton = new Button("Export");
         exportButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         exportButton.setOnAction(e -> {
-            logger.info("Export button clicked.");
             if (onExportRequestHandler != null) onExportRequestHandler.run();
         });
+
         Region footerSpacer = new Region();
         HBox.setHgrow(footerSpacer, Priority.ALWAYS);
         footer = new HBox(10, autoPopulateButton, footerSpacer, exportButton);
@@ -165,13 +157,12 @@ public class GroupDisplayView extends BorderPane {
         footer.setAlignment(Pos.CENTER_LEFT);
 
         // --- Center Content ---
-        gridScrollPane = new ScrollPane(groupFlowPane); // Point ScrollPane to the FlowPane
+        gridScrollPane = new ScrollPane(groupFlowPane);
         gridScrollPane.setFitToWidth(true);
         gridScrollPane.setStyle("-fx-background-color: transparent;");
 
         contentPane = new StackPane(gridScrollPane, suggestionContainer);
 
-        // --- Assemble BorderPane ---
         this.setTop(header);
         this.setCenter(contentPane);
         this.setBottom(footer);
@@ -180,11 +171,6 @@ public class GroupDisplayView extends BorderPane {
     }
 
     public void updateGroups(List<Group> groups, LocalDate eventDate) {
-        logger.info("Updating group display. Number of groups: {}. Event date: {}", groups.size(), eventDate);
-
-        // --- Save the updated state to disk ASYNC ---
-        // We create a shallow copy of the list here on the main thread to ensure the
-        // structure doesn't change before the background thread picks it up.
         if (groups != null) {
             List<Group> groupsToSave = new ArrayList<>(groups);
             CompletableFuture.runAsync(() -> this.persistenceService.saveGroups(groupsToSave));
@@ -195,35 +181,28 @@ public class GroupDisplayView extends BorderPane {
         this.datePicker.setValue(eventDate);
 
         if (groups.isEmpty()) {
-            logger.debug("No groups to display. Showing suggestion container.");
             header.setVisible(false);
             footer.setVisible(false);
             gridScrollPane.setVisible(false);
-
             suggestionContainer.setVisible(true);
             suggestionDisplayBox.getChildren().clear();
             createSuggestedButton.setVisible(false);
         } else {
-            logger.debug("Displaying {} groups. Showing group grid.", groups.size());
             header.setVisible(true);
             footer.setVisible(true);
             gridScrollPane.setVisible(true);
-
             suggestionContainer.setVisible(false);
-            rebuildGroupCards(); // Replaced call to updateGridLayout
+            rebuildGroupCards();
         }
     }
 
     public void displaySuggestions(List<House> suggestedThemes) {
-        logger.info("Displaying {} group theme suggestions.", suggestedThemes.size());
         this.currentSuggestions = suggestedThemes;
         suggestionDisplayBox.getChildren().clear();
         if (suggestedThemes.isEmpty()) {
-            logger.debug("No suggestions to display.");
             suggestionDisplayBox.getChildren().add(new Label("Not enough players or DMs to make suggestions."));
             createSuggestedButton.setVisible(false);
         } else {
-            logger.debug("Populating suggestion display box with themes.");
             Label title = new Label("Suggested Group Themes:");
             title.setStyle("-fx-font-weight: bold; -fx-underline: true;");
             suggestionDisplayBox.getChildren().add(title);
@@ -237,7 +216,6 @@ public class GroupDisplayView extends BorderPane {
     }
 
     private void setAllCardsExpanded(boolean expanded) {
-        logger.debug("Setting all group cards to expanded: {}.", expanded);
         groupCards.forEach(card -> card.setExpanded(expanded));
     }
 
@@ -252,36 +230,19 @@ public class GroupDisplayView extends BorderPane {
 
         boolean anyExpanded = groupCards.stream().anyMatch(TitledPane::isExpanded);
         collapseAllButton.setDisable(!anyExpanded);
-        logger.trace("Expand/Collapse buttons updated. Any collapsed: {}. Any expanded: {}.", anyCollapsed, anyExpanded);
     }
 
-    public void setOnGroupEdit(Consumer<Group> handler) {
-        this.onGroupEditHandler = handler;
-    }
-
-    public void setOnGroupDelete(Consumer<Group> handler) {
-        this.onGroupDeleteHandler = handler;
-    }
-
-    public void setOnPlayerMove(PlayerMoveHandler handler) {
-        this.onPlayerMoveHandler = handler;
-    }
-
-    public void setOnSuggestionRequest(Runnable handler) {
-        this.onSuggestionRequestHandler = handler;
-    }
-
-    public void setOnSuggestedGroupsCreate(Consumer<List<House>> handler) {
-        this.onSuggestedGroupsCreateHandler = handler;
-    }
-
-    public void setOnAutoPopulate(Runnable handler) {
-        this.onAutoPopulateHandler = handler;
-    }
-
-    public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) {
-        this.onDmUpdateRequestHandler = handler;
-    }
+    public void setOnGroupEdit(Consumer<Group> handler) { this.onGroupEditHandler = handler; }
+    public void setOnGroupDelete(Consumer<Group> handler) { this.onGroupDeleteHandler = handler; }
+    public void setOnPlayerMove(PlayerMoveHandler handler) { this.onPlayerMoveHandler = handler; }
+    public void setOnSuggestionRequest(Runnable handler) { this.onSuggestionRequestHandler = handler; }
+    public void setOnSuggestedGroupsCreate(Consumer<List<House>> handler) { this.onSuggestedGroupsCreateHandler = handler; }
+    public void setOnAutoPopulate(Runnable handler) { this.onAutoPopulateHandler = handler; }
+    public void setOnDmUpdateRequest(BiFunction<Group, Player, Boolean> handler) { this.onDmUpdateRequestHandler = handler; }
+    public void setOnLocationUpdate(BiFunction<Group, String, Boolean> handler) { this.onLocationUpdateRequestHandler = handler; }
+    public void setOnLockedUpdate(BiFunction<Group, Boolean, Boolean> handler) { this.onLockedUpdateRequestHandler = handler; }
+    public void setOnDateSelected(Consumer<LocalDate> handler) { this.onDateSelectedHandler = handler; }
+    public void setOnExportRequest(Runnable handler) { this.onExportRequestHandler = handler; }
 
     private Set<Player> getAllAssignedDms(List<Group> groups) {
         return groups.stream()
@@ -290,49 +251,31 @@ public class GroupDisplayView extends BorderPane {
                 .collect(Collectors.toSet());
     }
 
-    /**
-     * Rebuilds the group cards in the FlowPane.
-     * This is much simpler than the old grid layout logic!
-     */
     private void rebuildGroupCards() {
         groupCards.clear();
         groupFlowPane.getChildren().clear();
 
         for (Group group : currentGroups) {
             GroupTableView groupCard = new GroupTableView();
-            groupCard.setGroup(group); // This will pass the group with the new location
+            groupCard.setGroup(group);
             if (onGroupEditHandler != null) groupCard.setOnEditAction(onGroupEditHandler);
             if (onGroupDeleteHandler != null) groupCard.setOnDeleteAction(onGroupDeleteHandler);
             if (onPlayerMoveHandler != null) groupCard.setOnPlayerMove(onPlayerMoveHandler);
             if (onDmUpdateRequestHandler != null) groupCard.setOnDmUpdateRequest(onDmUpdateRequestHandler);
             if (onLocationUpdateRequestHandler != null) groupCard.setOnLocationUpdate(onLocationUpdateRequestHandler);
-            if (playerStore.getDmingPlayers() != null && allAssignedDms != null) groupCard.setDmList(playerStore.getDmingPlayers(), allAssignedDms);
+            if (onLockedUpdateRequestHandler != null) groupCard.setOnLockedUpdate(onLockedUpdateRequestHandler);
 
-            // --- This is the important part ---
-            // We give the card a fixed preferred width, and the FlowPane handles the rest.
+            if (playerStore.getDmingPlayers() != null && allAssignedDms != null) {
+                groupCard.setDmList(playerStore.getDmingPlayers(), allAssignedDms);
+            }
+
             groupCard.setPrefWidth(CARD_WIDTH);
-            groupCard.setMinWidth(CARD_WIDTH); // Ensure it doesn't shrink smaller
+            groupCard.setMinWidth(CARD_WIDTH);
 
             groupCard.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> updateExpandCollapseButtons());
             groupCards.add(groupCard);
-            groupFlowPane.getChildren().add(groupCard); // Add directly to the FlowPane
+            groupFlowPane.getChildren().add(groupCard);
         }
         updateExpandCollapseButtons();
-    }
-
-    /**
-     * Sets the handler for when a group's location is updated from its card.
-     * @param handler The handler function.
-     */
-    public void setOnLocationUpdate(BiFunction<Group, String, Boolean> handler) {
-        this.onLocationUpdateRequestHandler = handler;
-    }
-
-    public void setOnDateSelected(Consumer<LocalDate> handler) {
-        this.onDateSelectedHandler = handler;
-    }
-
-    public void setOnExportRequest(Runnable handler) {
-        this.onExportRequestHandler = handler;
     }
 }

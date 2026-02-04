@@ -4,14 +4,7 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.Separator;
-import javafx.scene.control.TextField; // Import the TextField class
+import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -33,14 +26,16 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * A reusable JavaFX component for creating or updating a group, inheriting from BaseFormView.
+ * A reusable JavaFX component for creating or updating a group, updated with MaxSize and Locked fields.
  */
 public class GroupFormView extends BaseFormView<Group> {
 
     private static final Logger logger = LoggerFactory.getLogger(GroupFormView.class);
 
     private ComboBox<Object> dmComboBox;
-    private TextField locationField; // Add a field for the location
+    private TextField locationField;
+    private TextField maxSizeField;
+    private CheckBox lockedCheckBox;
     private Map<House, CheckBox> houseCheckBoxes;
     private Button deleteButton;
     private Button showPlayersButton;
@@ -55,13 +50,14 @@ public class GroupFormView extends BaseFormView<Group> {
         super();
         this.playerStore = playerStoreProvider.getPlayerStore();
         setupFormControls();
-        clearForm(); // Set initial state
-        logger.info("GroupFormView initialised.");
+        clearForm();
+        logger.info("GroupFormView initialised with extended group settings.");
     }
 
     @Override
     protected void setupFormControls() {
         logger.debug("Setting up form controls for GroupFormView.");
+
         dmComboBox = new ComboBox<>();
         dmComboBox.setMaxWidth(Double.MAX_VALUE);
         setupDmComboBoxCellFactory();
@@ -70,11 +66,9 @@ public class GroupFormView extends BaseFormView<Group> {
             if (isRevertingDmSelection) return;
 
             Player selectedPlayer = (newVal instanceof Player) ? (Player) newVal : null;
-            logger.trace("DM selection changed from '{}' to '{}'.", oldVal, newVal);
             if (dmSelectRequestHandler != null && newVal instanceof Player) {
                 boolean success = dmSelectRequestHandler.onDmSelectionRequest(selectedPlayer);
                 if (!success) {
-                    logger.warn("DM selection request for '{}' was denied. Reverting selection to '{}'.", selectedPlayer.getName(), oldVal);
                     isRevertingDmSelection = true;
                     Platform.runLater(() -> {
                         dmComboBox.setValue(oldVal);
@@ -84,7 +78,6 @@ public class GroupFormView extends BaseFormView<Group> {
                 }
             }
             if (onDmSelectionHandler != null) {
-                logger.debug("Invoking DM selection handler for player: {}", selectedPlayer != null ? selectedPlayer.getName() : "null");
                 onDmSelectionHandler.accept(selectedPlayer);
             }
         });
@@ -103,10 +96,23 @@ public class GroupFormView extends BaseFormView<Group> {
             houseGrid.add(cb, i % 2, i / 2);
         }
 
-        // --- Add Location Field ---
         locationField = new TextField();
         locationField.setPromptText("Enter session location (e.g., Room 5)");
         locationField.setMaxWidth(Double.MAX_VALUE);
+
+        // --- New Max Size Field with numeric filter ---
+        maxSizeField = new TextField();
+        maxSizeField.setPromptText("Max party size (e.g., 6)");
+        maxSizeField.setMaxWidth(Double.MAX_VALUE);
+        maxSizeField.setTextFormatter(new TextFormatter<>(change -> {
+            if (change.getControlNewText().matches("\\d*")) {
+                return change;
+            }
+            return null; // Reject non-numeric input
+        }));
+
+        // --- New Locked Checkbox ---
+        lockedCheckBox = new CheckBox("Lock Group (Prevent auto-population)");
 
         showPlayersButton = new Button("Show Players");
         showPlayersButton.setMaxWidth(Double.MAX_VALUE);
@@ -115,20 +121,30 @@ public class GroupFormView extends BaseFormView<Group> {
         deleteButton = new Button("Delete");
         deleteButton.setStyle("-fx-background-color: #DC143C; -fx-text-fill: white;");
 
+        // Layout organisation
         add(new Label("Dungeon Master:"), 0, 2);
         add(dmComboBox, 0, 3);
         add(new Label("House Themes:"), 0, 4);
         add(houseGrid, 0, 5);
-        add(new Label("Location:"), 0, 6); // Add label for location
-        add(locationField, 0, 7);         // Add location field
-        add(showPlayersButton, 0, 8);     // Shift row index
-        add(deleteButton, 0, 9);          // Shift row index
+        add(new Label("Location:"), 0, 6);
+        add(locationField, 0, 7);
+        add(new Label("Settings:"), 0, 8);
 
-        // Add the common controls from the parent at the end
+        GridPane settingsGrid = new GridPane();
+        settingsGrid.setHgap(10);
+        settingsGrid.add(new Label("Max Size:"), 0, 0);
+        settingsGrid.add(maxSizeField, 1, 0);
+        settingsGrid.add(lockedCheckBox, 0, 1, 2, 1);
+        GridPane.setHgrow(maxSizeField, Priority.ALWAYS);
+        add(settingsGrid, 0, 9);
+
+        add(showPlayersButton, 0, 10);
+        add(deleteButton, 0, 11);
+
         VBox spacer = new VBox();
         GridPane.setVgrow(spacer, Priority.ALWAYS);
-        add(spacer, 0, 10);               // Shift row index
-        add(mainActionsBox, 0, 11);       // Shift row index
+        add(spacer, 0, 12);
+        add(mainActionsBox, 0, 13);
     }
 
     @Override
@@ -139,15 +155,16 @@ public class GroupFormView extends BaseFormView<Group> {
     @Override
     public void populateForm(Group group) {
         super.populateForm(group);
-        logger.debug("Populating group-specific fields for group with UUID '{}'.", group.getUuid());
         if (group.getDungeonMaster() == null) {
             dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
         } else {
             dmComboBox.setValue(group.getDungeonMaster());
         }
-        // Assuming Group has a getLocation() method
         locationField.setText(group.getLocation() != null ? group.getLocation() : "");
+        maxSizeField.setText(group.getMaxSize() != null ? group.getMaxSize().toString() : "");
+        lockedCheckBox.setSelected(group.isLocked());
         houseCheckBoxes.forEach((house, checkBox) -> checkBox.setSelected(group.getHouses().contains(house)));
+
         actionButton.setText("Update");
         actionButton.setStyle("-fx-background-color: #FFA500; -fx-text-fill: white;");
         deleteButton.setVisible(true);
@@ -156,32 +173,42 @@ public class GroupFormView extends BaseFormView<Group> {
     @Override
     public void clearForm() {
         super.clearForm();
-        logger.debug("Clearing group-specific fields.");
         dmComboBox.setValue(UNASSIGNED_PLACEHOLDER);
-        locationField.clear(); // Clear the location field
+        locationField.clear();
+        maxSizeField.clear();
+        lockedCheckBox.setSelected(false);
         houseCheckBoxes.values().forEach(cb -> cb.setSelected(false));
+
         actionButton.setText("Create");
         actionButton.setStyle("-fx-background-color: #3CB371; -fx-text-fill: white;");
         deleteButton.setVisible(false);
         Platform.runLater(dmComboBox::requestFocus);
     }
 
-    // --- Specific Getters and Methods ---
     public Player getSelectedDm() {
         Object selected = dmComboBox.getValue();
         return (selected instanceof Player) ? (Player) selected : null;
     }
 
-    /**
-     * Gets the text from the location field.
-     * @return The location string, or null if the field is blank.
-     */
     public String getSelectedLocation() {
         String loc = locationField.getText();
-        if (loc == null || loc.trim().isEmpty()) {
+        return (loc == null || loc.trim().isEmpty()) ? null : loc.trim();
+    }
+
+    public Integer getSelectedMaxSize() {
+        String text = maxSizeField.getText();
+        if (text == null || text.trim().isEmpty()) {
             return null;
         }
-        return loc.trim();
+        try {
+            return Integer.parseInt(text.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    public boolean isLocked() {
+        return lockedCheckBox.isSelected();
     }
 
     public List<House> getSelectedHouses() {
@@ -191,29 +218,14 @@ public class GroupFormView extends BaseFormView<Group> {
                 .collect(Collectors.toList());
     }
 
-    public Button getDeleteButton() {
-        return deleteButton;
-    }
+    public Button getDeleteButton() { return deleteButton; }
+    public Button getShowPlayersButton() { return showPlayersButton; }
+    public Group getGroupBeingEdited() { return super.getItemBeingEdited(); }
 
-    public Button getShowPlayersButton() {
-        return showPlayersButton;
-    }
-
-    public Group getGroupBeingEdited() {
-        return super.getItemBeingEdited();
-    }
-
-    public void setOnDmSelection(Consumer<Player> handler) {
-        this.onDmSelectionHandler = handler;
-    }
-
-    public void setOnDmSelectionRequest(DmSelectRequestHandler handler) {
-        this.dmSelectRequestHandler = handler;
-    }
+    public void setOnDmSelection(Consumer<Player> handler) { this.onDmSelectionHandler = handler; }
+    public void setOnDmSelectionRequest(DmSelectRequestHandler handler) { this.dmSelectRequestHandler = handler; }
 
     public void updateDmList(Set<Player> unavailablePlayers) {
-        logger.debug("Updating DM list. Total DMs: {}, Unavailable DMs in other groups: {}.",
-                playerStore.getDmingPlayers().size(), unavailablePlayers.size());
         Object selectedDm = dmComboBox.getValue();
         ObservableList<Object> items = FXCollections.observableArrayList();
         items.add(UNASSIGNED_PLACEHOLDER);
@@ -226,7 +238,6 @@ public class GroupFormView extends BaseFormView<Group> {
 
         List<Player> availableDms = allDms.stream().filter(dm -> !unavailablePlayers.contains(dm) || dm.equals(currentDmForThisGroup)).toList();
         List<Player> trulyUnavailableDms = allDms.stream().filter(dm -> unavailablePlayers.contains(dm) && !dm.equals(currentDmForThisGroup)).toList();
-        logger.trace("Found {} available DMs and {} truly unavailable DMs.", availableDms.size(), trulyUnavailableDms.size());
 
         items.addAll(availableDms);
         if (!trulyUnavailableDms.isEmpty()) {
@@ -249,7 +260,7 @@ public class GroupFormView extends BaseFormView<Group> {
             @Override
             protected void updateItem(Object item, boolean empty) {
                 super.updateItem(item, empty);
-                setDisable(false); // Reset disable state
+                setDisable(false);
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
