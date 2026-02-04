@@ -2,7 +2,6 @@ package org.poolen.backend.engine;
 
 import com.google.ortools.graph.LinearSumAssignment;
 import org.poolen.backend.db.constants.House;
-import org.poolen.backend.db.entities.Character;
 import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.store.SettingsStore;
@@ -15,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import static org.poolen.backend.db.constants.Settings.MatchmakerPrioritySettings.*;
@@ -30,6 +30,8 @@ public class Matchmaker {
     private List<Group> groups;
     private List<Player> players;
 
+    private boolean randomVariance = false;
+
     private final SettingsStore settingsStore;
     private final double HOUSE_MATCH_BONUS;
     private final double HOUSE_DEFAULT_SCORE;
@@ -41,6 +43,7 @@ public class Matchmaker {
     private final double HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER;
     private final double HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER;
     private final double HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER;
+    private final double RANDOM_VARIANCE_PERCENTAGE;
 
     private static final double MAX_INITIAL_SCORE = 1000.0;
     private final Map<House, List<House>> housePriorityMap = new EnumMap<>(House.class);
@@ -64,6 +67,7 @@ public class Matchmaker {
         HOUSE_SECOND_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_SECOND_CHOICE_MULTIPLIER).getSettingValue();
         HOUSE_THIRD_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_THIRD_CHOICE_MULTIPLIER).getSettingValue();
         HOUSE_FOURTH_CHOICE_MATCH_MULTIPLIER = (double) settingsStore.getSetting(HOUSE_FOURTH_CHOICE_MULTIPLIER).getSettingValue();
+        RANDOM_VARIANCE_PERCENTAGE = (double) settingsStore.getSetting(VARIANCE_PERCENTAGE).getSettingValue();
     }
 
     public List<Group> match() {
@@ -255,7 +259,7 @@ public class Matchmaker {
     }
 
     private double getTieredHouseScore(Player player, Group group) {
-        if (player.getCharacters().isEmpty()) return HOUSE_DEFAULT_SCORE;
+        if (player.getCharacters().isEmpty()) return applyVariance(HOUSE_DEFAULT_SCORE);
 
         double bestScoreForPlayer = HOUSE_DEFAULT_SCORE;
         List<House> groupHouses = group.getHouses();
@@ -289,15 +293,34 @@ public class Matchmaker {
             if (bestScoreForThisCharacter > bestScoreForPlayer) bestScoreForPlayer = bestScoreForThisCharacter;
         }
 
-        return bestScoreForPlayer;
+        return applyVariance(bestScoreForPlayer);
     }
 
     private double initialHouseScore(Player player, Group group) {
         return getTieredHouseScore(player, group);
     }
 
+    /**
+     * Applies random variance to a score if the feature is enabled.
+     * The variance is a percentage range (+/-) of the original score.
+     */
+    private double applyVariance(double score) {
+        if (!randomVariance) return score;
+
+        // Convert percentage to decimal (e.g., 10.0 -> 0.10)
+        double varianceDecimal = RANDOM_VARIANCE_PERCENTAGE / 100.0;
+
+        // Generate a random factor between -varianceDecimal and +varianceDecimal
+        // ThreadLocalRandom is better for concurrent environments
+        double randomFactor = (ThreadLocalRandom.current().nextDouble() * 2.0 - 1.0) * varianceDecimal;
+
+        return score * (1.0 + randomFactor);
+    }
+
     public List<Group> getGroups() { return groups; }
     public void setGroups(List<Group> groups) { this.groups = groups; }
     public List<Player> getPlayers() { return players; }
     public void setPlayers(List<Player> players) { this.players = players; }
+    public boolean isRandomVariance() { return randomVariance; }
+    public void setRandomVariance(boolean randomVariance) { this.randomVariance = randomVariance; }
 }

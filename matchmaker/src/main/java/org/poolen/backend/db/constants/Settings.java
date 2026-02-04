@@ -14,7 +14,8 @@ public abstract class Settings implements ISettings {
         HOUSE_SECOND_CHOICE_MULTIPLIER,
         HOUSE_THIRD_CHOICE_MULTIPLIER,
         HOUSE_FOURTH_CHOICE_MULTIPLIER,
-        MAIN_CHARACTER_MULTIPLIER
+        MAIN_CHARACTER_MULTIPLIER,
+        VARIANCE_PERCENTAGE
     }
     public enum MatchmakerPrioritySettings implements ISettings {
         AMBER_PRIORITIES,

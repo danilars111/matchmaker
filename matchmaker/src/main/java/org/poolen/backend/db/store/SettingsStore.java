@@ -105,6 +105,8 @@ public class SettingsStore {
         this.settingsMap.put(
                 MAIN_CHARACTER_MULTIPLIER, new Setting<Double>(MAIN_CHARACTER_MULTIPLIER, "Multiplier applied to when attempting to match a main character", 2.0));
         this.settingsMap.put(
+                VARIANCE_PERCENTAGE, new Setting<Double>(VARIANCE_PERCENTAGE, "How much random variance is applied to the matchmaking score, if random variance is enabled", 10.0));
+        this.settingsMap.put(
                 RECENCY_GRUDGE, new Setting<Double>(RECENCY_GRUDGE, "For how long in weeks the system maintains a matchmaking grudge between players", 12.0));
         this.settingsMap.put(
                 MAX_REUNION_BONUS, new Setting<Double>(MAX_REUNION_BONUS, "Maximum Matchmaking bonus applies to players who have not played together in a while. Increases linearly up to the max when there is no Recency Grudge", 10.0));

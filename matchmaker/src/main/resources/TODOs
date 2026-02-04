@@ -1,1 +1,5 @@
 BUG: Refreshing table resets attending / DMing status
+BUG: Stuck when saving settings
+
+FEATURE: Add colour profiles
+FEATURE: Reset session upon export?

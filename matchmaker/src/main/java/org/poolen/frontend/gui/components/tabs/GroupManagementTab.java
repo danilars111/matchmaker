@@ -272,6 +272,10 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                         new ArrayList<>(group.getParty().values()).forEach(group::removePartyMember);
                     }
                 }
+
+                // Toggle random variance based on the checkbox in the view
+                matchmaker.setRandomVariance(groupDisplayView.isRandomVarianceSelected());
+
                 matchmaker.setPlayers(playerStore.getAttendingPlayers().values().stream().filter(p -> !playerStore.getDmingPlayers().containsKey(p.getUuid())).collect(Collectors.toList()));
                 matchmaker.setGroups(groups);
                 Window parentWindow = (getTabPane() != null && getTabPane().getScene() != null) ? getTabPane().getScene().getWindow() : null;

@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -52,6 +53,7 @@ public class GroupDisplayView extends BorderPane {
     private final Button suggestButton;
     private final Button createSuggestedButton;
     private final Button autoPopulateButton;
+    private final CheckBox randomVarianceCheckbox;
     private final Button expandAllButton;
     private final Button collapseAllButton;
     private final Button exportButton;
@@ -143,6 +145,14 @@ public class GroupDisplayView extends BorderPane {
             if (onAutoPopulateHandler != null) onAutoPopulateHandler.run();
         });
 
+        randomVarianceCheckbox = new CheckBox("Random Variance");
+        randomVarianceCheckbox.setStyle("-fx-font-size: 12px;");
+        randomVarianceCheckbox.setSelected(false);
+
+        // Add a tooltip for clarity
+        javafx.scene.control.Tooltip varianceTooltip = new javafx.scene.control.Tooltip("Adds random variance to player scores for less predictable matching");
+        randomVarianceCheckbox.setTooltip(varianceTooltip);
+
         exportButton = new Button("Export");
         exportButton.setStyle("-fx-font-size: 14px; -fx-background-color: #4CAF50; -fx-text-fill: white;");
         exportButton.setOnAction(e -> {
@@ -151,7 +161,7 @@ public class GroupDisplayView extends BorderPane {
 
         Region footerSpacer = new Region();
         HBox.setHgrow(footerSpacer, Priority.ALWAYS);
-        footer = new HBox(10, autoPopulateButton, footerSpacer, exportButton);
+        footer = new HBox(10, autoPopulateButton, randomVarianceCheckbox, footerSpacer, exportButton);
         footer.setPadding(new Insets(10));
         footer.setStyle("-fx-background-color: #f5f5f5; -fx-border-color: #e0e0e0; -fx-border-width: 1 0 0 0;");
         footer.setAlignment(Pos.CENTER_LEFT);
@@ -230,6 +240,10 @@ public class GroupDisplayView extends BorderPane {
 
         boolean anyExpanded = groupCards.stream().anyMatch(TitledPane::isExpanded);
         collapseAllButton.setDisable(!anyExpanded);
+    }
+
+    public boolean isRandomVarianceSelected() {
+        return randomVarianceCheckbox.isSelected();
     }
 
     public void setOnGroupEdit(Consumer<Group> handler) { this.onGroupEditHandler = handler; }
