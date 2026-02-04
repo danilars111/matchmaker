@@ -3,6 +3,7 @@ package org.poolen.frontend.gui.components.views.tables.rosters;
 import javafx.scene.control.TableRow;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.persistence.StorePersistenceService;
+import org.poolen.frontend.util.services.PlayerPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.Map;
@@ -16,8 +17,9 @@ import java.util.UUID;
 public abstract class PlayerRosterTableView extends BaseRosterTableView<Player>{
     protected Runnable onPlayerListChanged;
 
-    public PlayerRosterTableView(StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
-        super(storePersistenceService, uiTaskExecutor);
+    public PlayerRosterTableView(StorePersistenceService storePersistenceService,
+                                 PlayerPersistenceService playerPersistenceService, UiTaskExecutor uiTaskExecutor) {
+        super(storePersistenceService, playerPersistenceService, uiTaskExecutor);
         this.searchField.setPromptText("Search by name or UUID...");
     }
     public void init(Runnable onPlayerListChanged) {

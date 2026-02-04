@@ -1,5 +1,9 @@
-BUG: Refreshing table resets attending / DMing status
-BUG: Stuck when saving settings
+BUG: Matchmaking doesn't work if not at least one group is locked.
+BUG: Stuck when saving settings, settings get saved properly but tab gets stuck infinitally
+BUG: Unassign players/DMs who are already in groups causes issues
+BUG: Unable to close import window
+BUG: Last seen and play log does not get updated properly when exporting.
+BUG: Unchecking Attending should automatically uncheck DMing and DMing should automatically check attending.
 
 FEATURE: Add colour profiles
 FEATURE: Reset session upon export?

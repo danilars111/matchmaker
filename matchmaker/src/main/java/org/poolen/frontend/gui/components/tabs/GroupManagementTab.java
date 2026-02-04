@@ -92,7 +92,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         this.newPartyMap = new HashMap<>();
         this.eventDate = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
 
-        if (groupPersistenceService.hasSaveFile()) {
+/*        if (groupPersistenceService.hasSaveFile()) {
             groups = this.groupPersistenceService.loadGroups();
             if (groups != null && !groups.isEmpty()) {
                 Platform.runLater(() -> {
@@ -106,7 +106,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
                     });
                 });
             }
-        }
+        }*/
 
         cleanUp();
         root.getItems().addAll(groupForm, groupDisplayView);
@@ -159,7 +159,7 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
         if (groupToEdit == null) {
             logger.info("Creating a new group with maxSize {} and locked state {}.", selectedMaxSize, selectedLocked);
             dmsToReassignAsPlayer.keySet().forEach(Group::removeDungeonMaster);
-            playersToPromoteToDm.forEach((sourceGroup, player) -> sourceGroup.removePartyMember(player));
+            playersToPromoteToDm.forEach(Group::removePartyMember);
             dmsToReassignAsDm.keySet().forEach(Group::removeDungeonMaster);
             new ArrayList<>(newPartyMap.values()).forEach(player -> {
                 Group source = findGroupForPlayer(player);
@@ -427,6 +427,19 @@ public class GroupManagementTab extends Tab implements PlayerUpdateListener {
     public void onPlayerUpdate() {
         updateDmList();
         rosterView.updateRoster();
+    }
+
+    public void setGroups(List<Group> groups) {
+        if(groups == null || groups.isEmpty()) {
+            return;
+        }
+        this.groups = groups;
+
+        LocalDate date = groups.get(0).getDate();
+        if (date == null) date = LocalDate.now();
+        handleDateChange(date);
+
+        cleanUp();
     }
 
     public Runnable getOnPlayerListChanged() { return onPlayerListChanged; }

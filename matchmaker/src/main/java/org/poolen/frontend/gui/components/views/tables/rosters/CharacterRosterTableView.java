@@ -12,6 +12,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.interfaces.store.CharacterStoreProvider;
 import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.backend.db.store.CharacterStore;
+import org.poolen.frontend.util.services.PlayerPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 
 /**
@@ -24,8 +25,9 @@ public class CharacterRosterTableView extends BaseRosterTableView<Character> {
     private CheckBox mainsFilterCheckBox;
     private Player selectedPlayer; // Can be null to show all characters
 
-    public CharacterRosterTableView(CharacterStoreProvider store, StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
-        super(storePersistenceService, uiTaskExecutor);
+    public CharacterRosterTableView(CharacterStoreProvider store, StorePersistenceService storePersistenceService,
+                                    PlayerPersistenceService playerPersistenceService, UiTaskExecutor uiTaskExecutor) {
+        super(storePersistenceService, playerPersistenceService, uiTaskExecutor);
         this.characterStore = store.getCharacterStore();
         this.searchField.setPromptText("Search by character or player name...");
         setupTableColumns();

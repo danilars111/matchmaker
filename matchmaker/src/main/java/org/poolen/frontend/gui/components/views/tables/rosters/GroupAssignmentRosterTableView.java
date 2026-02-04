@@ -15,6 +15,7 @@ import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.backend.db.store.PlayerStore;
 import org.poolen.frontend.gui.interfaces.PlayerAddRequestHandler;
+import org.poolen.frontend.util.services.PlayerPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.ArrayList;
@@ -42,8 +43,9 @@ public class GroupAssignmentRosterTableView extends PlayerRosterTableView {
     private CheckBox availableOnlyCheckbox;
 
     public GroupAssignmentRosterTableView(StorePersistenceService storePersistenceService,
+                                          PlayerPersistenceService playerPersistenceService,
                                           PlayerStoreProvider storeProvider, UiTaskExecutor uiTaskExecutor) {
-        super(storePersistenceService, uiTaskExecutor);
+        super(storePersistenceService, playerPersistenceService, uiTaskExecutor);
         this.playerStore = storeProvider.getPlayerStore();
         setupTableColumns();
         setupFilters();

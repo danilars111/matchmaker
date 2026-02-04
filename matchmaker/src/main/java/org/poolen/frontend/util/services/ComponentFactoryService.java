@@ -63,6 +63,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     private final UiTaskExecutor uiTaskExecutor;
     private final StorePersistenceService storePersistenceService;
     private final GroupPersistenceService groupPersistenceService;
+    private final PlayerPersistenceService playerPersistenceService;
 
     // Singleton components
     private ManagementStage managementStage;
@@ -94,6 +95,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
                                    UiTaskExecutor uiTaskExecutor,
                                    StorePersistenceService storePersistenceService,
                                    GroupPersistenceService groupPersistenceService,
+                                   PlayerPersistenceService playerPersistenceService,
                                    ConfigurableApplicationContext springContext) {
         this.store = store;
         this.uiPersistenceService = uiPersistenceService;
@@ -108,6 +110,7 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
         this.uiTaskExecutor = uiTaskExecutor;
         this.storePersistenceService = storePersistenceService;
         this.groupPersistenceService = groupPersistenceService;
+        this.playerPersistenceService = playerPersistenceService;
         this.springContext = springContext;
         logger.info("ComponentFactoryService initialised with all required beans.");
     }
@@ -169,7 +172,8 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public ManagementStage getManagementStage() {
         if (this.managementStage == null) {
             logger.info("Creating singleton instance of ManagementStage.");
-            this.managementStage = new ManagementStage(this,this, this);
+            this.managementStage = new ManagementStage(this,this, this,
+                    this.playerPersistenceService, this.groupPersistenceService);
         }
         return this.managementStage;
     }
@@ -259,22 +263,24 @@ public class ComponentFactoryService implements CoreProvider, StageProvider, Tab
     public CharacterRosterTableView getCharacterRosterTableView() {
         if (this.characterRosterTableView == null) {
             logger.info("Creating singleton instance of CharacterRosterTableView.");
-            this.characterRosterTableView = new CharacterRosterTableView(store, storePersistenceService, uiTaskExecutor);
+            this.characterRosterTableView = new CharacterRosterTableView(store, storePersistenceService,
+                    playerPersistenceService, uiTaskExecutor);
         }
         return this.characterRosterTableView;
     }
     public GroupAssignmentRosterTableView getGroupAssignmentRosterTableView() {
         if (this.groupAssignmentRosterTableView == null) {
             logger.info("Creating singleton instance of GroupAssignmentRosterTableView.");
-            this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView(storePersistenceService, store,
-                    uiTaskExecutor);
+            this.groupAssignmentRosterTableView = new GroupAssignmentRosterTableView(storePersistenceService,
+                    playerPersistenceService, store, uiTaskExecutor);
         }
         return this.groupAssignmentRosterTableView;
     }
     public PlayerManagementRosterTableView getPlayerManagementRosterTableView() {
         if (this.playerManagementRosterTableView == null) {
             logger.info("Creating singleton instance of PlayerManagementRosterTableView.");
-            this.playerManagementRosterTableView = new PlayerManagementRosterTableView(store, storePersistenceService, uiTaskExecutor);
+            this.playerManagementRosterTableView = new PlayerManagementRosterTableView(store, storePersistenceService,
+                    playerPersistenceService, uiTaskExecutor);
         }
         return this.playerManagementRosterTableView;
     }

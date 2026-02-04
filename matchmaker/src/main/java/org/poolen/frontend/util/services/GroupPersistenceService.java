@@ -52,7 +52,7 @@ public class GroupPersistenceService {
         // Resolving the path exactly as requested
         Path appDataDir = AppDataHandler.getAppDataDirectory();
         if (appDataDir != null) {
-            this.savePath = appDataDir.resolve("groups");
+            this.savePath = appDataDir.resolve("persistance/groups");
         } else {
             this.savePath = Path.of("groups_backup.json");
             logger.error("Could not resolve AppData directory. Falling back to local path: {}", this.savePath);
@@ -81,7 +81,12 @@ public class GroupPersistenceService {
 
         // 2. Thread-safe file writing
         fileLock.lock();
+
         try {
+            if (savePath.getParent() != null) {
+                Files.createDirectories(savePath.getParent());
+            }
+
             if (groupMap.isEmpty()) {
                 logger.debug("Group list is empty. Deleting save file if it exists.");
                 deleteSaveFile();

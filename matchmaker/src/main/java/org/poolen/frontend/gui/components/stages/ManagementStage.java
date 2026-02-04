@@ -4,17 +4,16 @@ import javafx.application.Platform; // <-- New!
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
+import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.poolen.backend.db.entities.Character;
+import org.poolen.backend.db.entities.Group;
 import org.poolen.backend.db.entities.Player;
 import org.poolen.frontend.gui.components.dialogs.BaseDialog.DialogType;
+import org.poolen.frontend.gui.components.dialogs.ConfirmationDialog;
 import org.poolen.frontend.gui.components.tabs.CharacterManagementTab;
 import org.poolen.frontend.gui.components.tabs.GroupManagementTab;
 import org.poolen.frontend.gui.components.tabs.PlayerManagementTab;
@@ -24,10 +23,13 @@ import org.poolen.frontend.gui.interfaces.PlayerUpdateListener;
 import org.poolen.frontend.util.interfaces.providers.CoreProvider;
 import org.poolen.frontend.util.interfaces.providers.StageProvider;
 import org.poolen.frontend.util.interfaces.providers.TabProvider;
+import org.poolen.frontend.util.services.GroupPersistenceService;
+import org.poolen.frontend.util.services.PlayerPersistenceService;
 import org.poolen.web.google.SheetsServiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,16 +49,22 @@ public class ManagementStage extends Stage {
     private final Map<Tab, Stage> detachedTabMap = new HashMap<>();
     private final List<PlayerUpdateListener> playerUpdateListeners = new ArrayList<>();
     private final SheetsTab sheetsTab;
+    private final GroupManagementTab groupTab;
     private final CoreProvider coreProvider;
-    private final StageProvider stageProvider;
+
+    private final PlayerPersistenceService playerPersistenceService;
+    private final GroupPersistenceService groupPersistenceService;
 
     private final ImportMatcherStage importMatcherStage;
     private final TabPane tabPane;
 
-    public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider, StageProvider stageProvider) {
+    public ManagementStage(CoreProvider coreProvider, TabProvider tabProvider, StageProvider stageProvider,
+                           PlayerPersistenceService playerPersistenceService, GroupPersistenceService groupPersistenceService) {
         logger.info("Initialising ManagementStage...");
         this.coreProvider = coreProvider;
-        this.stageProvider = stageProvider;
+        this.playerPersistenceService = playerPersistenceService;
+        this.groupPersistenceService = groupPersistenceService;
+
         initModality(Modality.APPLICATION_MODAL);
         setTitle("Management");
 
@@ -69,7 +77,7 @@ public class ManagementStage extends Stage {
         CharacterManagementTab characterTab = tabProvider.getCharacterManagementTab();
         characterTab.init(this::notifyPlayerUpdateListeners);
 
-        GroupManagementTab groupTab = tabProvider.getGroupManagementTab();
+        this.groupTab = tabProvider.getGroupManagementTab();
         groupTab.init(this::notifyPlayerUpdateListeners);
 
         this.sheetsTab = tabProvider.getSheetsTab();
@@ -77,7 +85,7 @@ public class ManagementStage extends Stage {
 
         SettingsTab settingsTab = tabProvider.getSettingsTab();
 
-        this.importMatcherStage = this.stageProvider.getImportMatcherStage();
+        this.importMatcherStage = stageProvider.getImportMatcherStage();
 
 
         this.tabPane = new TabPane();
@@ -152,6 +160,8 @@ public class ManagementStage extends Stage {
         Scene scene = new Scene(this.tabPane, MIN_WIDTH, MIN_HEIGHT);
         setScene(scene);
         logger.debug("ManagementStage scene created and set.");
+
+        restoreSession();
     }
 
     public void refreshAuthStatus() {
@@ -254,4 +264,23 @@ public class ManagementStage extends Stage {
             }
         });
     }
+
+    private void restoreSession() {
+        if (groupPersistenceService.hasSaveFile() || playerPersistenceService.hasSaveFile()) {
+            logger.info("Old session found.");
+            List<Group> groups = this.groupPersistenceService.loadGroups();
+            Platform.runLater(() -> {
+                ConfirmationDialog dialog = new ConfirmationDialog(
+                        "Unpublished Session found! Do you want to recover it?", this.tabPane);
+                dialog.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.YES) {
+                        logger.debug("Restoring previous session.");
+                        groupTab.setGroups(groups);
+                        playerPersistenceService.loadPlayers();
+                    }
+                });
+            });
+        }
+    }
+
 }

@@ -21,6 +21,8 @@ import javafx.stage.Window;
 import javafx.util.Callback;
 import org.poolen.backend.db.constants.House;
 import org.poolen.backend.db.persistence.StorePersistenceService;
+import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.frontend.util.services.PlayerPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.List;
@@ -44,10 +46,13 @@ public abstract class BaseRosterTableView<T> extends VBox {
 
     private int rowsPerPage = 15;
     private Consumer<T> onItemDoubleClickHandler;
-    private StorePersistenceService storePersistenceService;
-    private UiTaskExecutor uiTaskExecutor;
+    private final StorePersistenceService storePersistenceService;
+    private final UiTaskExecutor uiTaskExecutor;
+    private final PlayerPersistenceService playerPersistenceService;
 
-    public BaseRosterTableView(StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
+    public BaseRosterTableView(StorePersistenceService storePersistenceService,
+                               PlayerPersistenceService playerPersistenceService,
+                               UiTaskExecutor uiTaskExecutor) {
         super(10);
         setPadding(new Insets(10));
 
@@ -59,6 +64,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
         this.refreshButton = new Button("🔄");
         this.storePersistenceService = storePersistenceService;
         this.uiTaskExecutor = uiTaskExecutor;
+        this.playerPersistenceService = playerPersistenceService;
 
         this.sourceItems = FXCollections.observableArrayList();
         this.filteredData = new FilteredList<>(sourceItems, p -> true);
@@ -115,6 +121,7 @@ public abstract class BaseRosterTableView<T> extends VBox {
                     "Roster Successfully Refreshed",
                     (updater) -> {
                             storePersistenceService.findAll();
+                            playerPersistenceService.loadPlayers();
                             return null;
                         },
                     (result) -> updateRoster()

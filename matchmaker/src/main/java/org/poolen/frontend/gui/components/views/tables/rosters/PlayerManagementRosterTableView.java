@@ -1,6 +1,5 @@
 package org.poolen.frontend.gui.components.views.tables.rosters;
 
-import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Pos;
@@ -13,6 +12,7 @@ import org.poolen.backend.db.entities.Player;
 import org.poolen.backend.db.interfaces.store.PlayerStoreProvider;
 import org.poolen.backend.db.persistence.StorePersistenceService;
 import org.poolen.backend.db.store.PlayerStore;
+import org.poolen.frontend.util.services.PlayerPersistenceService;
 import org.poolen.frontend.util.services.UiTaskExecutor;
 
 import java.util.ArrayList;
@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class PlayerManagementRosterTableView extends PlayerRosterTableView{
 
     private final PlayerStore playerStore;
+    private final PlayerPersistenceService playerPersistenceService;
 
     // --- Filter Controls ---
     private CheckBox dmFilterCheckBox;
@@ -39,9 +40,13 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
     private TableColumn<Player, Boolean> attendingColumn;
     private TableColumn<Player, Boolean> dmingColumn;
 
-    public PlayerManagementRosterTableView(PlayerStoreProvider storeProvider, StorePersistenceService storePersistenceService, UiTaskExecutor uiTaskExecutor) {
-        super(storePersistenceService, uiTaskExecutor);
+    public PlayerManagementRosterTableView(PlayerStoreProvider storeProvider,
+                                           StorePersistenceService storePersistenceService,
+                                           PlayerPersistenceService playerPersistenceService,
+                                           UiTaskExecutor uiTaskExecutor) {
+        super(storePersistenceService, playerPersistenceService, uiTaskExecutor);
         this.playerStore = storeProvider.getPlayerStore();
+        this.playerPersistenceService = playerPersistenceService;
         setupTableColumns();
         setupFilters();
         updateRoster();
@@ -117,13 +122,13 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
         // (Loop current players, check if they are missing from the new map)
         List<Player> playersToRemove = currentPlayers.stream()
                 .filter(player -> !playerStore.hasPlayer(player))
-                .collect(Collectors.toList());
+                .toList();
 
         // 4. Find players to ADD
         // (Loop new players, check if they are missing from the current map)
         List<Player> playersToAdd = playerStore.getAllPlayers().stream()
                 .filter(player -> !currentPlayerMap.containsKey(player.getUuid()))
-                .collect(Collectors.toList());
+                .toList();
 
         // 5. Find players to UPDATE
         // (Loop new players, check if they existed before AND have changed)
@@ -146,11 +151,11 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
             }
         }
 
-        if(playersToRemove.size() > 0 || playersToUpdate_RemoveOld.size() > 0) {
+        if(!playersToRemove.isEmpty() || !playersToUpdate_RemoveOld.isEmpty()) {
             sourceItems.removeAll(playersToRemove);
             sourceItems.removeAll(playersToUpdate_RemoveOld);
         }
-        if(playersToAdd.size() > 0 || playersToUpdate_AddNew.size() > 0) {
+        if(!playersToAdd.isEmpty() || !playersToUpdate_AddNew.isEmpty()) {
             sourceItems.addAll(playersToAdd);
             sourceItems.addAll(playersToUpdate_AddNew);
         }
@@ -193,6 +198,7 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
                     player.isAttending(false);
                         player.isDming(false);
                 }
+                playerPersistenceService.savePlayers();
                 onPlayerListChanged.run();
             });
             return property;
@@ -212,6 +218,8 @@ public class PlayerManagementRosterTableView extends PlayerRosterTableView{
             if (isNow && !player.isAttending()) {
                 player.isAttending(true);
             }
+
+            playerPersistenceService.savePlayers();
             onPlayerListChanged.run();
             });
             return property;
