@@ -270,13 +270,16 @@ public class ManagementStage extends Stage {
             List<Group> groups = this.groupPersistenceService.loadGroups();
             Platform.runLater(() -> {
                 ConfirmationDialog dialog = new ConfirmationDialog(
-                        "Unpublished Session found! Do you want to recover it?", this.tabPane);
+                        "Do you wish to recover the previous session?", this.tabPane);
                 dialog.showAndWait().ifPresent(response -> {
                     if (response == ButtonType.YES) {
                         logger.debug("Restoring previous session.");
                         playerPersistenceService.loadPlayers();
                         groupTab.setGroups(groups);
                         notifyPlayerUpdateListeners();
+                    } else {
+                        playerPersistenceService.deleteSaveFile();
+                        groupPersistenceService.deleteSaveFile();
                     }
                 });
             });

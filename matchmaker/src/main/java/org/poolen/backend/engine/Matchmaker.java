@@ -108,6 +108,21 @@ public class Matchmaker {
     private void runOptimalHouseMatch(List<Player> activePlayers, List<Group> activeGroups) {
         int numPlayers = activePlayers.size();
 
+        boolean hasOpenGroup = activeGroups.stream().anyMatch(g -> g.getMaxSize() == null);
+
+        if (!hasOpenGroup) {
+            int totalAvailableSlots = activeGroups.stream()
+                    .mapToInt(g -> Math.max(0, g.getMaxSize() - g.getParty().size()))
+                    .sum();
+
+            if (numPlayers > totalAvailableSlots) {
+                throw new IllegalStateException(String.format(
+                        "Matchmaking aborted: Not enough seats! %d players for %d slots.",
+                        numPlayers, totalAvailableSlots
+                ));
+            }
+        }
+
         // Calculate slots available in each group
         List<Integer> groupSlots = new ArrayList<>();
         int totalAvailableSlots = 0;
