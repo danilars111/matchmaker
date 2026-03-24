@@ -304,7 +304,7 @@ public class Matchmaker {
                 bestScoreForThisCharacter = bestTieredScore;
             }
 
-            if (character.isMain()) bestScoreForThisCharacter += MAIN_CHARACTER_MATCH_MULTIPLIER;
+            if (character.isMain()) bestScoreForThisCharacter *= MAIN_CHARACTER_MATCH_MULTIPLIER;
             if (bestScoreForThisCharacter > bestScoreForPlayer) bestScoreForPlayer = bestScoreForThisCharacter;
         }
 

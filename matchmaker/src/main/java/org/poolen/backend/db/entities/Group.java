@@ -84,7 +84,7 @@ public class Group {
         }
         sb.append("**Geode(s):** ").append(houseThemes).append("\n");
 
-        sb.append("**Party Members (" + party.size() + "):**\n");
+        sb.append("**Party Members:**\n");
         if (party.isEmpty()) {
             sb.append("> _No players in this group yet._\n");
         } else {
